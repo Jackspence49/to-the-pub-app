@@ -53,7 +53,7 @@ const PAGE_SIZE = 6;
 
 const eventTagImageMap: Record<string, ImageSourcePropType> = {
 	bingo: require('@/assets/images/bingo.png'),
-	comedy: require('@/assets/images/comedy.png'),
+	'comedy show': require('@/assets/images/comedy.png'),
 	dj: require('@/assets/images/DJ.png'),
 	'drink special': require('@/assets/images/Drink Special.png'),
 	'food special': require('@/assets/images/Food Special.png'),
