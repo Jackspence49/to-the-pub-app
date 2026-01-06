@@ -1,3 +1,4 @@
+import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
@@ -6,12 +7,14 @@ import {
 	FlatList,
 	Image,
 	RefreshControl,
-	ScrollView,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
 	View,
 } from 'react-native';
+
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type FetchMode = 'initial' | 'refresh' | 'paginate';
 
@@ -40,8 +43,51 @@ type EventTag = {
 
 type LooseObject = Record<string, any>;
 
+type ThemeName = keyof typeof Colors;
+
+const TAG_PREVIEW_COUNT = 3;
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 const PAGE_SIZE = 6;
+
+const getEventThemeTokens = (theme: ThemeName) => {
+	const isLight = theme === 'light';
+	return {
+		pageBackground: isLight ? '#f5f5f5' : '#050608',
+		headerBackground: isLight ? '#ffffff' : '#161a20',
+		headerBorder: isLight ? '#e5e7eb' : '#2a2f36',
+		headingText: isLight ? '#111827' : '#f3f4f6',
+		subheadingText: isLight ? '#6b7280' : '#9ca3af',
+		cardBackground: isLight ? '#ffffff' : '#191f28',
+		cardBorder: isLight ? '#e5e7eb' : '#2b313c',
+		cardShadowColor: isLight ? '#111827' : '#000000',
+		cardShadowOpacity: isLight ? 0.05 : 0.35,
+		imageBackground: isLight ? '#f3f4f6' : '#101318',
+		imagePlaceholderText: isLight ? '#9ca3af' : '#6b7280',
+		eventBarLabel: isLight ? '#6b7280' : '#a0a8ba',
+		eventTitle: isLight ? '#111827' : '#f8fafc',
+		eventMeta: isLight ? '#4b5563' : '#cbd5f5',
+		timeBorder: isLight ? '#e5e7eb' : '#2f3642',
+		timeBackground: isLight ? '#f9fafb' : '#10131a',
+		timeLabel: isLight ? '#6b7280' : '#a3acc2',
+		timeValue: isLight ? '#111827' : '#f3f4f6',
+		tagBackground: isLight ? '#f0fdf4' : '#0f1c14',
+		tagBorder: isLight ? '#86efac' : '#14532d',
+		tagText: isLight ? '#15803d' : '#4ade80',
+		errorBackground: isLight ? '#fef2f2' : '#2d1313',
+		errorBorder: isLight ? '#fecaca' : '#7f1d1d',
+		errorTitle: isLight ? '#b91c1c' : '#fecdd3',
+		errorDescription: isLight ? '#991b1b' : '#fda4af',
+		retryBackground: isLight ? '#b91c1c' : '#7f1d1d',
+		retryText: '#ffffff',
+		emptyTitle: isLight ? '#111827' : '#f8fafc',
+		emptyText: isLight ? '#6b7280' : '#9ca3af',
+		footerText: isLight ? '#6b7280' : '#9ca3af',
+		indicator: isLight ? '#111827' : '#f8fafc',
+	};
+};
+
+type EventThemeTokens = ReturnType<typeof getEventThemeTokens>;
 
 type QueryValue = string | number | boolean | undefined | (string | number | boolean)[];
 
@@ -373,8 +419,8 @@ const formatEventTime = (value?: string): string => {
 
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
-type EventCardProps = { event: EventInstance; availableTags: EventTag[] };
-const EventCard = ({ event, availableTags }: EventCardProps) => {
+type EventCardProps = { event: EventInstance; availableTags: EventTag[]; tokens: EventThemeTokens };
+const EventCard = ({ event, availableTags, tokens }: EventCardProps) => {
 	const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
 	const dateLabel = formatEventDay(event.eventDate ?? event.startsAt);
 	const startTimeLabel = formatEventTime(event.startsAt);
@@ -392,36 +438,67 @@ const EventCard = ({ event, availableTags }: EventCardProps) => {
 	);
 
 	return (
-		<View style={styles.card}>
+		<View
+			style={[
+				styles.card,
+				{
+					backgroundColor: tokens.cardBackground,
+					borderColor: tokens.cardBorder,
+					shadowColor: tokens.cardShadowColor,
+					shadowOpacity: tokens.cardShadowOpacity,
+				},
+			]}
+		>
 			{event.heroImageUrl ? (
-				<Image source={{ uri: event.heroImageUrl }} style={styles.cardImage} resizeMode="cover" />
+				<Image
+					source={{ uri: event.heroImageUrl }}
+					style={[styles.cardImage, { backgroundColor: tokens.imageBackground }]}
+					resizeMode="cover"
+				/>
 			) : (
-				<View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-					<Text style={styles.cardImagePlaceholderText}>No image</Text>
+				<View style={[styles.cardImage, styles.cardImagePlaceholder, { backgroundColor: tokens.imageBackground }]}>
+					<Text style={[styles.cardImagePlaceholderText, { color: tokens.imagePlaceholderText }]}>No image</Text>
 				</View>
 			)}
 
 			<View style={styles.cardBody}>
-				<Text style={styles.eventBarName}>{barName}</Text>
-				<Text style={styles.eventTitle}>{event.title}</Text>
-				<Text style={styles.eventMeta}>{dateLabel}</Text>
+				<Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
+				<Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
+				<Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
 
-				<View style={styles.timeRow}>
+				<View
+					style={[
+						styles.timeRow,
+						{ borderColor: tokens.timeBorder, backgroundColor: tokens.timeBackground },
+					]}
+				>
 					<View style={styles.timeColumn}>
-						<Text style={styles.timeLabel}>Start Time</Text>
-						<Text style={styles.timeValue}>{startTimeLabel}</Text>
+						<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start Time</Text>
+						<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
 					</View>
-					<View style={[styles.timeColumn, styles.timeColumnRight]}>
-						<Text style={styles.timeLabel}>End Time</Text>
-						<Text style={styles.timeValue}>{endTimeLabel}</Text>
+					<View
+						style={[
+							styles.timeColumn,
+							styles.timeColumnRight,
+							{ borderLeftColor: tokens.timeBorder },
+						]}
+					>
+						<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End Time</Text>
+						<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
 					</View>
 				</View>
 
 				{tagsToRender.length > 0 ? (
 					<View style={styles.tagRow}>
 						{tagsToRender.map((tag, index) => (
-							<View key={`${event.id}-tag-${index}`} style={styles.tagPill}>
-								<Text style={styles.tagText}>{tag}</Text>
+							<View
+								key={`${event.id}-tag-${index}`}
+								style={[
+									styles.tagPill,
+									{ backgroundColor: tokens.tagBackground, borderColor: tokens.tagBorder },
+								]}
+							>
+								<Text style={[styles.tagText, { color: tokens.tagText }]}>{tag}</Text>
 							</View>
 						))}
 					</View>
@@ -431,12 +508,164 @@ const EventCard = ({ event, availableTags }: EventCardProps) => {
 	);
 };
 
+type EventTagFilterPanelProps = {
+	tags: EventTag[];
+	selectedTagId: string | null;
+	filtersExpanded: boolean;
+	onToggleExpand: () => void;
+	onExpand: () => void;
+	onSelectTag: (tagId: string) => void;
+	onClearSelection: () => void;
+	onRetry: () => void;
+	isLoading: boolean;
+	error: string | null;
+	theme: ThemeName;
+};
+
+const EventTagFilterPanel = ({
+	tags,
+	selectedTagId,
+	filtersExpanded,
+	onToggleExpand,
+	onExpand,
+	onSelectTag,
+	onClearSelection,
+	onRetry,
+	isLoading,
+	error,
+	theme,
+}: EventTagFilterPanelProps) => {
+	const palette = Colors[theme];
+	const highlightColor = theme === 'light' ? '#f5a524' : '#f6c15b';
+	const highlightText = theme === 'light' ? '#1e1202' : '#120900';
+	const inactiveBackground = theme === 'light' ? '#f8fafc' : '#1e242d';
+	const inactiveBorder = theme === 'light' ? '#dce2ec' : '#2c333c';
+	const inactiveText = theme === 'light' ? '#475569' : '#c7d0de';
+	const orderedTags = useMemo(() => {
+		if (!selectedTagId) {
+			return tags;
+		}
+		const prioritized = tags.filter((tag) => tag.id === selectedTagId);
+		const remaining = tags.filter((tag) => tag.id !== selectedTagId);
+		return [...prioritized, ...remaining];
+	}, [tags, selectedTagId]);
+	const hasHiddenTags = tags.length > TAG_PREVIEW_COUNT;
+	const showChips = !isLoading && !error && tags.length > 0;
+	const displayTags = filtersExpanded || !hasHiddenTags ? orderedTags : orderedTags.slice(0, TAG_PREVIEW_COUNT);
+
+	const handleChipPress = (tagId: string) => {
+		if (hasHiddenTags && !filtersExpanded) {
+			onExpand();
+		}
+		onSelectTag(tagId);
+	};
+
+	if (!showChips && !isLoading && !error) {
+		return null;
+	}
+
+	return (
+		<View
+			style={[
+				styles.filterSection,
+				theme === 'light' ? styles.filterSectionLight : styles.filterSectionDark,
+			]}
+		>
+			<View style={styles.filterHeaderRow}>
+				<Text style={[styles.filterTitle, { color: palette.text }]}>Filters</Text>
+				{selectedTagId ? (
+					<TouchableOpacity
+						onPress={onClearSelection}
+						style={[styles.clearFilterButton, { borderColor: highlightColor }]}
+						accessibilityRole="button"
+					>
+						<Text style={[styles.clearFilterText, { color: highlightColor }]}>Clear</Text>
+					</TouchableOpacity>
+				) : null}
+			</View>
+			{isLoading ? (
+				<View style={styles.filterStateRow}>
+					<ActivityIndicator size="small" color={highlightColor} />
+					<Text style={[styles.filterStateText, { color: palette.text }]}>Loading tags...</Text>
+				</View>
+			) : error ? (
+				<View style={styles.filterStateColumn}>
+					<Text style={[styles.filterStateErrorText, { color: palette.text }]}>{error}</Text>
+					<TouchableOpacity
+						onPress={onRetry}
+						style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
+						activeOpacity={0.85}
+					>
+						<Text style={[styles.filterStateRetryText, { color: highlightColor }]}>Retry</Text>
+					</TouchableOpacity>
+				</View>
+			) : (
+				<>
+					<View style={styles.filterChipContainer}>
+						{displayTags.map((tag) => {
+							const isActive = tag.id === selectedTagId;
+							return (
+								<TouchableOpacity
+									key={tag.id}
+									onPress={() => handleChipPress(tag.id)}
+									activeOpacity={0.85}
+									style={[
+										styles.filterChip,
+										isActive
+											? [
+												styles.filterChipActive,
+												{ backgroundColor: highlightColor, borderColor: highlightColor },
+										  ]
+										: [
+											styles.filterChipInactive,
+											{ backgroundColor: inactiveBackground, borderColor: inactiveBorder },
+										  ],
+									]}
+									accessibilityState={{ selected: isActive }}
+								>
+									<Text
+										style={[styles.filterChipText, { color: isActive ? highlightText : inactiveText }]}
+										numberOfLines={1}
+									>
+										{tag.name}
+									</Text>
+								</TouchableOpacity>
+							);
+						})}
+					</View>
+					{hasHiddenTags ? (
+						<TouchableOpacity
+							onPress={onToggleExpand}
+							style={styles.filterToggleRow}
+							accessibilityRole="button"
+							activeOpacity={0.8}
+						>
+							<Text style={[styles.filterToggleLabel, { color: highlightColor }]}>
+								{filtersExpanded ? 'Hide tags' : `Show all (${tags.length})`}
+							</Text>
+							<MaterialIcons
+								name={filtersExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+								size={20}
+								color={highlightColor}
+							/>
+						</TouchableOpacity>
+					) : null}
+				</>
+			)}
+		</View>
+	);
+};
+
 const EventsScreen = () => {
+	const colorScheme = useColorScheme();
+	const theme = (colorScheme ?? 'light') as ThemeName;
+	const tokens = useMemo(() => getEventThemeTokens(theme), [theme]);
 	const searchParams = useLocalSearchParams<{ eventTagId?: string | string[] }>();
 	const initialTagIdsFromParams = useMemo(
 		() => normalizeTagParamList(searchParams.eventTagId),
 		[searchParams.eventTagId]
 	);
+	const initialSelectedTagId = initialTagIdsFromParams[0] ?? null;
 
 	const [events, setEvents] = useState<EventInstance[]>([]);
 	const [page, setPage] = useState(1);
@@ -445,14 +674,14 @@ const EventsScreen = () => {
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [isPaginating, setIsPaginating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialTagIdsFromParams);
+	const [selectedTagId, setSelectedTagId] = useState<string | null>(initialSelectedTagId);
 	const [availableTags, setAvailableTags] = useState<EventTag[]>([]);
 	const [areTagsLoading, setAreTagsLoading] = useState(false);
 	const [tagsError, setTagsError] = useState<string | null>(null);
-	const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
+	const [filtersExpanded, setFiltersExpanded] = useState(false);
 
 	useEffect(() => {
-		setSelectedTagIds(initialTagIdsFromParams);
+		setSelectedTagId(initialTagIdsFromParams[0] ?? null);
 	}, [initialTagIdsFromParams]);
 
 	const fetchAvailableTags = useCallback(async () => {
@@ -484,46 +713,29 @@ const EventsScreen = () => {
 		fetchAvailableTags();
 	}, [fetchAvailableTags]);
 
-	const selectedTagDetails = useMemo(
-		() =>
-			selectedTagIds
-				.map((id) => availableTags.find((tag) => tag.id === id))
-				.filter((tag): tag is EventTag => Boolean(tag)),
-		[availableTags, selectedTagIds]
-	);
+	const hasExpandableFilters = availableTags.length > TAG_PREVIEW_COUNT;
 
-	const toggleTagSelection = useCallback((tagId: string) => {
-		setSelectedTagIds((previous) =>
-			previous.includes(tagId)
-				? previous.filter((id) => id !== tagId)
-				: [...previous, tagId]
-		);
+	useEffect(() => {
+		if (!hasExpandableFilters && filtersExpanded) {
+			setFiltersExpanded(false);
+		}
+	}, [filtersExpanded, hasExpandableFilters]);
+
+	const handleSelectTag = useCallback((tagId: string) => {
+		setSelectedTagId((previous) => (previous === tagId ? null : tagId));
 	}, []);
 
 	const handleClearTags = useCallback(() => {
-		setSelectedTagIds([]);
+		setSelectedTagId(null);
 	}, []);
 
-	const toggleTagPickerVisibility = useCallback(() => {
-		setIsTagPickerOpen((previous) => !previous);
+	const handleToggleFilterDropdown = useCallback(() => {
+		setFiltersExpanded((previous) => !previous);
 	}, []);
 
-	const selectedTagSummaryLabel = useMemo(() => {
-		if (selectedTagDetails.length === 0) {
-			return 'No tags selected';
-		}
-		if (selectedTagDetails.length <= 2) {
-			return selectedTagDetails.map((tag) => tag.name).join(', ');
-		}
-		return `${selectedTagDetails.length} tags selected`;
-	}, [selectedTagDetails]);
-
-	const helperTagQueryExample = useMemo(() => {
-		if (selectedTagIds.length === 0) {
-			return '&event_tag_id=TAG_ID (repeat per selection)';
-		}
-		return selectedTagIds.map((id) => `&event_tag_id=${id}`).join('');
-	}, [selectedTagIds]);
+	const handleExpandFilters = useCallback(() => {
+		setFiltersExpanded(true);
+	}, []);
 
 	const fetchEvents = useCallback(
 		async (pageToLoad: number, mode: FetchMode) => {
@@ -555,10 +767,8 @@ const EventsScreen = () => {
 					page: pageToLoad,
 				};
 
-				if (selectedTagIds.length === 1) {
-					queryParams.event_tag_id = selectedTagIds[0];
-				} else if (selectedTagIds.length > 1) {
-					queryParams.event_tag_id = selectedTagIds;
+				if (selectedTagId) {
+					queryParams.event_tag_id = selectedTagId;
 				}
 
 				const query = buildQueryString(queryParams);
@@ -586,7 +796,7 @@ const EventsScreen = () => {
 				}
 			}
 		},
-		[selectedTagIds]
+		[selectedTagId]
 	);
 
 	useEffect(() => {
@@ -614,107 +824,48 @@ const EventsScreen = () => {
 	}, [events.length, fetchEvents]);
 
 	const renderItem = useCallback<ListRenderItem<EventInstance>>(
-		({ item }) => <EventCard event={item} availableTags={availableTags} />,
-		[availableTags]
+		({ item }) => <EventCard event={item} availableTags={availableTags} tokens={tokens} />,
+		[availableTags, tokens]
 	);
 
 	const renderHeader = useMemo(
 		() => (
-			<View style={styles.listHeader}>
-				<Text style={styles.screenTitle}>Upcoming events</Text>
+			<View
+				style={[
+					styles.listHeader,
+					{ backgroundColor: tokens.headerBackground, borderBottomColor: tokens.headerBorder },
+				]}
+			>
+				<Text style={[styles.screenTitle, { color: tokens.headingText }]}>Upcoming events</Text>
 
-				<View style={styles.tagSelector}>
-					<View style={styles.tagSelectorHeader}>
-						<Text style={styles.tagLabel}>Filter by tags</Text>
-						{selectedTagIds.length > 0 ? (
-							<TouchableOpacity onPress={handleClearTags} style={styles.clearAllButton}>
-								<Text style={styles.clearTagButtonText}>Clear all</Text>
-							</TouchableOpacity>
-						) : null}
-					</View>
-
-					<TouchableOpacity
-						style={styles.tagSelectorButton}
-						onPress={toggleTagPickerVisibility}
-						activeOpacity={0.85}
-					>
-						<Text
-							style={[
-								styles.tagSelectorButtonText,
-								selectedTagDetails.length === 0 && styles.tagSelectorButtonTextMuted,
-							]}
-							numberOfLines={1}
-						>
-							{selectedTagSummaryLabel}
-						</Text>
-						<Text style={styles.tagSelectorButtonCaret}>{isTagPickerOpen ? '▲' : '▼'}</Text>
-					</TouchableOpacity>
-
-					{isTagPickerOpen ? (
-						<View style={styles.tagDropdownPanel}>
-							{areTagsLoading ? (
-								<View style={styles.tagDropdownStateRow}>
-									<ActivityIndicator size="small" color="#111827" />
-									<Text style={styles.tagDropdownStateText}>Loading tags...</Text>
-								</View>
-							) : tagsError ? (
-								<View style={styles.tagDropdownStateColumn}>
-									<Text style={styles.tagDropdownErrorText}>{tagsError}</Text>
-									<TouchableOpacity style={styles.retryInlineButton} onPress={fetchAvailableTags}>
-										<Text style={styles.retryInlineButtonText}>Retry</Text>
-									</TouchableOpacity>
-								</View>
-							) : availableTags.length === 0 ? (
-								<View style={styles.tagDropdownStateRow}>
-									<Text style={styles.tagDropdownStateText}>No tags available.</Text>
-								</View>
-							) : (
-								<ScrollView style={styles.tagDropdownList} nestedScrollEnabled>
-									{availableTags.map((tag) => {
-										const isSelected = selectedTagIds.includes(tag.id);
-										return (
-											<TouchableOpacity
-												key={tag.id}
-												style={[styles.tagOption, isSelected && styles.tagOptionSelected]}
-												onPress={() => toggleTagSelection(tag.id)}
-												activeOpacity={0.85}
-											>
-												<View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
-													{isSelected ? <Text style={styles.checkboxMark}>✓</Text> : null}
-												</View>
-												<View style={styles.tagOptionTextWrapper}>
-													<Text style={styles.tagOptionTitle}>{tag.name}</Text>
-													{tag.description ? (
-														<Text style={styles.tagOptionDescription} numberOfLines={2}>
-															{tag.description}
-														</Text>
-													) : null}
-												</View>
-											</TouchableOpacity>
-										);
-									})}
-								</ScrollView>
-							)}
-						</View>
-					) : null}
-
-					{selectedTagDetails.length > 0 ? (
-						<View style={styles.selectedTagsRow}>
-							{selectedTagDetails.map((tag) => (
-								<View key={tag.id} style={styles.selectedTagPill}>
-									<Text style={styles.selectedTagText}>{tag.name}</Text>
-								</View>
-							))}
-						</View>
-					) : null}
-				</View>
+				<EventTagFilterPanel
+					tags={availableTags}
+					selectedTagId={selectedTagId}
+					filtersExpanded={filtersExpanded}
+					onToggleExpand={handleToggleFilterDropdown}
+					onExpand={handleExpandFilters}
+					onSelectTag={handleSelectTag}
+					onClearSelection={handleClearTags}
+					onRetry={fetchAvailableTags}
+					isLoading={areTagsLoading}
+					error={tagsError}
+					theme={theme}
+				/>
 
 				{error ? (
-					<View style={styles.errorBanner}>
-						<Text style={styles.errorTitle}>Unable to load events</Text>
-						<Text style={styles.errorDescription}>{error}</Text>
-						<TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-							<Text style={styles.retryButtonText}>Try again</Text>
+					<View
+						style={[
+							styles.errorBanner,
+							{ backgroundColor: tokens.errorBackground, borderColor: tokens.errorBorder },
+						]}
+					>
+						<Text style={[styles.errorTitle, { color: tokens.errorTitle }]}>Unable to load events</Text>
+						<Text style={[styles.errorDescription, { color: tokens.errorDescription }]}>{error}</Text>
+						<TouchableOpacity
+							style={[styles.retryButton, { backgroundColor: tokens.retryBackground }]}
+							onPress={handleRetry}
+						>
+							<Text style={[styles.retryButtonText, { color: tokens.retryText }]}>Try again</Text>
 						</TouchableOpacity>
 					</View>
 				) : null}
@@ -725,16 +876,16 @@ const EventsScreen = () => {
 			availableTags,
 			error,
 			fetchAvailableTags,
+			filtersExpanded,
 			handleClearTags,
+			handleExpandFilters,
 			handleRetry,
-			helperTagQueryExample,
-			isTagPickerOpen,
-			selectedTagDetails,
-			selectedTagIds,
-			selectedTagSummaryLabel,
+			handleSelectTag,
+			handleToggleFilterDropdown,
+			selectedTagId,
 			tagsError,
-			toggleTagPickerVisibility,
-			toggleTagSelection,
+			theme,
+			tokens,
 		]
 	);
 
@@ -742,8 +893,8 @@ const EventsScreen = () => {
 		if (isInitialLoading) {
 			return (
 				<View style={styles.emptyState}>
-					<ActivityIndicator color="#111827" size="large" />
-					<Text style={styles.emptyStateText}>Loading events...</Text>
+					<ActivityIndicator color={tokens.indicator} size="large" />
+					<Text style={[styles.emptyStateText, { color: tokens.emptyText }]}>Loading events...</Text>
 				</View>
 			);
 		}
@@ -751,27 +902,29 @@ const EventsScreen = () => {
 		if (error) {
 			return (
 				<View style={styles.emptyState}>
-					<Text style={styles.emptyStateTitle}>No events to show</Text>
-					<Text style={styles.emptyStateText}>Adjust the filters above and try again.</Text>
+					<Text style={[styles.emptyStateTitle, { color: tokens.emptyTitle }]}>No events to show</Text>
+					<Text style={[styles.emptyStateText, { color: tokens.emptyText }]}>
+						Adjust the filters above and try again.
+					</Text>
 				</View>
 			);
 		}
 
 		return (
 			<View style={styles.emptyState}>
-				<Text style={styles.emptyStateTitle}>Nothing scheduled yet</Text>
-				<Text style={styles.emptyStateText}>
+				<Text style={[styles.emptyStateTitle, { color: tokens.emptyTitle }]}>Nothing scheduled yet</Text>
+				<Text style={[styles.emptyStateText, { color: tokens.emptyText }]}>
 					We could not find upcoming events for the selected tags.
 				</Text>
 			</View>
 		);
-	}, [error, isInitialLoading]);
+	}, [error, isInitialLoading, tokens]);
 
 	const renderFooter = useMemo(() => {
 		if (isPaginating) {
 			return (
 				<View style={styles.listFooter}>
-					<ActivityIndicator color="#111827" />
+					<ActivityIndicator color={tokens.indicator} />
 				</View>
 			);
 		}
@@ -779,16 +932,16 @@ const EventsScreen = () => {
 		if (!hasMore && events.length > 0) {
 			return (
 				<View style={styles.listFooter}>
-					<Text style={styles.footerText}>You have reached the end.</Text>
+					<Text style={[styles.footerText, { color: tokens.footerText }]}>You have reached the end.</Text>
 				</View>
 			);
 		}
 
 		return null;
-	}, [events.length, hasMore, isPaginating]);
+	}, [events.length, hasMore, isPaginating, tokens]);
 
 	return (
-		<View style={styles.container}>
+		<View style={[styles.container, { backgroundColor: tokens.pageBackground }]}>
 			<FlatList
 				data={events}
 				keyExtractor={(item) => item.id}
@@ -799,7 +952,15 @@ const EventsScreen = () => {
 				ListFooterComponent={renderFooter}
 				onEndReached={handleEndReached}
 				onEndReachedThreshold={0.35}
-				refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+				refreshControl={
+					<RefreshControl
+						refreshing={isRefreshing}
+						onRefresh={handleRefresh}
+						tintColor={tokens.indicator}
+						colors={[tokens.indicator]}
+						progressBackgroundColor={tokens.headerBackground}
+					/>
+				}
 				showsVerticalScrollIndicator={false}
 			/>
 		</View>
@@ -838,169 +999,105 @@ const styles = StyleSheet.create({
 		color: '#6b7280',
 		fontSize: 15,
 	},
-	tagSelector: {
+	filterSection: {
 		marginTop: 20,
+		padding: 18,
+		borderRadius: 20,
+		gap: 16,
 	},
-	tagSelectorHeader: {
+	filterSectionLight: {
+		borderWidth: 1,
+		borderColor: 'rgba(245, 165, 36, 0.35)',
+		backgroundColor: '#fff9ef',
+	},
+	filterSectionDark: {
+		borderWidth: 1,
+		borderColor: 'rgba(246, 193, 91, 0.35)',
+		backgroundColor: '#1f1a13',
+	},
+	filterHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginBottom: 8,
 	},
-	tagLabel: {
-		fontSize: 13,
+	filterTitle: {
+		fontSize: 16,
 		fontWeight: '600',
-		color: '#4b5563',
 	},
-	clearAllButton: {
+	clearFilterButton: {
 		paddingHorizontal: 12,
 		paddingVertical: 6,
 		borderRadius: 999,
 		borderWidth: 1,
-		borderColor: '#d1d5db',
 	},
-	clearTagButtonText: {
-		color: '#111827',
-		fontWeight: '600',
-		fontSize: 13,
-	},
-	tagSelectorButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		borderWidth: 1,
-		borderColor: '#d1d5db',
-		borderRadius: 12,
-		paddingHorizontal: 16,
-		paddingVertical: 14,
-		backgroundColor: '#ffffff',
-	},
-	tagSelectorButtonText: {
-		flex: 1,
-		marginRight: 12,
-		fontSize: 15,
-		color: '#111827',
-		fontWeight: '600',
-	},
-	tagSelectorButtonTextMuted: {
-		color: '#6b7280',
-		fontWeight: '500',
-	},
-	tagSelectorButtonCaret: {
-		fontSize: 12,
-		color: '#4b5563',
-	},
-	tagDropdownPanel: {
-		marginTop: 10,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 12,
-		backgroundColor: '#ffffff',
-		maxHeight: 240,
-		overflow: 'hidden',
-	},
-	tagDropdownStateRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		paddingHorizontal: 16,
-		paddingVertical: 20,
-	},
-	tagDropdownStateColumn: {
-		paddingHorizontal: 16,
-		paddingVertical: 20,
-	},
-	tagDropdownStateText: {
-		marginLeft: 12,
-		color: '#4b5563',
-	},
-	tagDropdownErrorText: {
-		color: '#b91c1c',
-		fontWeight: '600',
-		marginBottom: 12,
-	},
-	retryInlineButton: {
-		alignSelf: 'flex-start',
-		paddingHorizontal: 14,
-		paddingVertical: 8,
-		borderRadius: 999,
-		backgroundColor: '#111827',
-	},
-	retryInlineButtonText: {
-		color: '#ffffff',
-		fontWeight: '600',
-		fontSize: 13,
-	},
-	tagDropdownList: {
-		maxHeight: 240,
-	},
-	tagOption: {
-		flexDirection: 'row',
-		alignItems: 'flex-start',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderBottomWidth: 1,
-		borderBottomColor: '#f3f4f6',
-	},
-	tagOptionSelected: {
-		backgroundColor: '#f0fdf4',
-	},
-	checkbox: {
-		width: 22,
-		height: 22,
-		borderRadius: 6,
-		borderWidth: 2,
-		borderColor: '#d1d5db',
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginRight: 12,
-	},
-	checkboxChecked: {
-		borderColor: '#10b981',
-		backgroundColor: '#d1fae5',
-	},
-	checkboxMark: {
+	clearFilterText: {
 		fontSize: 14,
-		fontWeight: '700',
-		color: '#065f46',
-	},
-	tagOptionTextWrapper: {
-		flex: 1,
-	},
-	tagOptionTitle: {
-		fontSize: 15,
 		fontWeight: '600',
-		color: '#111827',
 	},
-	tagOptionDescription: {
-		marginTop: 2,
-		color: '#6b7280',
-		fontSize: 13,
-	},
-	selectedTagsRow: {
+	filterChipContainer: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
-		marginTop: 12,
+		gap: 8,
 	},
-	selectedTagPill: {
+	filterChip: {
+		paddingHorizontal: 16,
+		paddingVertical: 8,
 		borderRadius: 999,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		backgroundColor: '#eef2ff',
-		marginRight: 8,
-		marginBottom: 8,
+		borderWidth: 1,
+		minHeight: 36,
+		justifyContent: 'center',
 	},
-	selectedTagText: {
-		color: '#3730a3',
+	filterChipActive: {
+		shadowColor: '#f59e0b',
+		shadowOpacity: 0.3,
+		shadowRadius: 8,
+		shadowOffset: { width: 0, height: 3 },
+		elevation: 2,
+	},
+	filterChipInactive: {
+		borderStyle: 'solid',
+	},
+	filterChipText: {
+		fontSize: 14,
+		fontWeight: '600',
+		textAlign: 'center',
+	},
+	filterToggleRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'center',
+		gap: 4,
+		marginTop: 4,
+	},
+	filterToggleLabel: {
+		fontSize: 14,
 		fontWeight: '600',
 	},
-	selectedTagsHelper: {
-		marginTop: 12,
-		color: '#6b7280',
+	filterStateRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 12,
 	},
-	helperText: {
-		marginTop: 16,
-		color: '#6b7280',
-		fontSize: 13,
+	filterStateColumn: {
+		gap: 8,
+	},
+	filterStateText: {
+		fontSize: 14,
+	},
+	filterStateErrorText: {
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	filterStateRetryButton: {
+		alignSelf: 'flex-start',
+		borderRadius: 999,
+		borderWidth: 1,
+		paddingHorizontal: 16,
+		paddingVertical: 8,
+	},
+	filterStateRetryText: {
+		fontSize: 14,
+		fontWeight: '600',
 	},
 	errorBanner: {
 		marginTop: 16,
