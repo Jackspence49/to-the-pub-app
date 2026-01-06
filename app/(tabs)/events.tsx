@@ -6,6 +6,7 @@ import {
 	ActivityIndicator,
 	FlatList,
 	Image,
+	ImageSourcePropType,
 	RefreshControl,
 	StyleSheet,
 	Text,
@@ -49,6 +50,31 @@ const TAG_PREVIEW_COUNT = 3;
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 const PAGE_SIZE = 6;
+
+const eventTagImageMap: Record<string, ImageSourcePropType> = {
+	bingo: require('@/assets/images/bingo.png'),
+	comedy: require('@/assets/images/comedy.png'),
+	dj: require('@/assets/images/DJ.png'),
+	'drink special': require('@/assets/images/Drink Special.png'),
+	'food special': require('@/assets/images/Food Special.png'),
+	'happy hour': require('@/assets/images/Happy Hour.png'),
+	karaoke: require('@/assets/images/Karaoke.png'),
+	'live music': require('@/assets/images/live music.png'),
+	'sports viewing': require('@/assets/images/Sports Viewing.png'),
+	trivia: require('@/assets/images/Triva.png'),
+};
+
+const normalizeImageKey = (value?: string) => value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
+
+const resolveEventTagImage = (candidates: string[]): ImageSourcePropType | null => {
+	for (const candidate of candidates) {
+		const normalized = normalizeImageKey(candidate);
+		if (normalized && eventTagImageMap[normalized]) {
+			return eventTagImageMap[normalized];
+		}
+	}
+	return null;
+};
 
 const getEventThemeTokens = (theme: ThemeName) => {
 	const isLight = theme === 'light';
@@ -436,6 +462,29 @@ const EventCard = ({ event, availableTags, tokens }: EventCardProps) => {
 	const tagsToRender = tagIds.map(
 		(tagId) => availableTags.find((t) => t.id === tagId)?.name || tagId
 	);
+	const tagIdSignature = tagIds.join('|');
+
+	const fallbackImageSource = useMemo<ImageSourcePropType | null>(() => {
+		if (event.heroImageUrl) {
+			return null;
+		}
+		const candidateLabels: string[] = [];
+		tagIds.forEach((tagId) => {
+			const matchedTag = availableTags.find((tag) => tag.id === tagId);
+			if (matchedTag?.name) {
+				candidateLabels.push(matchedTag.name);
+			}
+			candidateLabels.push(tagId);
+		});
+		return resolveEventTagImage([
+			event.eventTagName ?? '',
+			...candidateLabels,
+		]);
+	}, [availableTags, event.eventTagName, event.heroImageUrl, tagIdSignature]);
+
+	const cardImageSource: ImageSourcePropType | null = event.heroImageUrl
+		? { uri: event.heroImageUrl }
+		: fallbackImageSource;
 
 	return (
 		<View
@@ -449,9 +498,9 @@ const EventCard = ({ event, availableTags, tokens }: EventCardProps) => {
 				},
 			]}
 		>
-			{event.heroImageUrl ? (
+			{cardImageSource ? (
 				<Image
-					source={{ uri: event.heroImageUrl }}
+					source={cardImageSource}
 					style={[styles.cardImage, { backgroundColor: tokens.imageBackground }]}
 					resizeMode="cover"
 				/>
