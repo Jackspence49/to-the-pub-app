@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import {
@@ -21,6 +21,8 @@ type FetchMode = 'initial' | 'refresh' | 'paginate';
 
 type EventInstance = {
 	id: string;
+	instanceId: string;
+	eventId?: string;
 	title: string;
 	description?: string;
 	barName?: string;
@@ -247,13 +249,16 @@ const shouldKeepPaginating = (payload: unknown, receivedCount: number): boolean 
 };
 
 const mapToEventInstance = (raw: LooseObject): EventInstance => {
-	const idSource =
-		raw.id ??
-		raw.uuid ??
+	const fallbackLabel = `${raw.name ?? raw.title ?? 'event'}-${raw.start_time ?? raw.starts_at ?? Date.now()}`;
+	const primaryId =
 		raw.instance_id ??
 		raw.event_instance_id ??
+		raw.id ??
+		raw.uuid ??
 		raw.event_id ??
-		`${raw.name ?? raw.title ?? 'event'}-${raw.start_time ?? raw.starts_at ?? Date.now()}`;
+		raw.eventId ??
+		fallbackLabel;
+	const eventIdSource = raw.event_id ?? raw.eventId ?? raw.parent_event_id ?? undefined;
 
 	const tags = Array.isArray(raw.tags)
 		? (raw.tags
@@ -322,7 +327,9 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 		undefined;
 
 	return {
-		id: String(idSource),
+		id: String(primaryId),
+		instanceId: String(primaryId),
+		eventId: eventIdSource ? String(eventIdSource) : undefined,
 		title: raw.title ?? raw.name ?? 'Untitled event',
 		description: raw.description ?? raw.summary ?? raw.subtitle ?? undefined,
 		barName,
@@ -445,8 +452,13 @@ const formatEventTime = (value?: string): string => {
 
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
-type EventCardProps = { event: EventInstance; availableTags: EventTag[]; tokens: EventThemeTokens };
-const EventCard = ({ event, availableTags, tokens }: EventCardProps) => {
+type EventCardProps = {
+	event: EventInstance;
+	availableTags: EventTag[];
+	tokens: EventThemeTokens;
+	onPress?: () => void;
+};
+const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) => {
 	const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
 	const dateLabel = formatEventDay(event.eventDate ?? event.startsAt);
 	const startTimeLabel = formatEventTime(event.startsAt);
@@ -487,7 +499,10 @@ const EventCard = ({ event, availableTags, tokens }: EventCardProps) => {
 		: fallbackImageSource;
 
 	return (
-		<View
+		<TouchableOpacity
+			activeOpacity={0.92}
+			disabled={!onPress}
+			onPress={onPress}
 			style={[
 				styles.card,
 				{
@@ -553,7 +568,7 @@ const EventCard = ({ event, availableTags, tokens }: EventCardProps) => {
 					</View>
 				) : null}
 			</View>
-		</View>
+		</TouchableOpacity>
 	);
 };
 
@@ -706,6 +721,7 @@ const EventTagFilterPanel = ({
 };
 
 const EventsScreen = () => {
+	const router = useRouter();
 	const colorScheme = useColorScheme();
 	const theme = (colorScheme ?? 'light') as ThemeName;
 	const tokens = useMemo(() => getEventThemeTokens(theme), [theme]);
@@ -785,6 +801,17 @@ const EventsScreen = () => {
 	const handleExpandFilters = useCallback(() => {
 		setFiltersExpanded(true);
 	}, []);
+
+	const handleOpenEvent = useCallback(
+		(event: EventInstance) => {
+			const instanceId = event.instanceId ?? event.id;
+			if (!instanceId) {
+				return;
+			}
+			router.push({ pathname: '/event/[instanceId]', params: { instanceId } });
+		},
+		[router]
+	);
 
 	const fetchEvents = useCallback(
 		async (pageToLoad: number, mode: FetchMode) => {
@@ -873,8 +900,15 @@ const EventsScreen = () => {
 	}, [events.length, fetchEvents]);
 
 	const renderItem = useCallback<ListRenderItem<EventInstance>>(
-		({ item }) => <EventCard event={item} availableTags={availableTags} tokens={tokens} />,
-		[availableTags, tokens]
+		({ item }) => (
+			<EventCard
+				event={item}
+				availableTags={availableTags}
+				tokens={tokens}
+				onPress={() => handleOpenEvent(item)}
+			/>
+		),
+		[availableTags, handleOpenEvent, tokens]
 	);
 
 	const renderHeader = useMemo(

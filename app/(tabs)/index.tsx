@@ -1,4 +1,5 @@
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import {
@@ -290,9 +291,10 @@ const openMapsForAddress = async (value?: string) => {
 type BarCardProps = {
   bar: Bar;
   theme: ThemeName;
+  onPress?: () => void;
 };
 
-const BarCard = ({ bar, theme }: BarCardProps) => {
+const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
   const palette = Colors[theme];
   const mutedColor = theme === 'light' ? '#5c6672' : '#a7adb4';
   const secondaryMutedColor = theme === 'light' ? '#6c7682' : '#9298a0';
@@ -304,7 +306,12 @@ const BarCard = ({ bar, theme }: BarCardProps) => {
   const canOpenMaps = Boolean(bar.fullAddress);
 
   return (
-    <View style={[styles.card, cardTone]}>
+    <TouchableOpacity
+      style={[styles.card, cardTone]}
+      activeOpacity={0.9}
+      onPress={onPress}
+      disabled={!onPress}
+    >
       <View style={styles.cardHeader}>
         <Text style={[styles.barName, { color: palette.text }]} numberOfLines={1}>
           {bar.name}
@@ -368,7 +375,7 @@ const BarCard = ({ bar, theme }: BarCardProps) => {
           ) : null}
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -592,6 +599,7 @@ export default function BarsScreen() {
   const colorScheme = useColorScheme();
   const theme = (colorScheme ?? 'light') as ThemeName;
   const palette = Colors[theme];
+  const router = useRouter();
   const [bars, setBars] = useState<Bar[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -751,9 +759,16 @@ export default function BarsScreen() {
     fetchBars('initial');
   }, [fetchBars]);
 
+  const openBarDetail = useCallback(
+    (barId: string) => {
+      router.push({ pathname: '/bar/[barId]', params: { barId } });
+    },
+    [router]
+  );
+
   const renderItem = useCallback<ListRenderItem<Bar>>(
-    ({ item }) => <BarCard bar={item} theme={theme} />,
-    [theme]
+    ({ item }) => <BarCard bar={item} theme={theme} onPress={() => openBarDetail(item.id)} />,
+    [openBarDetail, theme]
   );
 
   const keyExtractor = useCallback((item: Bar) => item.id, []);
