@@ -8,7 +8,6 @@ import {
   Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Platform,
   RefreshControl,
   StyleSheet,
   Text,
@@ -32,13 +31,16 @@ type BarTag = {
 type Bar = {
   id: string;
   name: string;
+  city?: string;
+  state?: string;
   addressLabel?: string;
-  fullAddress?: string;
   instagram?: string;
   facebook?: string;
   twitter?: string;
   distanceKm?: number;
   distanceMiles?: number;
+  closesToday?: string;
+  crossesMidnightToday?: boolean;
   tags: BarTag[];
 };
 
@@ -68,7 +70,7 @@ const DEFAULT_QUERY_PARAMS: QueryParams = {
   lat: DEFAULT_LATITUDE,
   lon: DEFAULT_LONGITUDE,
   open_now: true,
-  include: 'tags',
+  include: 'tags,hours',
 };
 
 const buildQueryString = (params: QueryParams): string =>
@@ -158,6 +160,170 @@ const mapToBarTag = (raw: any, index: number): BarTag | null => {
   return null;
 };
 
+const DAY_NAME_INDEX: Record<string, number> = {
+  sunday: 0,
+  sun: 0,
+  monday: 1,
+  mon: 1,
+  tuesday: 2,
+  tue: 2,
+  tues: 2,
+  wednesday: 3,
+  wed: 3,
+  thursday: 4,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  friday: 5,
+  fri: 5,
+  saturday: 6,
+  sat: 6,
+};
+
+const coerceDayIndex = (value: unknown): number | null => {
+  if (typeof value === 'number' && value >= 0 && value <= 6) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    if (!Number.isNaN(Number(trimmed))) {
+      const numeric = Number(trimmed);
+      if (numeric >= 0 && numeric <= 6) {
+        return numeric;
+      }
+    }
+    const lookup = DAY_NAME_INDEX[trimmed.toLowerCase() as keyof typeof DAY_NAME_INDEX];
+    return typeof lookup === 'number' ? lookup : null;
+  }
+  return null;
+};
+
+const extractCloseMetaFromRecord = (record?: LooseObject | null): { closesAt?: string; crossesMidnight?: boolean } | null => {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+  const closesRaw =
+    record.close_time ??
+    record.closeTime ??
+    record.close ??
+    record.closes_at ??
+    record.closesAt ??
+    record.close_label ??
+    record.closeLabel ??
+    record.end ??
+    record.end_time ??
+    record.endTime;
+  const closesAt = typeof closesRaw === 'string' && closesRaw.trim().length > 0 ? closesRaw.trim() : undefined;
+  const crossesMidnight = Boolean(record.crosses_midnight ?? record.crossesMidnight ?? record.crossesNextDay ?? false);
+  if (!closesAt && !crossesMidnight) {
+    return null;
+  }
+  return { closesAt, crossesMidnight };
+};
+
+const resolveClosingFromSchedules = (raw: LooseObject): { closesAt?: string; crossesMidnight?: boolean } | null => {
+  const scheduleBuckets = [
+    raw.hours,
+    raw.operating_hours,
+    raw.operatingHours,
+    raw.schedule,
+    raw.daily_hours,
+    raw.dailyHours,
+  ];
+  const today = new Date().getDay();
+  for (const bucket of scheduleBuckets) {
+    if (!Array.isArray(bucket)) {
+      continue;
+    }
+    for (const entry of bucket) {
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+      const record = entry as LooseObject;
+      const entryDay = coerceDayIndex(
+        record.day_of_week ?? record.dayOfWeek ?? record.day ?? record.dayName ?? record.weekday ?? record.weekDay ?? record.name
+      );
+      if (entryDay !== today) {
+        continue;
+      }
+      const meta = extractCloseMetaFromRecord(record);
+      if (meta) {
+        return meta;
+      }
+    }
+  }
+  return null;
+};
+
+const extractTodayClosingMeta = (raw: LooseObject): { closesAt?: string; crossesMidnight?: boolean } => {
+  let closesAt: string | undefined;
+  let crossesMidnight: boolean | undefined;
+
+  const assignCandidate = (value?: unknown) => {
+    if (!closesAt && typeof value === 'string' && value.trim().length > 0) {
+      closesAt = value.trim();
+    }
+  };
+
+  const directCandidates: unknown[] = [
+    raw.today_close_time,
+    raw.todayCloseTime,
+    raw.todayClose,
+    raw.today_closes_at,
+    raw.todayClosesAt,
+    raw.close_time_today,
+    raw.closeTimeToday,
+    raw.closes_at,
+    raw.closesAt,
+    raw.close_time,
+    raw.closeTime,
+  ];
+  directCandidates.forEach(assignCandidate);
+
+  const hoursTodayVariants = [
+    raw.hours_today,
+    raw.hoursToday,
+    raw.today_hours,
+    raw.todayHours,
+    raw.current_hours,
+    raw.currentHours,
+  ];
+  for (const variant of hoursTodayVariants) {
+    const meta = extractCloseMetaFromRecord(variant as LooseObject | null);
+    if (meta) {
+      if (!closesAt && meta.closesAt) {
+        closesAt = meta.closesAt;
+      }
+      if (typeof meta.crossesMidnight === 'boolean') {
+        crossesMidnight = meta.crossesMidnight;
+      }
+      if (closesAt) {
+        break;
+      }
+    }
+  }
+
+  if (!closesAt || crossesMidnight === undefined) {
+    const scheduleMeta = resolveClosingFromSchedules(raw);
+    if (scheduleMeta) {
+      if (!closesAt && scheduleMeta.closesAt) {
+        closesAt = scheduleMeta.closesAt;
+      }
+      if (typeof scheduleMeta.crossesMidnight === 'boolean') {
+        crossesMidnight = scheduleMeta.crossesMidnight;
+      }
+    }
+  }
+
+  return {
+    closesAt,
+    crossesMidnight,
+  };
+};
+
 const mapToBar = (raw: LooseObject, index: number): Bar => {
   const idSource =
     raw.id ??
@@ -168,33 +334,10 @@ const mapToBar = (raw: LooseObject, index: number): Bar => {
     `bar-${index}`;
 
   const location = (raw.address ?? raw.location ?? {}) as LooseObject;
-  const street =
-    raw.address_street ??
-    raw.street ??
-    raw.addressLine1 ??
-    location.street ??
-    location.line1 ??
-    location.address;
   const city = raw.address_city ?? raw.city ?? location.city;
   const state = raw.address_state ?? raw.state ?? location.state;
-  const zip = raw.address_zip ?? raw.zip ?? raw.postal_code ?? location.zip;
-
-  const addressSegments: string[] = [];
-  if (street) {
-    addressSegments.push(String(street));
-  }
-
   const cityState = [city, state].filter(Boolean).join(', ');
-  if (cityState || zip) {
-    const combined = [cityState, zip].filter(Boolean).join(' ');
-    if (combined.trim().length > 0) {
-      addressSegments.push(combined.trim());
-    }
-  }
-
-  const fullAddress = addressSegments.length > 0 ? addressSegments.join(', ') : undefined;
-  const rawAddressLabel = fullAddress ?? addressSegments.join(', ');
-  const addressLabel = rawAddressLabel && rawAddressLabel.trim().length > 0 ? rawAddressLabel : undefined;
+  const addressLabel = cityState || city || state || undefined;
   const distanceKm = toNumber(raw.distance_km ?? raw.distanceKm ?? raw.distance);
   const distanceMilesExplicit = toNumber(
     raw.distance_miles ?? raw.distanceMiles ?? raw.distance_mi ?? raw.distanceMi ?? raw.distanceMilesAway
@@ -222,16 +365,28 @@ const mapToBar = (raw: LooseObject, index: number): Bar => {
       }
     });
 
+  const closingMeta = extractTodayClosingMeta(raw);
+  const closesToday = closingMeta.closesAt;
+  const crossesMidnightToday = Boolean(
+    raw.crosses_midnight_today ??
+      raw.crossesMidnightToday ??
+      closingMeta.crossesMidnight ??
+      false
+  );
+
   return {
     id: String(idSource),
     name: raw.name ?? raw.title ?? 'Unnamed bar',
+    city: city ? String(city) : undefined,
+    state: state ? String(state) : undefined,
     addressLabel,
-    fullAddress,
     instagram: raw.instagram ?? undefined,
     facebook: raw.facebook ?? undefined,
     twitter: normalizeTwitterUrl(raw.twitter),
     distanceKm,
     distanceMiles,
+    closesToday,
+    crossesMidnightToday,
     tags: dedupedTags,
   };
 };
@@ -280,6 +435,66 @@ const formatDistanceLabel = (distanceMiles?: number): string | null => {
   return `${distanceMiles.toFixed(1)} mi away`;
 };
 
+const parseTimeToken = (value?: string): Date | null => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const timestamp = Date.parse(trimmed);
+  if (!Number.isNaN(timestamp)) {
+    return new Date(timestamp);
+  }
+
+  const amPmMatch = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (amPmMatch) {
+    let hours = Number(amPmMatch[1]);
+    const minutes = Number(amPmMatch[2] ?? '0');
+    const meridian = amPmMatch[4]?.toLowerCase();
+    if (meridian === 'pm' && hours < 12) {
+      hours += 12;
+    } else if (meridian === 'am' && hours === 12) {
+      hours = 0;
+    }
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+      return null;
+    }
+    if (hours > 23 || minutes > 59) {
+      return null;
+    }
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  }
+
+  const fourDigitMatch = trimmed.match(/^(\d{2})(\d{2})$/);
+  if (fourDigitMatch) {
+    const hours = Number(fourDigitMatch[1]);
+    const minutes = Number(fourDigitMatch[2]);
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes) && hours <= 23 && minutes <= 59) {
+      const date = new Date();
+      date.setHours(hours, minutes, 0, 0);
+      return date;
+    }
+  }
+
+  return null;
+};
+
+const formatClosingTimeLabel = (value?: string): string | null => {
+  const parsed = parseTimeToken(value);
+  if (!parsed) {
+    return null;
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(parsed);
+};
+
 const ensureProtocol = (value: string): string => {
   if (/^https?:\/\//i.test(value)) {
     return value;
@@ -299,23 +514,6 @@ const openExternalLink = async (value?: string) => {
   }
 };
 
-const openMapsForAddress = async (value?: string) => {
-  if (!value) {
-    return;
-  }
-
-  const encoded = encodeURIComponent(value);
-  const url = Platform.OS === 'ios'
-    ? `http://maps.apple.com/?q=${encoded}`
-    : `https://www.google.com/maps/search/?api=1&query=${encoded}`;
-
-  try {
-    await Linking.openURL(url);
-  } catch (error) {
-    console.warn('Unable to open maps', error);
-  }
-};
-
 type BarCardProps = {
   bar: Bar;
   theme: ThemeName;
@@ -330,8 +528,16 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
   const pillBackground = theme === 'light' ? '#f1f5f9' : '#252a30';
   const pillBorder = theme === 'light' ? '#e2e8f0' : '#2e3339';
   const distanceLabel = formatDistanceLabel(bar.distanceMiles);
-  const addressLabel = bar.fullAddress ?? bar.addressLabel ?? 'Address coming soon';
-  const canOpenMaps = Boolean(bar.fullAddress);
+  const addressLabel = bar.addressLabel ?? 'Location coming soon';
+  const closingLabel = formatClosingTimeLabel(bar.closesToday);
+  const detailParts: string[] = [];
+  if (distanceLabel) {
+    detailParts.push(distanceLabel);
+  }
+  if (closingLabel) {
+    detailParts.push(`Closes ${closingLabel}`);
+  }
+  const detailLine = detailParts.join(' • ');
 
   return (
     <TouchableOpacity
@@ -346,21 +552,16 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
         </Text>
       </View>
 
-      <TouchableOpacity
-        style={styles.addressTouchable}
-        activeOpacity={canOpenMaps ? 0.7 : 1}
-        disabled={!canOpenMaps}
-        onPress={() => openMapsForAddress(bar.fullAddress)}
-      >
+      <View style={styles.addressTouchable}>
         <Text style={[styles.addressText, { color: mutedColor }]} numberOfLines={2}>
           {addressLabel}
         </Text>
-      </TouchableOpacity>
+      </View>
 
-      {distanceLabel ? (
+      {detailLine ? (
         <View style={styles.distanceDetailRow}>
           <MaterialIcons name="location-on" size={16} color={secondaryMutedColor} style={{ marginRight: 4 }} />
-          <Text style={[styles.distanceDetail, { color: secondaryMutedColor }]}>{distanceLabel}</Text>
+          <Text style={[styles.distanceDetail, { color: secondaryMutedColor }]}>{detailLine}</Text>
         </View>
       ) : null}
 

@@ -1,4 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import MapView, { Marker, Region } from 'react-native-maps';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -60,6 +62,10 @@ type ContactAction = {
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+const HERO_MAP_DELTA = {
+  latitudeDelta: 0.01,
+  longitudeDelta: 0.01,
+};
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -229,6 +235,29 @@ export default function BarDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const addressLabel = useMemo(() => buildAddressLabel(bar), [bar]);
+  const coordinates = useMemo(() => {
+    if (!bar?.latitude || !bar?.longitude) {
+      return null;
+    }
+    const latitude = Number(bar.latitude);
+    const longitude = Number(bar.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+    return { latitude, longitude };
+  }, [bar?.latitude, bar?.longitude]);
+
+  const heroRegion = useMemo<Region | null>(() => {
+    if (!coordinates) {
+      return null;
+    }
+    return {
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      latitudeDelta: HERO_MAP_DELTA.latitudeDelta,
+      longitudeDelta: HERO_MAP_DELTA.longitudeDelta,
+    };
+  }, [coordinates]);
 
   const fetchBarDetail = useCallback(async () => {
     if (!barId) {
@@ -358,12 +387,42 @@ export default function BarDetailScreen() {
 
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
+        {heroRegion && coordinates ? (
+          <View style={styles.heroMapWrapper}>
+            <MapView
+              style={styles.heroMap}
+              initialRegion={heroRegion}
+              pointerEvents="none"
+              scrollEnabled={false}
+              zoomEnabled={false}
+              rotateEnabled={false}
+              pitchEnabled={false}
+            >
+              <Marker coordinate={coordinates} title={bar.name} description={addressLabel ?? undefined} />
+            </MapView>
+            <LinearGradient
+              pointerEvents="none"
+              colors={theme === 'light'
+                ? ['rgba(255,255,255,0)', 'rgba(255,255,255,0.92)', palette.background]
+                : ['rgba(5,6,10,0)', 'rgba(5,6,10,0.92)', palette.background]}
+              locations={[0, 0.6, 1]}
+              style={styles.heroMapFade}
+            />
+          </View>
+        ) : null}
+
+        <View style={[styles.section, styles.heroSection, heroRegion ? styles.heroSectionOverlap : null]}>
           <Text style={[styles.barName, { color: palette.text }]}>{bar.name}</Text>
           {bar.description ? (
             <Text style={[styles.barDescription, { color: theme === 'light' ? '#4b5563' : '#cbd5f5' }]}>
               {bar.description}
             </Text>
+          ) : null}
+          {addressLabel ? (
+            <TouchableOpacity onPress={() => openMapsForAddress(addressLabel)} activeOpacity={0.8}>
+              <Text style={[styles.heroAddressLabel, { color: palette.tint }]}>Address</Text>
+              <Text style={[styles.heroAddressText, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>{addressLabel}</Text>
+            </TouchableOpacity>
           ) : null}
           {contactActions.length > 0 ? (
             <View style={styles.contactRow}>
@@ -398,17 +457,6 @@ export default function BarDetailScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-
-        {addressLabel ? (
-          <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
-            {addressLabel ? (
-              <TouchableOpacity onPress={() => openMapsForAddress(addressLabel)} activeOpacity={0.8}>
-                <Text style={[styles.cardLabel, { color: theme === 'light' ? '#0f172a' : '#e2e8f0' }]}>Address</Text>
-                <Text style={[styles.cardValue, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>{addressLabel}</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        ) : null}
 
         {bar.tags.length > 0 ? (
           <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
@@ -495,13 +543,48 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 20,
   },
+  heroMapWrapper: {
+    height: 240,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginHorizontal: 20,
+  },
+  heroMap: {
+    width: '100%',
+    height: '100%',
+  },
+  heroMapFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 110,
+  },
   section: {
     gap: 12,
+  },
+  heroSection: {
+    paddingTop: 8,
+  },
+  heroSectionOverlap: {
+    marginTop: -40,
   },
   contactRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  heroAddressLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: 4,
+  },
+  heroAddressText: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 2,
   },
   eventsButton: {
     flexDirection: 'row',

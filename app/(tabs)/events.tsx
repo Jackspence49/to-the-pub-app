@@ -559,40 +559,8 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 			)}
 
 			<View style={styles.cardBody}>
-				<Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
-				<Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
-				<Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
-				{distanceLabel ? (
-					<View style={styles.distanceRow}>
-						<MaterialIcons name="place" size={16} color={tokens.eventMeta} style={styles.distanceIcon} />
-						<Text style={[styles.distanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
-					</View>
-				) : null}
-
-				<View
-					style={[
-						styles.timeRow,
-						{ borderColor: tokens.timeBorder, backgroundColor: tokens.timeBackground },
-					]}
-				>
-					<View style={styles.timeColumn}>
-						<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start Time</Text>
-						<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
-					</View>
-					<View
-						style={[
-							styles.timeColumn,
-							styles.timeColumnRight,
-							{ borderLeftColor: tokens.timeBorder },
-						]}
-					>
-						<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End Time</Text>
-						<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
-					</View>
-				</View>
-
 				{tagsToRender.length > 0 ? (
-					<View style={styles.tagRow}>
+					<View style={[styles.tagRow, styles.tagRowTop]}>
 						{tagsToRender.map((tag, index) => (
 							<View
 								key={`${event.id}-tag-${index}`}
@@ -604,6 +572,38 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 								<Text style={[styles.tagText, { color: tokens.tagText }]}>{tag}</Text>
 							</View>
 						))}
+					</View>
+				) : null}
+				<Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
+				<Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
+				<View style={styles.scheduleBlock}>
+					<Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
+					<View
+						style={[
+							styles.timeRow,
+							{ borderColor: tokens.timeBorder, backgroundColor: tokens.timeBackground },
+						]}
+					>
+						<View style={styles.timeColumn}>
+							<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start Time</Text>
+							<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
+						</View>
+						<View
+							style={[
+								styles.timeColumn,
+								styles.timeColumnRight,
+								{ borderLeftColor: tokens.timeBorder },
+							]}
+						>
+							<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End Time</Text>
+							<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
+						</View>
+					</View>
+				</View>
+				{distanceLabel ? (
+					<View style={[styles.distanceRow, styles.distanceRowBottom]}>
+						<MaterialIcons name="place" size={16} color={tokens.eventMeta} style={styles.distanceIcon} />
+						<Text style={[styles.distanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
 					</View>
 				) : null}
 			</View>
@@ -1448,28 +1448,36 @@ const styles = StyleSheet.create({
 		padding: 18,
 	},
 	eventBarName: {
-		fontSize: 12,
-		fontWeight: '700',
+		marginTop: 4,
+		fontSize: 16,
+		fontWeight: '600',
 		color: '#6b7280',
-		letterSpacing: 0.8,
-		textTransform: 'uppercase',
+		letterSpacing: 0.25,
+		textTransform: 'none',
 	},
 	eventTitle: {
 		fontSize: 20,
 		fontWeight: '700',
 		color: '#111827',
+		marginTop: 2,
 	},
 	eventMeta: {
-		marginTop: 6,
 		fontSize: 15,
 		color: '#4b5563',
-		fontWeight: '500',
+		fontWeight: '600',
+	},
+	scheduleBlock: {
+		marginTop: 16,
+		gap: 12,
 	},
 	distanceRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		marginTop: 4,
 		gap: 4,
+	},
+	distanceRowBottom: {
+		marginTop: 18,
 	},
 	distanceIcon: {
 		marginRight: 2,
@@ -1513,6 +1521,10 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		marginTop: 12,
+	},
+	tagRowTop: {
+		marginTop: 0,
+		marginBottom: 12,
 	},
 	tagPill: {
 		borderRadius: 999,

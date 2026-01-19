@@ -1,11 +1,11 @@
 import { FontAwesome } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -107,20 +107,6 @@ const formatEventTime = (value?: string): string | null => {
 
 const ensureProtocol = (value: string) => (value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
 
-const formatAddressLabel = (event?: EventDetail | null) => {
-  if (!event) {
-    return null;
-  }
-  const segments = [
-    event.addressStreet,
-    [event.addressCity, event.addressState].filter(Boolean).join(', '),
-    event.addressZip,
-  ]
-    .map((segment) => segment?.trim())
-    .filter((segment) => segment && segment.length > 0);
-  return segments.length ? segments.join(' ') : null;
-};
-
 const mapToEventDetail = (raw: LooseObject): EventDetail => {
   const crossesMidnight = Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false);
   const dateSource = raw.date ?? raw.event_date ?? raw.starts_at ?? raw.start ?? undefined;
@@ -194,21 +180,6 @@ const openPhone = async (phone?: string) => {
   }
 };
 
-const openMaps = async (address?: string) => {
-  if (!address) {
-    return;
-  }
-  const encoded = encodeURIComponent(address);
-  const url = Platform.OS === 'ios'
-    ? `http://maps.apple.com/?q=${encoded}`
-    : `https://www.google.com/maps/search/?api=1&query=${encoded}`;
-  try {
-    await Linking.openURL(url);
-  } catch (error) {
-    console.warn('Unable to open maps', error);
-  }
-};
-
 export default function EventDetailScreen() {
   const { instanceId } = useLocalSearchParams<{ instanceId?: string }>();
   const router = useRouter();
@@ -219,7 +190,6 @@ export default function EventDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const addressLabel = useMemo(() => formatAddressLabel(event), [event]);
   const dateLabel = useMemo(() => formatEventDay(event?.eventDate ?? event?.startsAt), [event?.eventDate, event?.startsAt]);
   const startTimeLabel = useMemo(() => formatEventTime(event?.startsAt), [event?.startsAt]);
   const endTimeLabel = useMemo(() => formatEventTime(event?.endsAt), [event?.endsAt]);
@@ -260,21 +230,22 @@ export default function EventDetailScreen() {
     if (!event) {
       return [];
     }
-    const buttons: { key: string; label: string; iconName: React.ComponentProps<typeof FontAwesome>['name']; onPress: () => void }[] = [];
+    const buttons: { key: string; iconName: React.ComponentProps<typeof FontAwesome>['name']; onPress: () => void }[] = [];
     if (event.externalLink) {
-      buttons.push({ key: 'external', label: 'View Event Page', iconName: 'external-link', onPress: () => openExternal(event.externalLink) });
+      buttons.push({ key: 'external', iconName: 'external-link', onPress: () => openExternal(event.externalLink) });
     }
     if (event.website) {
-      buttons.push({ key: 'website', label: 'Visit Website', iconName: 'globe', onPress: () => openExternal(event.website) });
+      buttons.push({ key: 'website', iconName: 'globe', onPress: () => openExternal(event.website) });
     }
     if (event.phone) {
-      buttons.push({ key: 'phone', label: 'Call the Bar', iconName: 'phone', onPress: () => openPhone(event.phone) });
+      buttons.push({ key: 'phone', iconName: 'phone', onPress: () => openPhone(event.phone) });
     }
     return buttons;
   }, [event]);
 
   const handleViewBarEvents = useCallback(() => {
     if (!event?.barId) {
+      Alert.alert('Events unavailable', 'We could not find the bar for this event yet.');
       return;
     }
     router.push({
@@ -298,7 +269,7 @@ export default function EventDetailScreen() {
     });
   }, [event, router]);
 
-  const showActionSection = actionButtons.length > 0 || Boolean(event?.barId);
+  const showActionSection = true;
 
   const content = () => {
     if (isLoading) {
@@ -343,9 +314,50 @@ export default function EventDetailScreen() {
             </View>
           ) : null}
           <Text style={[styles.eventTitle, { color: palette.text }]}>{event.title}</Text>
-          {event.barName ? (
-            <Text style={[styles.eventMeta, { color: theme === 'light' ? '#4b5563' : '#cbd5f5' }]}>Hosted by {event.barName}</Text>
+          {event.description ? (
+            <Text style={[styles.descriptionText, { color: theme === 'light' ? '#1f2937' : '#f1f5f9' }]}>{event.description}</Text>
           ) : null}
+          <View style={styles.barLinkSection}>
+            {event.barId ? (
+              <Link
+                href={{ pathname: '/bar/[barId]', params: { barId: event.barId } }}
+                asChild
+                prefetch
+              >
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.barLinkButton, { borderColor: palette.tint }]}
+                  accessibilityRole="link"
+                  accessibilityLabel={`View ${event.barName ?? 'bar'} details`}
+                >
+                  <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+                  <Text style={[styles.barLinkText, { color: palette.tint }]}>{event.barName ?? 'Bar coming soon'}</Text>
+                </TouchableOpacity>
+              </Link>
+            ) : (
+              <View style={[styles.barLinkButton, { borderColor: palette.tint, opacity: 0.6 }]}
+                pointerEvents="none"
+              >
+                <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+                <Text style={[styles.barLinkText, { color: palette.tint }]}>Bar coming soon</Text>
+              </View>
+            )}
+            {event.barId ? (
+              <TouchableOpacity
+                onPress={handleViewBarEvents}
+                accessibilityRole="button"
+                accessibilityLabel={`See upcoming events at ${event.barName ?? 'this bar'}`}
+                style={[
+                  styles.barEventsButton,
+                  { borderColor: palette.tint, backgroundColor: theme === 'light' ? '#ffffff' : '#0f172a' },
+                ]}
+                activeOpacity={0.85}
+              >
+                <FontAwesome name="calendar" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+                <Text style={[styles.barEventsButtonText, { color: palette.tint }]}>See upcoming events</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
           <View style={styles.timeCard}>
             <Text style={[styles.timeHeading, { color: palette.text }]}>{dateLabel}</Text>
             <Text style={[styles.timeRange, { color: theme === 'light' ? '#334155' : '#e2e8f0' }]}>
@@ -358,57 +370,52 @@ export default function EventDetailScreen() {
               <Text style={[styles.recurrenceFootnote, { color: theme === 'light' ? '#9ca3af' : '#94a3b8' }]}>Ends after midnight</Text>
             ) : null}
           </View>
-          {event.description ? (
-            <Text style={[styles.descriptionText, { color: theme === 'light' ? '#1f2937' : '#f1f5f9' }]}>{event.description}</Text>
-          ) : null}
         </View>
 
         {showActionSection ? (
           <View style={styles.actionList}>
-            {actionButtons.map((button) => (
-              <TouchableOpacity
-                key={button.key}
-                onPress={button.onPress}
-                style={[styles.actionButton, { borderColor: palette.tint }]}
-                activeOpacity={0.85}
-              >
-                <FontAwesome name={button.iconName} size={16} color={palette.tint} style={{ marginRight: 8 }} />
-                <Text style={[styles.actionButtonText, { color: palette.tint }]}>{button.label}</Text>
-              </TouchableOpacity>
-            ))}
-
-            {event?.barId ? (
-              <>
+            <View style={[styles.iconButtonRow, { borderColor: 'rgba(15, 23, 42, 0.08)' }]}> 
+              {actionButtons.map((button) => (
+                <TouchableOpacity
+                  key={button.key}
+                  onPress={button.onPress}
+                  style={[styles.iconCircleButton, { borderColor: palette.tint }]}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={button.key}
+                >
+                  <FontAwesome name={button.iconName} size={16} color={palette.tint} />
+                </TouchableOpacity>
+              ))}
+              {event?.barId ? (
                 <TouchableOpacity
                   onPress={handleViewBarDetails}
-                  style={[styles.actionButton, { borderColor: palette.tint }]}
+                  style={[styles.iconCircleButton, { borderColor: palette.tint }]}
                   activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="View bar details"
                 >
-                  <FontAwesome name="info-circle" size={16} color={palette.tint} style={{ marginRight: 8 }} />
-                  <Text style={[styles.actionButtonText, { color: palette.tint }]}>View bar details</Text>
+                  <FontAwesome name="info-circle" size={16} color={palette.tint} />
                 </TouchableOpacity>
-
+              ) : null}
+              {event?.barId ? (
                 <TouchableOpacity
                   onPress={handleViewBarEvents}
-                  style={[styles.actionButton, styles.primaryActionButton]}
+                  style={[styles.iconCircleButton, styles.iconCircleButtonPrimary]}
                   activeOpacity={0.88}
+                  accessibilityRole="button"
+                  accessibilityLabel="See bar events"
                 >
-                  <FontAwesome name="calendar" size={16} color="#1f2937" style={{ marginRight: 8 }} />
-                  <Text style={[styles.actionButtonText, styles.primaryActionButtonText]}>
-                    See all events at {event.barName ?? 'this bar'}
-                  </Text>
+                  <FontAwesome name="calendar" size={16} color="#1f2937" />
                 </TouchableOpacity>
-              </>
-            ) : null}
-          </View>
-        ) : null}
-
-        {addressLabel ? (
-          <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
-            <Text style={[styles.cardLabel, { color: palette.text }]}>Location</Text>
-            <Text style={[styles.cardValue, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>{addressLabel}</Text>
-            <TouchableOpacity onPress={() => openMaps(addressLabel)} style={styles.mapButton} activeOpacity={0.8}>
-              <Text style={[styles.mapButtonText, { color: theme === 'light' ? '#0f172a' : '#e2e8f0' }]}>Open in Maps</Text>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              onPress={handleViewBarEvents}
+              style={styles.fullWidthButton}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.fullWidthButtonText}>See all upcoming events</Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -546,47 +553,72 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
   },
-  actionList: {
-    gap: 12,
+  barLinkSection: {
+    gap: 8,
   },
-  actionButton: {
-    borderWidth: 1,
+  barLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignSelf: 'flex-start',
+  },
+  barLinkText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  barEventsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    marginTop: 8,
+    alignSelf: 'flex-start',
   },
-  actionButtonText: {
+  barEventsButtonText: {
     fontSize: 15,
     fontWeight: '600',
   },
-  primaryActionButton: {
-    borderColor: 'rgba(15, 23, 42, 0)',
-    backgroundColor: '#fef3c7',
+  actionList: {
+    gap: 12,
   },
-  primaryActionButtonText: {
-    color: '#1f2937',
+  iconButtonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: 4,
+  },
+  iconCircleButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  iconCircleButtonPrimary: {
+    backgroundColor: '#fef3c7',
+    borderColor: 'rgba(15, 23, 42, 0)',
+  },
+  fullWidthButton: {
+    marginTop: 8,
+    borderRadius: 999,
+    paddingVertical: 14,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+  },
+  fullWidthButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#f8fafc',
   },
   cardLabel: {
     fontSize: 16,
-    fontWeight: '600',
-  },
-  cardValue: {
-    fontSize: 15,
-    marginTop: 4,
-  },
-  mapButton: {
-    marginTop: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.15)',
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  mapButtonText: {
-    fontSize: 15,
     fontWeight: '600',
   },
 });
