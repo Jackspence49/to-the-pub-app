@@ -386,7 +386,12 @@ export default function BarDetailScreen() {
     }
 
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+      >
         {heroRegion && coordinates ? (
           <View style={styles.heroMapWrapper}>
             <MapView
@@ -403,133 +408,157 @@ export default function BarDetailScreen() {
             <LinearGradient
               pointerEvents="none"
               colors={theme === 'light'
-                ? ['rgba(255,255,255,0)', 'rgba(255,255,255,0.92)', palette.background]
-                : ['rgba(5,6,10,0)', 'rgba(5,6,10,0.92)', palette.background]}
-              locations={[0, 0.6, 1]}
+                ? ['rgba(255,255,255,0)', 'rgba(15,23,42,0.25)', 'rgba(15,23,42,0.7)', palette.background]
+                : ['rgba(15,23,42,0)', 'rgba(2,6,23,0.55)', 'rgba(2,6,23,0.92)', palette.background]}
+              locations={[0, 0.4, 0.85, 1]}
               style={styles.heroMapFade}
             />
-          </View>
-        ) : null}
-
-        <View style={[styles.section, styles.heroSection, heroRegion ? styles.heroSectionOverlap : null]}>
-          <Text style={[styles.barName, { color: palette.text }]}>{bar.name}</Text>
-          {bar.description ? (
-            <Text style={[styles.barDescription, { color: theme === 'light' ? '#4b5563' : '#cbd5f5' }]}>
-              {bar.description}
-            </Text>
-          ) : null}
-          {addressLabel ? (
-            <TouchableOpacity onPress={() => openMapsForAddress(addressLabel)} activeOpacity={0.8}>
-              <Text style={[styles.heroAddressLabel, { color: palette.tint }]}>Address</Text>
-              <Text style={[styles.heroAddressText, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>{addressLabel}</Text>
-            </TouchableOpacity>
-          ) : null}
-          {contactActions.length > 0 ? (
-            <View style={styles.contactRow}>
-              {contactActions.map((action) => (
-                <TouchableOpacity
-                  key={action.key}
-                  onPress={action.onPress}
-                  accessibilityRole="button"
-                  accessibilityLabel={action.accessibilityLabel}
-                  style={[
-                    styles.contactIconButton,
-                    theme === 'light' ? styles.contactIconButtonLight : styles.contactIconButtonDark,
-                  ]}
-                  activeOpacity={0.8}
-                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                >
-                  <FontAwesome name={action.iconName} size={18} color={palette.tint} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
-          {bar.id ? (
-            <TouchableOpacity
-              onPress={handleViewUpcomingEvents}
-              accessibilityRole="button"
-              accessibilityLabel={`See upcoming events at ${bar.name}`}
-              style={[styles.eventsButton, { borderColor: palette.tint }]}
-              activeOpacity={0.85}
-            >
-              <FontAwesome name="calendar" size={16} color={palette.tint} style={{ marginRight: 8 }} />
-              <Text style={[styles.eventsButtonText, { color: palette.tint }]}>See upcoming events</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {bar.tags.length > 0 ? (
-          <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
-            <View style={{ flexDirection: 'row', gap: 16 }}>
-              {/* Type tags */}
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardLabel, { marginBottom: 6, color: palette.text }]}>Type</Text>
-                <View style={styles.tagContainer}>
-                  {bar.tags.filter(tag => (tag.category ?? '').toLowerCase() === 'type').map((tag) => (
-                    <View
-                      key={tag.id}
-                      style={[styles.tagPill, { borderColor: palette.tint, backgroundColor: theme === 'light' ? '#f0f9ff' : '#1e293b' }]}
-                    >
-                      <Text style={[styles.tagText, { color: palette.text }]}>{tag.name}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-              {/* Amenity tags */}
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardLabel, { marginBottom: 6, color: palette.text }]}>Amenities</Text>
-                <View style={styles.tagContainer}>
-                  {bar.tags.filter(tag => (tag.category ?? '').toLowerCase() === 'amenity').map((tag) => (
-                    <View
-                      key={tag.id}
-                      style={[styles.tagPill, { borderColor: palette.tint, backgroundColor: theme === 'light' ? '#f0f9ff' : '#1e293b' }]}
-                    >
-                      <Text style={[styles.tagText, { color: palette.text }]}>{tag.name}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
+            <View style={styles.heroContent} pointerEvents="none">
+              <Text style={styles.heroTitle}>{bar.name}</Text>
             </View>
           </View>
         ) : null}
 
-        {sortedHours.length > 0 ? (
-          <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
-            <Text style={[styles.sectionHeading, { color: palette.text }]}>Hours</Text>
-            {sortedHours.map((hour) => {
-              const dayLabel = DAY_NAMES[hour.dayOfWeek] ?? `Day ${hour.dayOfWeek}`;
-              if (hour.isClosed) {
+        <View style={[styles.bodyContent, { paddingTop: heroRegion ? 32 : 20 }]}>
+          <View
+            style={[
+              styles.card,
+              theme === 'light' ? styles.cardLight : styles.cardDark,
+              styles.heroSection,
+              heroRegion ? styles.heroSectionOverlap : null,
+            ]}
+          >
+            {!heroRegion ? (
+              <Text style={[styles.barName, { color: palette.text }]}>{bar.name}</Text>
+            ) : null}
+            {bar.description ? (
+              <Text style={[styles.barDescription, { color: theme === 'light' ? '#4b5563' : '#cbd5f5' }]}>
+                {bar.description}
+              </Text>
+            ) : null}
+            {addressLabel ? (
+              <TouchableOpacity onPress={() => openMapsForAddress(addressLabel)} activeOpacity={0.8}>
+                <Text style={[styles.heroAddressLabel, { color: palette.tint }]}>Address</Text>
+                <Text style={[styles.heroAddressText, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>{addressLabel}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {contactActions.length > 0 ? (
+              <View style={styles.contactRow}>
+                {contactActions.map((action) => (
+                  <TouchableOpacity
+                    key={action.key}
+                    onPress={action.onPress}
+                    accessibilityRole="button"
+                    accessibilityLabel={action.accessibilityLabel}
+                    style={[
+                      styles.contactIconButton,
+                      theme === 'light' ? styles.contactIconButtonLight : styles.contactIconButtonDark,
+                    ]}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <FontAwesome name={action.iconName} size={18} color={palette.tint} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+            {bar.id ? (
+              <TouchableOpacity
+                onPress={handleViewUpcomingEvents}
+                accessibilityRole="button"
+                accessibilityLabel={`See upcoming events at ${bar.name}`}
+                style={[styles.eventsButton, { borderColor: palette.tint }]}
+                activeOpacity={0.85}
+              >
+                <FontAwesome name="calendar" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+                <Text style={[styles.eventsButtonText, { color: palette.tint }]}>See upcoming events</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {bar.tags.length > 0 ? (
+            <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
+              <View style={{ flexDirection: 'row', gap: 16 }}>
+                {/* Type tags */}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardLabel, { marginBottom: 6, color: palette.text }]}>Type</Text>
+                  <View style={styles.tagContainer}>
+                    {bar.tags.filter(tag => (tag.category ?? '').toLowerCase() === 'type').map((tag) => (
+                      <View
+                        key={tag.id}
+                        style={[styles.tagPill, { borderColor: palette.tint, backgroundColor: theme === 'light' ? '#f0f9ff' : '#1e293b' }]}
+                      >
+                        <Text style={[styles.tagText, { color: palette.text }]}>{tag.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                {/* Amenity tags */}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardLabel, { marginBottom: 6, color: palette.text }]}>Amenities</Text>
+                  <View style={styles.tagContainer}>
+                    {bar.tags.filter(tag => (tag.category ?? '').toLowerCase() === 'amenity').map((tag) => (
+                      <View
+                        key={tag.id}
+                        style={[styles.tagPill, { borderColor: palette.tint, backgroundColor: theme === 'light' ? '#f0f9ff' : '#1e293b' }]}
+                      >
+                        <Text style={[styles.tagText, { color: palette.text }]}>{tag.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
+          {sortedHours.length > 0 ? (
+            <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
+              <Text style={[styles.sectionHeading, { color: palette.text }]}>Hours</Text>
+              {sortedHours.map((hour) => {
+                const dayLabel = DAY_NAMES[hour.dayOfWeek] ?? `Day ${hour.dayOfWeek}`;
+                if (hour.isClosed) {
+                  return (
+                    <View key={dayLabel} style={styles.hourRow}>
+                      <Text style={[styles.hourDay, { color: palette.text }]}>{dayLabel}</Text>
+                      <Text style={[styles.hourValue, { color: theme === 'light' ? '#94a3b8' : '#94a3b8' }]}>Closed</Text>
+                    </View>
+                  );
+                }
+                const openLabel = formatHourToken(hour.openTime);
+                const closeLabel = formatHourToken(hour.closeTime);
                 return (
                   <View key={dayLabel} style={styles.hourRow}>
                     <Text style={[styles.hourDay, { color: palette.text }]}>{dayLabel}</Text>
-                    <Text style={[styles.hourValue, { color: theme === 'light' ? '#94a3b8' : '#94a3b8' }]}>Closed</Text>
+                    <Text style={[styles.hourValue, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>
+                      {openLabel && closeLabel ? `${openLabel} – ${closeLabel}` : 'Hours coming soon'}
+                      {hour.crossesMidnight ? ' *' : ''}
+                    </Text>
                   </View>
                 );
-              }
-              const openLabel = formatHourToken(hour.openTime);
-              const closeLabel = formatHourToken(hour.closeTime);
-              return (
-                <View key={dayLabel} style={styles.hourRow}>
-                  <Text style={[styles.hourDay, { color: palette.text }]}>{dayLabel}</Text>
-                  <Text style={[styles.hourValue, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>
-                    {openLabel && closeLabel ? `${openLabel} – ${closeLabel}` : 'Hours coming soon'}
-                    {hour.crossesMidnight ? ' *' : ''}
-                  </Text>
-                </View>
-              );
-            })}
-            {sortedHours.some((hour) => hour.crossesMidnight) ? (
-              <Text style={[styles.hourFootnote, { color: theme === 'light' ? '#9ca3af' : '#94a3b8' }]}>* Closes after midnight</Text>
-            ) : null}
-          </View>
-        ) : null}
+              })}
+              {sortedHours.some((hour) => hour.crossesMidnight) ? (
+                <Text style={[styles.hourFootnote, { color: theme === 'light' ? '#9ca3af' : '#94a3b8' }]}>* Closes after midnight</Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </ScrollView>
     );
   };
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
-      <Stack.Screen options={{ title: bar?.name ?? 'Bar Details', headerBackTitle: 'Back' }} />
+      <Stack.Screen
+        options={{
+          headerTransparent: true,
+          headerTitle: '',
+          headerBackTitleVisible: false,
+          headerBackTitle: '',
+          headerBackButtonDisplayMode: 'minimal',
+          headerTintColor: '#ffffff',
+          headerShadowVisible: false,
+        }}
+      />
       {content()}
     </View>
   );
@@ -539,35 +568,59 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
-    padding: 20,
+    paddingBottom: 40,
+  },
+  bodyContent: {
+    width: '100%',
+    paddingHorizontal: 20,
     gap: 20,
   },
   heroMapWrapper: {
-    height: 240,
-    borderRadius: 24,
+    width: '100%',
+    height: 360,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     overflow: 'hidden',
-    marginHorizontal: 20,
   },
   heroMap: {
     width: '100%',
     height: '100%',
+    marginTop: -30,
   },
   heroMapFade: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 110,
+    height: '80%',
+  },
+  heroContent: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 60,
+    paddingTop: 80,
+    gap: 12,
+  },
+  heroTitle: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   section: {
     gap: 12,
   },
   heroSection: {
-    paddingTop: 8,
+    gap: 12,
   },
   heroSectionOverlap: {
-    marginTop: -40,
+    marginTop: -48,
   },
   contactRow: {
     flexDirection: 'row',
