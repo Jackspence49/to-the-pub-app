@@ -36,6 +36,7 @@ type Bar = {
   fullAddress?: string;
   instagram?: string;
   facebook?: string;
+  twitter?: string;
   distanceKm?: number;
   distanceMiles?: number;
   tags: BarTag[];
@@ -228,10 +229,37 @@ const mapToBar = (raw: LooseObject, index: number): Bar => {
     fullAddress,
     instagram: raw.instagram ?? undefined,
     facebook: raw.facebook ?? undefined,
+    twitter: normalizeTwitterUrl(raw.twitter),
     distanceKm,
     distanceMiles,
     tags: dedupedTags,
   };
+};
+
+const normalizeTwitterUrl = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^(?:www\.)?(?:twitter\.com|x\.com)(?:\/|$)/i.test(trimmed)) {
+    return ensureProtocol(trimmed);
+  }
+
+  const handle = trimmed.replace(/^@/, '');
+  if (!handle) {
+    return undefined;
+  }
+
+  return `https://x.com/${handle}`;
 };
 
 const normalizeTagName = (value: string): string => value.trim().toLowerCase();
@@ -259,7 +287,7 @@ const ensureProtocol = (value: string): string => {
   return `https://${value}`;
 };
 
-const openExternalLink = async (value: string) => {
+const openExternalLink = async (value?: string) => {
   if (!value) {
     return;
   }
@@ -329,12 +357,10 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
         </Text>
       </TouchableOpacity>
 
-      {typeof bar.distanceMiles === 'number' ? (
+      {distanceLabel ? (
         <View style={styles.distanceDetailRow}>
           <MaterialIcons name="location-on" size={16} color={secondaryMutedColor} style={{ marginRight: 4 }} />
-          <Text style={[styles.distanceDetail, { color: secondaryMutedColor }]}> 
-            {bar.distanceMiles.toFixed(2)} miles away
-          </Text>
+          <Text style={[styles.distanceDetail, { color: secondaryMutedColor }]}>{distanceLabel}</Text>
         </View>
       ) : null}
 
@@ -353,7 +379,7 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
         </View>
       ) : null}
 
-      {(bar.facebook || bar.instagram) && (
+      {(bar.facebook || bar.instagram || bar.twitter) && (
         <View style={styles.socialRow}>
           {bar.facebook ? (
             <TouchableOpacity
@@ -371,6 +397,15 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
               activeOpacity={0.8}
             >
               <FontAwesome name="instagram" size={16} color={palette.tint} />
+            </TouchableOpacity>
+          ) : null}
+          {bar.twitter ? (
+            <TouchableOpacity
+              onPress={() => openExternalLink(bar.twitter)}
+              style={[styles.socialButton, { borderColor: palette.tint }]}
+              activeOpacity={0.8}
+            >
+              <FontAwesome name="twitter" size={16} color={palette.tint} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -406,7 +441,6 @@ const TagFilterPanel = ({
   const inactiveBackground = theme === 'light' ? '#f8fafc' : '#1e242d';
   const inactiveBorder = theme === 'light' ? '#dce2ec' : '#2c333c';
   const inactiveText = theme === 'light' ? '#475569' : '#c7d0de';
-  const subtleText = theme === 'light' ? '#64748b' : '#9ba5ba';
   const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
   const orderedTags = useMemo(() => {
     if (selectedTags.length === 0) {
@@ -742,7 +776,7 @@ export default function BarsScreen() {
         setBusy(false);
       }
     },
-    [barsEndpoint]
+    []
   );
 
   useEffect(() => {

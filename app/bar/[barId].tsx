@@ -2,14 +2,14 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { Colors } from '@/constants/theme';
@@ -46,6 +46,7 @@ type BarDetail = {
   website?: string;
   instagram?: string;
   facebook?: string;
+  twitter?: string;
   tags: BarTag[];
   hours: BarHour[];
 };
@@ -63,6 +64,32 @@ const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const ensureProtocol = (value: string) => (value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
+
+const normalizeTwitterUrl = (value?: string | null) => {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (/^(?:www\.)?(?:twitter\.com|x\.com)(?:\/|$)/i.test(trimmed)) {
+    return ensureProtocol(trimmed);
+  }
+
+  const handle = trimmed.replace(/^@/, '');
+  if (!handle) {
+    return undefined;
+  }
+
+  return `https://x.com/${handle}`;
+};
 
 const formatHourToken = (value?: string | null) => {
   if (!value || typeof value !== 'string') {
@@ -144,6 +171,7 @@ const mapToBarDetail = (raw: LooseObject): BarDetail => {
     website: raw.website ?? raw.site ?? undefined,
     instagram: raw.instagram ?? undefined,
     facebook: raw.facebook ?? undefined,
+    twitter: normalizeTwitterUrl(raw.twitter ?? raw.twitter_url ?? raw.x ?? raw.x_url ?? undefined),
     tags,
     hours,
   };
@@ -281,6 +309,14 @@ export default function BarDetailScreen() {
         iconName: 'facebook',
         onPress: () => openExternal(bar.facebook),
         accessibilityLabel: `Open ${bar.name} Facebook`,
+      });
+    }
+    if (bar.twitter) {
+      actions.push({
+        key: 'twitter',
+        iconName: 'twitter',
+        onPress: () => openExternal(bar.twitter),
+        accessibilityLabel: `Open ${bar.name} Twitter`,
       });
     }
     if (bar.phone) {
@@ -445,7 +481,7 @@ export default function BarDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
-      <Stack.Screen options={{ title: bar?.name ?? 'Bar Details' }} />
+      <Stack.Screen options={{ title: bar?.name ?? 'Bar Details', headerBackTitle: 'Back' }} />
       {content()}
     </View>
   );

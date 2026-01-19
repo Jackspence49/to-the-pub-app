@@ -298,7 +298,7 @@ export default function EventDetailScreen() {
     });
   }, [event, router]);
 
-  const showActionSection = actionButtons.length > 0;
+  const showActionSection = actionButtons.length > 0 || Boolean(event?.barId);
 
   const content = () => {
     if (isLoading) {
@@ -344,42 +344,7 @@ export default function EventDetailScreen() {
           ) : null}
           <Text style={[styles.eventTitle, { color: palette.text }]}>{event.title}</Text>
           {event.barName ? (
-            <TouchableOpacity
-              onPress={event.barId ? handleViewBarDetails : undefined}
-              activeOpacity={event.barId ? 0.75 : 1}
-              disabled={!event.barId}
-            >
-              <Text
-                style={[
-                  styles.eventMeta,
-                  event.barId
-                    ? [styles.hostedByLink, { color: palette.tint }]
-                    : { color: theme === 'light' ? '#4b5563' : '#cbd5f5' },
-                ]}
-              >
-                Hosted by {event.barName}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-          {event.barId ? (
-            <View style={styles.barQuickActions}>
-              <TouchableOpacity
-                onPress={handleViewBarDetails}
-                style={[styles.barQuickAction, { borderColor: palette.tint }]}
-                activeOpacity={0.85}
-              >
-                <FontAwesome name="map-marker" size={14} color={palette.tint} style={{ marginRight: 6 }} />
-                <Text style={[styles.barQuickActionText, { color: palette.tint }]}>Bar details</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleViewBarEvents}
-                style={[styles.barQuickAction, styles.barQuickActionPrimary]}
-                activeOpacity={0.88}
-              >
-                <FontAwesome name="calendar" size={14} color="#1f2937" style={{ marginRight: 6 }} />
-                <Text style={[styles.barQuickActionText, styles.barQuickActionPrimaryText]}>Bar events</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.eventMeta, { color: theme === 'light' ? '#4b5563' : '#cbd5f5' }]}>Hosted by {event.barName}</Text>
           ) : null}
           <View style={styles.timeCard}>
             <Text style={[styles.timeHeading, { color: palette.text }]}>{dateLabel}</Text>
@@ -412,6 +377,29 @@ export default function EventDetailScreen() {
               </TouchableOpacity>
             ))}
 
+            {event?.barId ? (
+              <>
+                <TouchableOpacity
+                  onPress={handleViewBarDetails}
+                  style={[styles.actionButton, { borderColor: palette.tint }]}
+                  activeOpacity={0.85}
+                >
+                  <FontAwesome name="info-circle" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+                  <Text style={[styles.actionButtonText, { color: palette.tint }]}>View bar details</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleViewBarEvents}
+                  style={[styles.actionButton, styles.primaryActionButton]}
+                  activeOpacity={0.88}
+                >
+                  <FontAwesome name="calendar" size={16} color="#1f2937" style={{ marginRight: 8 }} />
+                  <Text style={[styles.actionButtonText, styles.primaryActionButtonText]}>
+                    See all events at {event.barName ?? 'this bar'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
           </View>
         ) : null}
 
@@ -430,7 +418,7 @@ export default function EventDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
-      <Stack.Screen options={{ title: event?.title ?? 'Event Details' }} />
+      <Stack.Screen options={{ title: event?.title ?? 'Event Details', headerBackTitle: 'Back' }} />
       {content()}
     </View>
   );
@@ -528,34 +516,6 @@ const styles = StyleSheet.create({
   },
   eventMeta: {
     fontSize: 15,
-  },
-  hostedByLink: {
-    fontWeight: '600',
-  },
-  barQuickActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  barQuickAction: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  barQuickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  barQuickActionPrimary: {
-    backgroundColor: '#fde68a',
-    borderColor: '#fde68a',
-  },
-  barQuickActionPrimaryText: {
-    color: '#1f2937',
   },
   timeCard: {
     borderRadius: 16,
