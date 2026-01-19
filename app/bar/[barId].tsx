@@ -1,5 +1,5 @@
 import { FontAwesome } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -192,6 +192,7 @@ const openMapsForAddress = async (address?: string) => {
 
 export default function BarDetailScreen() {
   const { barId } = useLocalSearchParams<{ barId?: string }>();
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = (colorScheme ?? 'light') as ThemeName;
   const palette = Colors[theme];
@@ -232,6 +233,19 @@ export default function BarDetailScreen() {
   useEffect(() => {
     fetchBarDetail();
   }, [fetchBarDetail]);
+
+  const handleViewUpcomingEvents = useCallback(() => {
+    if (!bar?.id) {
+      return;
+    }
+    router.push({
+      pathname: '/bar-events/[barId]',
+      params: {
+        barId: bar.id,
+        barName: bar.name,
+      },
+    });
+  }, [bar, router]);
 
   const sortedHours = useMemo(() => {
     if (!bar?.hours?.length) {
@@ -334,6 +348,18 @@ export default function BarDetailScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          ) : null}
+          {bar.id ? (
+            <TouchableOpacity
+              onPress={handleViewUpcomingEvents}
+              accessibilityRole="button"
+              accessibilityLabel={`See upcoming events at ${bar.name}`}
+              style={[styles.eventsButton, { borderColor: palette.tint }]}
+              activeOpacity={0.85}
+            >
+              <FontAwesome name="calendar" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+              <Text style={[styles.eventsButtonText, { color: palette.tint }]}>See upcoming events</Text>
+            </TouchableOpacity>
           ) : null}
         </View>
 
@@ -440,6 +466,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  eventsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  eventsButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   contactIconButton: {
     width: 48,

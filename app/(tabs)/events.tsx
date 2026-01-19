@@ -10,6 +10,7 @@ import {
 	RefreshControl,
 	StyleSheet,
 	Text,
+	TextInput,
 	TouchableOpacity,
 	View,
 } from 'react-native';
@@ -35,6 +36,7 @@ type EventInstance = {
 	eventTagName?: string;
 	eventDate?: string;
 	crossesMidnight?: boolean;
+	distanceMiles?: number;
 };
 
 type EventTag = {
@@ -52,6 +54,13 @@ const TAG_PREVIEW_COUNT = 3;
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 const PAGE_SIZE = 6;
+const DEFAULT_COORDINATES = {
+	latitude: 42.34105265628477,
+	longitude: -71.0521475972448,
+};
+const DEFAULT_RADIUS_MILES = 10;
+const DISTANCE_UNIT = 'miles';
+const RADIUS_PRESET_OPTIONS = [5, 10, 15, 25];
 
 const eventTagImageMap: Record<string, ImageSourcePropType> = {
 	bingo: require('@/assets/images/bingo.png'),
@@ -326,6 +335,12 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 		raw.event_tag_id ??
 		undefined;
 
+	const distanceMiles = (() => {
+		const candidates = [raw.distance_miles, raw.distanceMiles, raw.distance];
+		const numeric = candidates.find((entry) => typeof entry === 'number');
+		return typeof numeric === 'number' ? numeric : undefined;
+	})();
+
 	return {
 		id: String(primaryId),
 		instanceId: String(primaryId),
@@ -342,6 +357,7 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 		eventTagName,
 		eventDate: eventDate ?? startDateTime,
 		crossesMidnight,
+		distanceMiles,
 	};
 };
 
@@ -450,6 +466,22 @@ const formatEventTime = (value?: string): string => {
 	}).format(date);
 };
 
+const formatDistance = (value?: number): string | null => {
+	if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
+		return null;
+	}
+
+	if (value < 0.1) {
+		return `< 0.1 ${DISTANCE_UNIT} away`;
+	}
+
+	const formatter = new Intl.NumberFormat('en-US', {
+		maximumFractionDigits: value < 10 ? 1 : 0,
+	});
+
+	return `${formatter.format(value)} ${DISTANCE_UNIT} away`;
+};
+
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
 type EventCardProps = {
@@ -463,6 +495,7 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 	const dateLabel = formatEventDay(event.eventDate ?? event.startsAt);
 	const startTimeLabel = formatEventTime(event.startsAt);
 	const endTimeLabel = formatEventTime(event.endsAt);
+	const distanceLabel = formatDistance(event.distanceMiles);
 	// Gather all tag IDs (eventTagName and tags[]), filter out falsy, dedupe, and slice
 	const tagIds = Array.from(
 		new Set([
@@ -529,6 +562,12 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 				<Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
 				<Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
 				<Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
+				{distanceLabel ? (
+					<View style={styles.distanceRow}>
+						<MaterialIcons name="place" size={16} color={tokens.eventMeta} style={styles.distanceIcon} />
+						<Text style={[styles.distanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
+					</View>
+				) : null}
 
 				<View
 					style={[
@@ -569,6 +608,106 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 				) : null}
 			</View>
 		</TouchableOpacity>
+	);
+};
+
+type RadiusSelectorProps = {
+	value: number;
+	onChange: (value: number) => void;
+	theme: ThemeName;
+};
+
+const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
+	const [radiusText, setRadiusText] = useState(String(value));
+
+	useEffect(() => {
+		setRadiusText(String(value));
+	}, [value]);
+
+	const highlightColor = theme === 'light' ? '#f5a524' : '#f6c15b';
+	const textColor = theme === 'light' ? '#111827' : '#f8fafc';
+	const subtleText = theme === 'light' ? '#4b5563' : '#cbd5f5';
+	const borderColor = theme === 'light' ? '#e5e7eb' : '#2b313c';
+	const backgroundColor = theme === 'light' ? '#ffffff' : '#191f28';
+	const chipInactiveBg = theme === 'light' ? '#f8fafc' : '#1e242d';
+	const chipInactiveBorder = theme === 'light' ? '#dce2ec' : '#2c333c';
+	const chipInactiveText = theme === 'light' ? '#475569' : '#c7d0de';
+	const inputBackground = theme === 'light' ? '#f9fafb' : '#10131a';
+	const inputBorder = theme === 'light' ? '#e5e7eb' : '#2b313c';
+	const inputText = theme === 'light' ? '#111827' : '#f3f4f6';
+	const placeholder = theme === 'light' ? '#9ca3af' : '#6b7280';
+
+	const handleCommit = useCallback(() => {
+		const parsed = Number(radiusText);
+		if (!Number.isNaN(parsed) && parsed > 0) {
+			onChange(parsed);
+		} else {
+			setRadiusText(String(value));
+		}
+	}, [onChange, radiusText, value]);
+
+	const handlePresetPress = useCallback(
+		(option: number) => {
+			setRadiusText(String(option));
+			onChange(option);
+		},
+		[onChange]
+	);
+
+	return (
+		<View style={[styles.radiusCard, { borderColor, backgroundColor }]}>
+			<Text style={[styles.radiusTitle, { color: textColor }]}>Search radius</Text>
+			<Text style={[styles.radiusSubtitle, { color: subtleText }]}>
+				Currently showing events within {value} {DISTANCE_UNIT} of the default location.
+			</Text>
+			<View style={styles.radiusControls}>
+				<View style={styles.radiusChipRow}>
+					{RADIUS_PRESET_OPTIONS.map((option) => {
+						const isActive = option === value;
+						return (
+							<TouchableOpacity
+								key={`radius-${option}`}
+								onPress={() => handlePresetPress(option)}
+								style={[
+									styles.radiusChip,
+									isActive
+										? [styles.radiusChipActive, { backgroundColor: highlightColor, borderColor: highlightColor }]
+										: [
+											styles.radiusChipInactive,
+											{ backgroundColor: chipInactiveBg, borderColor: chipInactiveBorder },
+										],
+								]}
+								activeOpacity={0.85}
+							>
+								<Text
+									style={[
+										styles.radiusChipText,
+										{ color: isActive ? '#1e1202' : chipInactiveText },
+									]}
+								>
+									{option} {DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT}
+								</Text>
+							</TouchableOpacity>
+						);
+					})}
+				</View>
+				<View style={[styles.radiusInputWrapper, { borderColor: inputBorder, backgroundColor: inputBackground }]}>
+					<TextInput
+						style={[styles.radiusInput, { color: inputText }]}
+						keyboardType="numeric"
+						value={radiusText}
+						onChangeText={setRadiusText}
+						onBlur={handleCommit}
+						onSubmitEditing={handleCommit}
+						placeholder={`e.g. ${DEFAULT_RADIUS_MILES}`}
+						placeholderTextColor={placeholder}
+						returnKeyType="done"
+						maxLength={4}
+					/>
+					<Text style={[styles.radiusUnitLabel, { color: subtleText }]}>{DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT}</Text>
+				</View>
+			</View>
+		</View>
 	);
 };
 
@@ -744,6 +883,7 @@ const EventsScreen = () => {
 	const [areTagsLoading, setAreTagsLoading] = useState(false);
 	const [tagsError, setTagsError] = useState<string | null>(null);
 	const [filtersExpanded, setFiltersExpanded] = useState(false);
+	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_RADIUS_MILES);
 
 	useEffect(() => {
 		setSelectedTagId(initialTagIdsFromParams[0] ?? null);
@@ -813,6 +953,10 @@ const EventsScreen = () => {
 		[router]
 	);
 
+	const handleRadiusChange = useCallback((nextRadius: number) => {
+		setSearchRadius(Math.max(1, nextRadius));
+	}, []);
+
 	const fetchEvents = useCallback(
 		async (pageToLoad: number, mode: FetchMode) => {
 			if (mode === 'paginate') {
@@ -841,6 +985,10 @@ const EventsScreen = () => {
 					upcoming: true,
 					limit: PAGE_SIZE,
 					page: pageToLoad,
+					lon: DEFAULT_COORDINATES.longitude,
+					lat: DEFAULT_COORDINATES.latitude,
+					radius: searchRadius,
+					unit: DISTANCE_UNIT,
 				};
 
 				if (selectedTagId) {
@@ -872,7 +1020,7 @@ const EventsScreen = () => {
 				}
 			}
 		},
-		[selectedTagId]
+		[searchRadius, selectedTagId]
 	);
 
 	useEffect(() => {
@@ -921,6 +1069,8 @@ const EventsScreen = () => {
 			>
 				<Text style={[styles.screenTitle, { color: tokens.headingText }]}>Upcoming events</Text>
 
+				<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
+
 				<EventTagFilterPanel
 					tags={availableTags}
 					selectedTagId={selectedTagId}
@@ -962,9 +1112,11 @@ const EventsScreen = () => {
 			filtersExpanded,
 			handleClearTags,
 			handleExpandFilters,
+			handleRadiusChange,
 			handleRetry,
 			handleSelectTag,
 			handleToggleFilterDropdown,
+			searchRadius,
 			selectedTagId,
 			tagsError,
 			theme,
@@ -1081,6 +1233,60 @@ const styles = StyleSheet.create({
 		marginTop: 4,
 		color: '#6b7280',
 		fontSize: 15,
+	},
+	radiusCard: {
+		marginTop: 20,
+		padding: 18,
+		borderRadius: 20,
+		borderWidth: 1,
+		gap: 12,
+	},
+	radiusTitle: {
+		fontSize: 18,
+		fontWeight: '600',
+	},
+	radiusSubtitle: {
+		fontSize: 14,
+		lineHeight: 20,
+	},
+	radiusControls: {
+		gap: 12,
+	},
+	radiusChipRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	radiusChip: {
+		borderWidth: 1,
+		borderRadius: 999,
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+	},
+	radiusChipActive: {},
+	radiusChipInactive: {},
+	radiusChipText: {
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	radiusInputWrapper: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		borderWidth: 1,
+		borderRadius: 14,
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+	},
+	radiusInput: {
+		flex: 1,
+		fontSize: 16,
+		fontWeight: '600',
+		paddingVertical: 6,
+	},
+	radiusUnitLabel: {
+		marginLeft: 6,
+		fontSize: 14,
+		fontWeight: '500',
 	},
 	filterSection: {
 		marginTop: 20,
@@ -1257,6 +1463,19 @@ const styles = StyleSheet.create({
 		marginTop: 6,
 		fontSize: 15,
 		color: '#4b5563',
+		fontWeight: '500',
+	},
+	distanceRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		marginTop: 4,
+		gap: 4,
+	},
+	distanceIcon: {
+		marginRight: 2,
+	},
+	distanceText: {
+		fontSize: 13,
 		fontWeight: '500',
 	},
 	timeRow: {

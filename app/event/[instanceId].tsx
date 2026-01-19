@@ -1,16 +1,16 @@
 import { FontAwesome } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Image,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { Colors } from '@/constants/theme';
@@ -21,6 +21,7 @@ type LooseObject = Record<string, any>;
 
 type EventDetail = {
   id: string;
+  barId?: string;
   title: string;
   description?: string;
   barName?: string;
@@ -125,6 +126,7 @@ const mapToEventDetail = (raw: LooseObject): EventDetail => {
   const dateSource = raw.date ?? raw.event_date ?? raw.starts_at ?? raw.start ?? undefined;
   const startTimeSource = raw.custom_start_time ?? raw.start_time ?? raw.start_time_formatted;
   const endTimeSource = raw.custom_end_time ?? raw.end_time ?? raw.end_time_formatted;
+  const barId = raw.bar_id ?? raw.bar?.id ?? raw.barId ?? undefined;
   const startsAt =
     raw.starts_at ??
     raw.start ??
@@ -145,6 +147,7 @@ const mapToEventDetail = (raw: LooseObject): EventDetail => {
         raw.event_id ??
         `${raw.name ?? raw.title ?? 'event'}-${raw.start_time ?? raw.starts_at ?? Date.now()}`
     ),
+    barId: barId ? String(barId) : undefined,
     title: raw.custom_title ?? raw.title ?? raw.name ?? 'Untitled event',
     description: raw.custom_description ?? raw.description ?? raw.summary ?? undefined,
     barName: raw.bar_name ?? raw.bar?.name ?? raw.venue?.name ?? undefined,
@@ -208,6 +211,7 @@ const openMaps = async (address?: string) => {
 
 export default function EventDetailScreen() {
   const { instanceId } = useLocalSearchParams<{ instanceId?: string }>();
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = (colorScheme ?? 'light') as ThemeName;
   const palette = Colors[theme];
@@ -269,6 +273,33 @@ export default function EventDetailScreen() {
     return buttons;
   }, [event]);
 
+  const handleViewBarEvents = useCallback(() => {
+    if (!event?.barId) {
+      return;
+    }
+    router.push({
+      pathname: '/bar-events/[barId]',
+      params: {
+        barId: event.barId,
+        barName: event.barName ?? '',
+      },
+    });
+  }, [event, router]);
+
+  const handleViewBarDetails = useCallback(() => {
+    if (!event?.barId) {
+      return;
+    }
+    router.push({
+      pathname: '/bar/[barId]',
+      params: {
+        barId: event.barId,
+      },
+    });
+  }, [event, router]);
+
+  const showActionSection = actionButtons.length > 0;
+
   const content = () => {
     if (isLoading) {
       return (
@@ -313,7 +344,42 @@ export default function EventDetailScreen() {
           ) : null}
           <Text style={[styles.eventTitle, { color: palette.text }]}>{event.title}</Text>
           {event.barName ? (
-            <Text style={[styles.eventMeta, { color: theme === 'light' ? '#4b5563' : '#cbd5f5' }]}>Hosted by {event.barName}</Text>
+            <TouchableOpacity
+              onPress={event.barId ? handleViewBarDetails : undefined}
+              activeOpacity={event.barId ? 0.75 : 1}
+              disabled={!event.barId}
+            >
+              <Text
+                style={[
+                  styles.eventMeta,
+                  event.barId
+                    ? [styles.hostedByLink, { color: palette.tint }]
+                    : { color: theme === 'light' ? '#4b5563' : '#cbd5f5' },
+                ]}
+              >
+                Hosted by {event.barName}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {event.barId ? (
+            <View style={styles.barQuickActions}>
+              <TouchableOpacity
+                onPress={handleViewBarDetails}
+                style={[styles.barQuickAction, { borderColor: palette.tint }]}
+                activeOpacity={0.85}
+              >
+                <FontAwesome name="map-marker" size={14} color={palette.tint} style={{ marginRight: 6 }} />
+                <Text style={[styles.barQuickActionText, { color: palette.tint }]}>Bar details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleViewBarEvents}
+                style={[styles.barQuickAction, styles.barQuickActionPrimary]}
+                activeOpacity={0.88}
+              >
+                <FontAwesome name="calendar" size={14} color="#1f2937" style={{ marginRight: 6 }} />
+                <Text style={[styles.barQuickActionText, styles.barQuickActionPrimaryText]}>Bar events</Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
           <View style={styles.timeCard}>
             <Text style={[styles.timeHeading, { color: palette.text }]}>{dateLabel}</Text>
@@ -332,7 +398,7 @@ export default function EventDetailScreen() {
           ) : null}
         </View>
 
-        {actionButtons.length > 0 ? (
+        {showActionSection ? (
           <View style={styles.actionList}>
             {actionButtons.map((button) => (
               <TouchableOpacity
@@ -345,6 +411,7 @@ export default function EventDetailScreen() {
                 <Text style={[styles.actionButtonText, { color: palette.tint }]}>{button.label}</Text>
               </TouchableOpacity>
             ))}
+
           </View>
         ) : null}
 
@@ -462,6 +529,34 @@ const styles = StyleSheet.create({
   eventMeta: {
     fontSize: 15,
   },
+  hostedByLink: {
+    fontWeight: '600',
+  },
+  barQuickActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  barQuickAction: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barQuickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  barQuickActionPrimary: {
+    backgroundColor: '#fde68a',
+    borderColor: '#fde68a',
+  },
+  barQuickActionPrimaryText: {
+    color: '#1f2937',
+  },
   timeCard: {
     borderRadius: 16,
     padding: 16,
@@ -506,6 +601,13 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  primaryActionButton: {
+    borderColor: 'rgba(15, 23, 42, 0)',
+    backgroundColor: '#fef3c7',
+  },
+  primaryActionButtonText: {
+    color: '#1f2937',
   },
   cardLabel: {
     fontSize: 16,

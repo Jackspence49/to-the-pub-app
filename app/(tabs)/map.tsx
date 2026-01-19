@@ -6,8 +6,8 @@ import MapView, { Region } from 'react-native-maps';
 export default function MapScreen() {
   // Boston region coordinates
   const bostonRegion: Region = {
-    latitude: 42.3601,
-    longitude: -71.0589,
+    latitude: 42.34105265628477,
+    longitude: -71.0521475972448,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   };

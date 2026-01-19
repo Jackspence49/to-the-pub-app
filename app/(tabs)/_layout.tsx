@@ -1,24 +1,40 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { LogoHeader } from '@/components/logo-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/hooks/use-auth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { status } = useAuth();
+  const palette = Colors[colorScheme ?? 'light'];
+
+  if (status === 'checking') {
+    return (
+      <View style={[styles.loaderContainer, { backgroundColor: palette.background }]}>
+        <ActivityIndicator size="large" color={palette.tint} />
+      </View>
+    );
+  }
+
+  if (status !== 'authenticated') {
+    return <Redirect href="/login" />;
+  }
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: palette.tint,
         headerShown: true,
         headerTitle: () => <LogoHeader />,
         headerTitleAlign: 'left',
         headerStyle: {
-          backgroundColor: Colors[colorScheme ?? 'light'].background,
+          backgroundColor: palette.background,
         },
         headerShadowVisible: false,
         tabBarButton: HapticTab,
@@ -47,3 +63,11 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  loaderContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
