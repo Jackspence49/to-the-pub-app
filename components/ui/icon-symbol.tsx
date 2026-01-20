@@ -20,6 +20,7 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   calendar: 'event',
   'map.fill': 'map',
+  magnifyingglass: 'search',
   wineglass: 'local-bar',
 } as IconMapping;
 

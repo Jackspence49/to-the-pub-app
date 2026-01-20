@@ -4,8 +4,6 @@ import type { ListRenderItem } from 'react-native';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
-  ImageSourcePropType,
   RefreshControl,
   StyleSheet,
   Text,
@@ -43,31 +41,6 @@ const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 const PAGE_SIZE = 6;
 
-const eventTagImageMap: Record<string, ImageSourcePropType> = {
-  bingo: require('@/assets/images/bingo.png'),
-  'comedy show': require('@/assets/images/comedy.png'),
-  dj: require('@/assets/images/DJ.png'),
-  'drink special': require('@/assets/images/Drink Special.png'),
-  'food special': require('@/assets/images/Food Special.png'),
-  'happy hour': require('@/assets/images/Happy Hour.png'),
-  karaoke: require('@/assets/images/Karaoke.png'),
-  'live music': require('@/assets/images/live music.png'),
-  'sports viewing': require('@/assets/images/Sports Viewing.png'),
-  trivia: require('@/assets/images/Triva.png'),
-};
-
-const normalizeImageKey = (value?: string) => value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
-
-const resolveEventTagImage = (candidates: string[]): ImageSourcePropType | null => {
-  for (const candidate of candidates) {
-    const normalized = normalizeImageKey(candidate);
-    if (normalized && eventTagImageMap[normalized]) {
-      return eventTagImageMap[normalized];
-    }
-  }
-  return null;
-};
-
 const getEventThemeTokens = (theme: ThemeName) => {
   const isLight = theme === 'light';
   return {
@@ -91,6 +64,7 @@ const getEventThemeTokens = (theme: ThemeName) => {
     timeValue: isLight ? '#111827' : '#f3f4f6',
     footerText: isLight ? '#6b7280' : '#9ca3af',
     indicator: isLight ? '#111827' : '#f8fafc',
+    accent: Colors[theme]?.tint ?? '#2563eb',
   };
 };
 
@@ -127,6 +101,17 @@ const combineDateAndTime = (
   return `${datePart}T${timeValue}`;
 };
 
+const isWithinCurrentWeek = (date: Date): boolean => {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+  return date >= startOfWeek && date <= endOfWeek;
+};
+
 const formatEventDay = (value?: string): string => {
   if (!value) {
     return 'Date coming soon';
@@ -134,6 +119,9 @@ const formatEventDay = (value?: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return 'Date coming soon';
+  }
+  if (isWithinCurrentWeek(date)) {
+    return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
   }
   return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
@@ -302,14 +290,40 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
       offsetDays: crossesMidnight ? 1 : 0,
     }) ??
     undefined;
-  const eventTagName =
-    raw.event_tag?.name ??
-    raw.event_tag_name ??
-    raw.tag_name ??
-    raw.tag?.name ??
-    raw.event_tag ??
-    raw.event_tag_id ??
-    undefined;
+  const eventTagNameSources = [
+    raw.event_tag?.name,
+    raw.event_tag?.title,
+    raw.event_tag?.label,
+    raw.event_tag_name,
+    raw.eventTagName,
+    raw.tag_name,
+    raw.tagName,
+    raw.tag?.name,
+    raw.tag?.title,
+    raw.tag?.label,
+  ];
+  let eventTagName: string | undefined;
+  for (const source of eventTagNameSources) {
+    if (typeof source === 'string') {
+      const trimmed = source.trim();
+      if (trimmed.length > 0) {
+        eventTagName = trimmed;
+        break;
+      }
+    }
+  }
+  if (!eventTagName && typeof raw.event_tag === 'string') {
+    const trimmed = raw.event_tag.trim();
+    if (/[A-Za-z]/.test(trimmed)) {
+      eventTagName = trimmed;
+    }
+  }
+  if (!eventTagName && typeof raw.event_tag?.slug === 'string') {
+    const trimmed = raw.event_tag.slug.trim();
+    if (trimmed.length > 0) {
+      eventTagName = trimmed;
+    }
+  }
   return {
     id: String(primaryId),
     instanceId: String(primaryId),
@@ -336,24 +350,15 @@ type EventCardProps = {
 };
 
 const EventCard = ({ event, tokens, onPress }: EventCardProps) => {
-  const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
+  const primaryTagLabel = useMemo(() => {
+    const tagName = event.eventTagName?.trim();
+    const fallbackTag = event.tags?.find((tag) => typeof tag === 'string' && tag.trim().length > 0);
+    const finalTag = tagName || (fallbackTag ? fallbackTag.trim() : undefined);
+    return finalTag ?? 'Event Tag';
+  }, [event.eventTagName, event.tags]);
   const dateLabel = formatEventDay(event.eventDate ?? event.startsAt);
   const startTimeLabel = formatEventTime(event.startsAt);
   const endTimeLabel = formatEventTime(event.endsAt);
-  const tagCandidates = useMemo(() => {
-    const combined = [event.eventTagName, ...(event.tags ?? [])].filter(Boolean) as string[];
-    return combined.slice(0, 3);
-  }, [event.eventTagName, event.tags]);
-  const tagSignature = tagCandidates.join('|');
-  const fallbackImageSource = useMemo<ImageSourcePropType | null>(() => {
-    if (event.heroImageUrl) {
-      return null;
-    }
-    return resolveEventTagImage([event.eventTagName ?? '', ...tagCandidates]);
-  }, [event.eventTagName, event.heroImageUrl, tagSignature]);
-  const cardImageSource: ImageSourcePropType | null = event.heroImageUrl
-    ? { uri: event.heroImageUrl }
-    : fallbackImageSource;
   return (
     <TouchableOpacity
       activeOpacity={0.92}
@@ -369,22 +374,12 @@ const EventCard = ({ event, tokens, onPress }: EventCardProps) => {
         },
       ]}
     >
-      {cardImageSource ? (
-        <Image
-          source={cardImageSource}
-          style={[styles.cardImage, { backgroundColor: tokens.imageBackground }]}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={[styles.cardImage, styles.cardImagePlaceholder, { backgroundColor: tokens.imageBackground }]}>
-          <Text style={[styles.cardImagePlaceholderText, { color: tokens.imagePlaceholderText }]}>No image</Text>
-        </View>
-      )}
-
       <View style={styles.cardBody}>
-        <Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
+        <View style={[styles.tagPill, { borderColor: tokens.accent }]}>
+          <Text style={[styles.tagLabel, { color: tokens.accent }]}>{primaryTagLabel}</Text>
+        </View>
         <Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
-        <Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
+        <Text style={[styles.dateText, { color: tokens.eventMeta }]}>{dateLabel}</Text>
 
         <View
           style={[
@@ -393,33 +388,20 @@ const EventCard = ({ event, tokens, onPress }: EventCardProps) => {
           ]}
         >
           <View style={styles.timeColumn}>
-            <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start Time</Text>
+            <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start</Text>
             <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
           </View>
           <View
             style={[
               styles.timeColumn,
-              styles.timeColumnRight,
+              styles.timeColumnDivider,
               { borderLeftColor: tokens.timeBorder },
             ]}
           >
-            <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End Time</Text>
+            <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End</Text>
             <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
           </View>
         </View>
-
-        {tagCandidates.length > 0 ? (
-          <View style={styles.tagRow}>
-            {tagCandidates.map((tag, index) => (
-              <View
-                key={`${event.id}-tag-${index}`}
-                style={[styles.tagPill, { backgroundColor: '#f0fdf4', borderColor: '#86efac' }]}
-              >
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -535,22 +517,16 @@ export default function BarEventsScreen() {
     [handleOpenEvent, tokens]
   );
 
-  const renderHeader = useMemo(
-    () => (
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: tokens.headerBackground, borderBottomColor: tokens.headerBorder },
-        ]}
-      >
-        <Text style={[styles.headerTitle, { color: tokens.headingText }]}>
-          {barName ? `${barName}` : 'Bar events'}
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: tokens.subheadingText }]}>Upcoming events for this bar</Text>
+  const navTitle = useMemo(() => {
+    const introLabel = 'Upcoming events for';
+    const barLabel = barName ?? 'This bar';
+    return (
+      <View style={styles.navTitleContainer}>
+        <Text style={[styles.navTitleEyebrow, { color: tokens.subheadingText }]}>{introLabel}</Text>
+        <Text style={[styles.navTitleMain, { color: tokens.headingText }]}>{barLabel}</Text>
       </View>
-    ),
-    [barName, tokens]
-  );
+    );
+  }, [barName, tokens]);
 
   const renderEmpty = useMemo(() => {
     if (isInitialLoading) {
@@ -600,13 +576,20 @@ export default function BarEventsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: tokens.pageBackground }]}>
-      <Stack.Screen options={{ title: barName ? `${barName} Events` : 'Bar Events' }} />
+      <Stack.Screen
+        options={{
+          headerTintColor: tokens.headingText,
+          headerTitleAlign: 'left',
+          headerStyle: { backgroundColor: tokens.headerBackground },
+          headerShadowVisible: true,
+          headerTitle: () => navTitle,
+        }}
+      />
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={events.length === 0 ? styles.listContentEmpty : styles.listContent}
-        ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={renderFooter}
         onEndReached={handleEndReached}
@@ -630,19 +613,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    paddingTop: 56,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
+  navTitleContainer: {
+    flexDirection: 'column',
   },
-  headerTitle: {
-    fontSize: 26,
+  navTitleEyebrow: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  navTitleMain: {
+    marginTop: 2,
+    fontSize: 20,
     fontWeight: '700',
-  },
-  headerSubtitle: {
-    marginTop: 6,
-    fontSize: 15,
   },
   listContent: {
     paddingBottom: 32,
@@ -664,81 +647,61 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
-  },
-  cardImage: {
-    width: '100%',
-    height: 170,
-    backgroundColor: '#f3f4f6',
-  },
-  cardImagePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardImagePlaceholderText: {
-    color: '#9ca3af',
-    fontWeight: '600',
+    minHeight: 220,
   },
   cardBody: {
-    padding: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
   },
-  eventBarName: {
-    fontSize: 12,
+  tagPill: {
+    borderWidth: 2,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 14,
+    marginLeft: -8,
+    marginTop: -8,
+  },
+  tagLabel: {
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   eventTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
   },
-  eventMeta: {
-    marginTop: 6,
+  dateText: {
+    marginTop: 8,
     fontSize: 15,
     fontWeight: '500',
   },
   timeRow: {
     flexDirection: 'row',
-    marginTop: 12,
+    marginTop: 16,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: '#f9fafb',
     overflow: 'hidden',
   },
   timeColumn: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
   },
-  timeColumnRight: {
+  timeColumnDivider: {
     borderLeftWidth: 1,
   },
   timeLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   timeValue: {
-    marginTop: 6,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 12,
-  },
-  tagPill: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  tagText: {
-    color: '#15803d',
-    fontSize: 13,
+    marginTop: 8,
+    fontSize: 18,
     fontWeight: '600',
   },
   emptyState: {
@@ -759,14 +722,18 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: 8,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#111827',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    borderWidth: 2,
+    borderColor: '#2563eb',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   retryButtonText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#2563eb',
+    textTransform: 'uppercase',
   },
   listFooter: {
     paddingVertical: 24,

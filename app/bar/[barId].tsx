@@ -552,7 +552,6 @@ export default function BarDetailScreen() {
         options={{
           headerTransparent: true,
           headerTitle: '',
-          headerBackTitleVisible: false,
           headerBackTitle: '',
           headerBackButtonDisplayMode: 'minimal',
           headerTintColor: '#ffffff',
@@ -582,8 +581,6 @@ const styles = StyleSheet.create({
   heroMapWrapper: {
     width: '100%',
     height: 360,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
     overflow: 'hidden',
   },
   heroMap: {

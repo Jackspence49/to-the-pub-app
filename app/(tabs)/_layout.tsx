@@ -33,12 +33,11 @@ export default function TabLayout() {
         headerShown: true,
         headerTitle: () => <LogoHeader />,
         headerTitleAlign: 'left',
-        headerStyle: {
-          backgroundColor: palette.background,
-        },
+        headerStyle: { backgroundColor: palette.background },
         headerShadowVisible: false,
         tabBarButton: HapticTab,
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -46,7 +45,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="wineglass" color={color} />,
         }}
       />
-       <Tabs.Screen
+      <Tabs.Screen
         name="events"
         options={{
           title: 'Events',
@@ -54,10 +53,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="map"
+        name="search"
         options={{
-          title: 'Map',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="map.fill" color={color} />,
+          title: 'Search',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
         }}
       />
     </Tabs>

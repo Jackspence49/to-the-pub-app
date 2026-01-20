@@ -1,9 +1,8 @@
 import { FontAwesome } from '@expo/vector-icons';
-import { Link, Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   ScrollView,
@@ -245,7 +244,6 @@ export default function EventDetailScreen() {
 
   const handleViewBarEvents = useCallback(() => {
     if (!event?.barId) {
-      Alert.alert('Events unavailable', 'We could not find the bar for this event yet.');
       return;
     }
     router.push({
@@ -318,45 +316,17 @@ export default function EventDetailScreen() {
             <Text style={[styles.descriptionText, { color: theme === 'light' ? '#1f2937' : '#f1f5f9' }]}>{event.description}</Text>
           ) : null}
           <View style={styles.barLinkSection}>
-            {event.barId ? (
-              <Link
-                href={{ pathname: '/bar/[barId]', params: { barId: event.barId } }}
-                asChild
-                prefetch
-              >
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  style={[styles.barLinkButton, { borderColor: palette.tint }]}
-                  accessibilityRole="link"
-                  accessibilityLabel={`View ${event.barName ?? 'bar'} details`}
-                >
-                  <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
-                  <Text style={[styles.barLinkText, { color: palette.tint }]}>{event.barName ?? 'Bar coming soon'}</Text>
-                </TouchableOpacity>
-              </Link>
-            ) : (
-              <View style={[styles.barLinkButton, { borderColor: palette.tint, opacity: 0.6 }]}
-                pointerEvents="none"
-              >
-                <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
-                <Text style={[styles.barLinkText, { color: palette.tint }]}>Bar coming soon</Text>
-              </View>
-            )}
-            {event.barId ? (
-              <TouchableOpacity
-                onPress={handleViewBarEvents}
-                accessibilityRole="button"
-                accessibilityLabel={`See upcoming events at ${event.barName ?? 'this bar'}`}
-                style={[
-                  styles.barEventsButton,
-                  { borderColor: palette.tint, backgroundColor: theme === 'light' ? '#ffffff' : '#0f172a' },
-                ]}
-                activeOpacity={0.85}
-              >
-                <FontAwesome name="calendar" size={16} color={palette.tint} style={{ marginRight: 8 }} />
-                <Text style={[styles.barEventsButtonText, { color: palette.tint }]}>See upcoming events</Text>
-              </TouchableOpacity>
-            ) : null}
+            <TouchableOpacity
+              onPress={event.barId ? handleViewBarDetails : undefined}
+              activeOpacity={event.barId ? 0.85 : 1}
+              style={[styles.barLinkButton, { borderColor: palette.tint, opacity: event.barId ? 1 : 0.6 }]}
+              disabled={!event.barId}
+              accessibilityRole={event.barId ? 'button' : undefined}
+              accessibilityLabel={event.barId ? `View ${event.barName ?? 'bar'} details` : undefined}
+            >
+              <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+              <Text style={[styles.barLinkText, { color: palette.tint }]}>{event.barName ?? 'Bar coming soon'}</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.timeCard}>
             <Text style={[styles.timeHeading, { color: palette.text }]}>{dateLabel}</Text>
@@ -412,8 +382,9 @@ export default function EventDetailScreen() {
             </View>
             <TouchableOpacity
               onPress={handleViewBarEvents}
-              style={styles.fullWidthButton}
+              style={[styles.fullWidthButton, !event?.barId && styles.fullWidthButtonDisabled]}
               activeOpacity={0.9}
+              disabled={!event?.barId}
             >
               <Text style={styles.fullWidthButtonText}>See all upcoming events</Text>
             </TouchableOpacity>
@@ -569,21 +540,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  barEventsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  barEventsButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
   actionList: {
     gap: 12,
   },
@@ -611,6 +567,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: '#0f172a',
     alignItems: 'center',
+  },
+  fullWidthButtonDisabled: {
+    opacity: 0.5,
   },
   fullWidthButtonText: {
     fontSize: 15,
