@@ -5,19 +5,20 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
 import { LogoHeader } from '@/components/logo-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const { status } = useAuth();
-  const palette = Colors[colorScheme ?? 'light'];
+  const colorScheme = useColorScheme();
+  const background = useThemeColor({}, 'background');
+  const tint = useThemeColor({}, 'tint');
 
   if (status === 'checking') {
     return (
-      <View style={[styles.loaderContainer, { backgroundColor: palette.background }]}>
-        <ActivityIndicator size="large" color={palette.tint} />
+      <View style={[styles.loaderContainer, { backgroundColor: background }]}>
+        <ActivityIndicator size="large" color={tint} />
       </View>
     );
   }
@@ -29,11 +30,11 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: palette.tint,
+        tabBarActiveTintColor: tint,
         headerShown: true,
         headerTitle: () => <LogoHeader />,
         headerTitleAlign: 'left',
-        headerStyle: { backgroundColor: palette.background },
+        headerStyle: { backgroundColor: background },
         headerShadowVisible: false,
         tabBarButton: HapticTab,
       }}

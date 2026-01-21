@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 
 import { AuthProvider } from '@/hooks/use-auth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -12,11 +13,12 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const background = useThemeColor({}, 'background');
 
   return (
     <AuthProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
+        <Stack screenOptions={{ contentStyle: { backgroundColor: background } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="bar/[barId]" options={{ title: 'Bar Details' }} />
           <Stack.Screen name="event/[instanceId]" options={{ title: 'Event Details' }} />
@@ -25,7 +27,7 @@ export default function RootLayout() {
           <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
-        <StatusBar style="auto" />
+        <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
     </AuthProvider>
   );
