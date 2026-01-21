@@ -4,8 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import {
 	ActivityIndicator,
-	FlatList,
 	RefreshControl,
+	SectionList,
 	StyleSheet,
 	Text,
 	TextInput,
@@ -473,6 +473,39 @@ const formatEventTime = (value?: string): string => {
 	}).format(date);
 };
 
+const formatRelativeEventDay = (value?: string): string => {
+	if (!value) {
+		return 'Date coming soon';
+	}
+
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) {
+		return 'Date coming soon';
+	}
+
+	const today = startOfDay(new Date());
+	const target = startOfDay(date);
+	const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+
+	if (diffDays === 0) {
+		return 'Today';
+	}
+	if (diffDays === 1) {
+		return 'Tomorrow';
+	}
+	if (diffDays > 1 && diffDays <= 6) {
+		return new Intl.DateTimeFormat('en-US', {
+			weekday: 'long',
+		}).format(date);
+	}
+
+	return new Intl.DateTimeFormat('en-US', {
+		weekday: 'short',
+		month: 'short',	
+		day: 'numeric',
+	}).format(date);
+};
+
 const formatDistance = (value?: number): string | null => {
 	if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
 		return null;
@@ -499,7 +532,6 @@ type EventCardProps = {
 };
 const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) => {
 	const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
-	const dateLabel = formatEventDay(event.eventDate ?? event.startsAt);
 	const startTimeLabel = formatEventTime(event.startsAt);
 	const endTimeLabel = formatEventTime(event.endsAt);
 	const distanceLabel = formatDistance(event.distanceMiles);
@@ -537,15 +569,11 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 				) : null}
 				<Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
 				<Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
-				<View style={styles.metaRow}>
-					<Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
-					{distanceLabel ? (
-						<>
-							<View style={[styles.metaDot, { backgroundColor: tokens.eventMeta }]} />
-							<Text style={[styles.metaDistanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
-						</>
-					) : null}
-				</View>
+				{distanceLabel ? (
+					<View style={styles.metaRow}>
+						<Text style={[styles.metaDistanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
+					</View>
+				) : null}
 				<View style={styles.scheduleBlock}>
 					<View
 						style={[
@@ -975,6 +1003,44 @@ const EventsScreen = () => {
 		[availableTags, handleOpenEvent, tokens]
 	);
 
+	const sections = useMemo(() => {
+		if (events.length === 0) {
+			return [] as { title: string; data: EventInstance[] }[];
+		}
+
+		const sorted = [...events].sort((a, b) => {
+			const aDate = a.eventDate ?? a.startsAt ?? '';
+			const bDate = b.eventDate ?? b.startsAt ?? '';
+			const aTime = new Date(aDate).getTime();
+			const bTime = new Date(bDate).getTime();
+			const aValue = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
+			const bValue = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+			return aValue - bValue;
+		});
+
+		const groups: Record<string, { title: string; data: EventInstance[]; order: number }> = {};
+
+		sorted.forEach((event) => {
+			const dateValue = event.eventDate ?? event.startsAt;
+			const normalized = normalizeDateOnly(dateValue ?? undefined) ?? 'unknown-date';
+			const label = dateValue ? formatRelativeEventDay(dateValue) : 'Date coming soon';
+			const orderValue = (() => {
+				const ts = dateValue ? new Date(dateValue).getTime() : Number.MAX_SAFE_INTEGER;
+				return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
+			})();
+
+			if (!groups[normalized]) {
+				groups[normalized] = { title: label, data: [], order: orderValue };
+			}
+
+			groups[normalized].data.push(event);
+		});
+
+		return Object.values(groups)
+			.sort((a, b) => a.order - b.order)
+			.map(({ title, data }) => ({ title, data }));
+	}, [events]);
+
 	const renderHeader = useMemo(
 		() => (
 			<View
@@ -985,26 +1051,21 @@ const EventsScreen = () => {
 			>
 				<Text style={[styles.screenTitle, { color: tokens.headingText }]}>Upcoming events</Text>
 
-				<View style={styles.filtersRow}>
-					<View style={styles.radiusColumn}>
-						<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
-					</View>
-					<View style={styles.filtersColumn}>
-						<EventTagFilterPanel
-							tags={availableTags}
-							selectedTagId={selectedTagId}
-							filtersExpanded={filtersExpanded}
-							onToggleExpand={handleToggleFilterDropdown}
-							onExpand={handleExpandFilters}
-							onSelectTag={handleSelectTag}
-							onClearSelection={handleClearTags}
-							onRetry={fetchAvailableTags}
-							isLoading={areTagsLoading}
-							error={tagsError}
-							theme={theme}
-						/>
-					</View>
-				</View>
+				<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
+
+				<EventTagFilterPanel
+					tags={availableTags}
+					selectedTagId={selectedTagId}
+					filtersExpanded={filtersExpanded}
+					onToggleExpand={handleToggleFilterDropdown}
+					onExpand={handleExpandFilters}
+					onSelectTag={handleSelectTag}
+					onClearSelection={handleClearTags}
+					onRetry={fetchAvailableTags}
+					isLoading={areTagsLoading}
+					error={tagsError}
+					theme={theme}
+				/>
 
 				{error ? (
 					<View
@@ -1098,12 +1159,29 @@ const EventsScreen = () => {
 
 	return (
 		<View style={[styles.container, { backgroundColor: tokens.pageBackground }]}>
-			<FlatList
-				data={events}
+			<SectionList
+				sections={sections}
 				keyExtractor={(item) => item.id}
 				renderItem={renderItem}
-				contentContainerStyle={events.length === 0 ? styles.listContentEmpty : styles.listContent}
+				renderSectionHeader={({ section }) => (
+					<View style={[styles.sectionHeader, { backgroundColor: tokens.pageBackground }]}>
+						<View
+							style={[
+								styles.sectionHeaderPill,
+								{ backgroundColor: tokens.headerBackground, borderColor: tokens.headerBorder },
+							]}
+						>
+							<Text style={[styles.sectionHeaderText, { color: tokens.headingText }]}>
+								{section.title}
+							</Text>
+						</View>
+					</View>
+				)}
+				stickySectionHeadersEnabled
 				ListHeaderComponent={renderHeader}
+				contentContainerStyle={
+					sections.length === 0 ? styles.listContentEmpty : styles.listContent
+				}
 				ListEmptyComponent={renderEmpty}
 				ListFooterComponent={renderFooter}
 				onEndReached={handleEndReached}
@@ -1145,20 +1223,23 @@ const styles = StyleSheet.create({
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
 	},
-	filtersRow: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		alignItems: 'flex-start',
-		marginTop: 16,
+	sectionHeader: {
+		paddingHorizontal: 20,
+		paddingTop: 16,
+		paddingBottom: 6,
 	},
-	radiusColumn: {
-		flex: 1,
-		minWidth: 220,
-		marginRight: 12,
+	sectionHeaderPill: {
+		alignSelf: 'flex-start',
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		borderRadius: 999,
+		borderWidth: 1,
 	},
-	filtersColumn: {
-		flex: 1,
-		minWidth: 260,
+	sectionHeaderText: {
+		fontSize: 14,
+		fontWeight: '700',
+		letterSpacing: 0.3,
+		textTransform: 'uppercase',
 	},
 	screenTitle: {
 		fontSize: 26,
@@ -1171,7 +1252,7 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 	},
 	radiusCard: {
-		marginTop: 0,
+		marginTop: 20,
 		padding: 12,
 		borderRadius: 14,
 		borderWidth: 1,
@@ -1207,7 +1288,7 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 	filterSection: {
-		marginTop: 0,
+		marginTop: 20,
 		padding: 18,
 		borderRadius: 20,
 		gap: 16,

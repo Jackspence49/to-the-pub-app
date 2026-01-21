@@ -1,9 +1,11 @@
 import { FontAwesome } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  ImageSourcePropType,
   Linking,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import heroFallback from '@/assets/images/light_logo.png';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -106,6 +109,28 @@ const formatEventTime = (value?: string): string | null => {
 
 const ensureProtocol = (value: string) => (value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
 
+const tagImageMap: Record<string, any> = {
+  bingo: require('../../assets/images/bingo.png'),
+  comedy: require('../../assets/images/comedy.png'),
+  dj: require('../../assets/images/DJ.png'),
+  drinkspecial: require('../../assets/images/Drink Special.png'),
+  foodspecial: require('../../assets/images/Food Special.png'),
+  happyhour: require('../../assets/images/Happy Hour.png'),
+  karaoke: require('../../assets/images/Karaoke.png'),
+  livemusic: require('../../assets/images/live music.png'),
+  sportsviewing: require('../../assets/images/Sports Viewing.png'),
+  triva: require('../../assets/images/Triva.png'),
+  trivia: require('../../assets/images/Triva.png'),
+};
+
+const getTagImage = (tagName?: string) => {
+  if (!tagName) {
+    return null;
+  }
+  const key = tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return tagImageMap[key] ?? null;
+};
+
 const mapToEventDetail = (raw: LooseObject): EventDetail => {
   const crossesMidnight = Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false);
   const dateSource = raw.date ?? raw.event_date ?? raw.starts_at ?? raw.start ?? undefined;
@@ -192,6 +217,36 @@ export default function EventDetailScreen() {
   const dateLabel = useMemo(() => formatEventDay(event?.eventDate ?? event?.startsAt), [event?.eventDate, event?.startsAt]);
   const startTimeLabel = useMemo(() => formatEventTime(event?.startsAt), [event?.startsAt]);
   const endTimeLabel = useMemo(() => formatEventTime(event?.endsAt), [event?.endsAt]);
+  const tagImage = useMemo(() => getTagImage(event?.tagName), [event?.tagName]);
+  const heroSource = useMemo<ImageSourcePropType>(() => {
+    if (event?.heroImageUrl) {
+      return { uri: event.heroImageUrl };
+    }
+    if (tagImage) {
+      return tagImage;
+    }
+    return heroFallback;
+  }, [event?.heroImageUrl, tagImage]);
+  const timeRangeLabel = useMemo(() => {
+    if (startTimeLabel && endTimeLabel) {
+      return `${startTimeLabel} – ${endTimeLabel}`;
+    }
+    if (startTimeLabel || endTimeLabel) {
+      return startTimeLabel ?? endTimeLabel ?? 'Time coming soon';
+    }
+    return 'Time coming soon';
+  }, [startTimeLabel, endTimeLabel]);
+  const recurrenceLabel = useMemo(() => {
+    const raw = event?.recurrencePattern?.trim();
+    if (!raw) {
+      return null;
+    }
+    const normalized = raw.toLowerCase();
+    if (normalized === 'none' || normalized === 'n/a') {
+      return null;
+    }
+    return raw;
+  }, [event?.recurrencePattern]);
 
   const fetchEventDetail = useCallback(async () => {
     if (!instanceId) {
@@ -296,107 +351,102 @@ export default function EventDetailScreen() {
     }
 
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {event.heroImageUrl ? (
-          <Image source={{ uri: event.heroImageUrl }} style={styles.heroImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.heroImage, styles.heroPlaceholder]}>
-            <Text style={[styles.heroPlaceholderText, { color: theme === 'light' ? '#94a3b8' : '#64748b' }]}>Image coming soon</Text>
-          </View>
-        )}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.heroWrapper}>
+          <Image source={heroSource} style={styles.heroImage} resizeMode="cover" />
+          <LinearGradient
+            pointerEvents="none"
+            colors={theme === 'light'
+              ? ['rgba(15,23,42,0)', 'rgba(15,23,42,0.35)', 'rgba(15,23,42,0.7)', palette.background]
+              : ['rgba(15,23,42,0)', 'rgba(2,6,23,0.6)', 'rgba(2,6,23,0.9)', palette.background]}
+            locations={[0, 0.45, 0.8, 1]}
+            style={styles.heroFade}
+          />
+        </View>
 
-        <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark]}>
-          {event.tagName ? (
-            <View style={[styles.tagPill, { borderColor: palette.tint }]}>
-              <Text style={[styles.tagText, { color: palette.tint }]}>{event.tagName}</Text>
-            </View>
-          ) : null}
-          <Text style={[styles.eventTitle, { color: palette.text }]}>{event.title}</Text>
-          {event.description ? (
-            <Text style={[styles.descriptionText, { color: theme === 'light' ? '#1f2937' : '#f1f5f9' }]}>{event.description}</Text>
-          ) : null}
-          <View style={styles.barLinkSection}>
-            <TouchableOpacity
-              onPress={event.barId ? handleViewBarDetails : undefined}
-              activeOpacity={event.barId ? 0.85 : 1}
-              style={[styles.barLinkButton, { borderColor: palette.tint, opacity: event.barId ? 1 : 0.6 }]}
-              disabled={!event.barId}
-              accessibilityRole={event.barId ? 'button' : undefined}
-              accessibilityLabel={event.barId ? `View ${event.barName ?? 'bar'} details` : undefined}
-            >
-              <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
-              <Text style={[styles.barLinkText, { color: palette.tint }]}>{event.barName ?? 'Bar coming soon'}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.timeCard}>
-            <Text style={[styles.timeHeading, { color: palette.text }]}>{dateLabel}</Text>
-            <Text style={[styles.timeRange, { color: theme === 'light' ? '#334155' : '#e2e8f0' }]}>
-              {startTimeLabel && endTimeLabel ? `${startTimeLabel} – ${endTimeLabel}` : startTimeLabel ?? 'Time TBD'}
-            </Text>
-            {event.recurrencePattern ? (
-              <Text style={[styles.recurrenceText, { color: theme === 'light' ? '#6366f1' : '#c7d2fe' }]}>Repeats {event.recurrencePattern}</Text>
+        <View style={[styles.bodyContent, { paddingTop: 32 }]}>
+          <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark, styles.heroSectionOverlap]}>
+            <Text style={[styles.eventTitle, { color: palette.text }]}>{event.title}</Text>
+            {event.description ? (
+              <Text style={[styles.descriptionText, { color: theme === 'light' ? '#1f2937' : '#f1f5f9' }]}>{event.description}</Text>
             ) : null}
-            {event.crossesMidnight ? (
-              <Text style={[styles.recurrenceFootnote, { color: theme === 'light' ? '#9ca3af' : '#94a3b8' }]}>Ends after midnight</Text>
+            <View style={styles.barLinkSection}>
+              {event.tagName ? (
+                <Text style={[styles.barTagLine, { color: palette.text }]}>{`${event.tagName} @`}</Text>
+              ) : null}
+              <TouchableOpacity
+                onPress={event.barId ? handleViewBarDetails : undefined}
+                activeOpacity={event.barId ? 0.85 : 1}
+                style={[styles.barLinkButton, { opacity: event.barId ? 1 : 0.6 }]}
+                disabled={!event.barId}
+                accessibilityRole={event.barId ? 'button' : undefined}
+                accessibilityLabel={event.barId ? `View ${event.barName ?? 'bar'} details` : undefined}
+              >
+                <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
+                <Text style={[styles.barLinkText, { color: palette.text }]}>
+                  {event.barName ?? 'Bar coming soon'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.timeCard}>
+              <Text style={[styles.timeHeading, { color: palette.text }]}>{dateLabel}</Text>
+              <Text style={[styles.timeRange, { color: theme === 'light' ? '#334155' : '#e2e8f0' }]}>{timeRangeLabel}</Text>
+              {recurrenceLabel ? (
+                <Text style={[styles.recurrenceText, { color: theme === 'light' ? '#6366f1' : '#c7d2fe' }]}>Repeats {recurrenceLabel}</Text>
+              ) : null}
+              {event.crossesMidnight ? (
+                <Text style={[styles.recurrenceFootnote, { color: theme === 'light' ? '#9ca3af' : '#94a3b8' }]}>Ends after midnight</Text>
+              ) : null}
+            </View>
+            {showActionSection ? (
+              <View style={styles.actionList}>
+                <View style={[styles.iconButtonRow, { borderColor: 'rgba(15, 23, 42, 0.08)' }]}> 
+                  {actionButtons.map((button) => (
+                    <TouchableOpacity
+                      key={button.key}
+                      onPress={button.onPress}
+                      style={[styles.iconCircleButton, { borderColor: palette.tint }]}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                      accessibilityLabel={button.key}
+                    >
+                      <FontAwesome name={button.iconName} size={16} color={palette.tint} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TouchableOpacity
+                  onPress={handleViewBarEvents}
+                  style={[styles.fullWidthButton, !event?.barId && styles.fullWidthButtonDisabled]}
+                  activeOpacity={0.9}
+                  disabled={!event?.barId}
+                >
+                  <Text style={styles.fullWidthButtonText}>See all upcoming events</Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
           </View>
         </View>
-
-        {showActionSection ? (
-          <View style={styles.actionList}>
-            <View style={[styles.iconButtonRow, { borderColor: 'rgba(15, 23, 42, 0.08)' }]}> 
-              {actionButtons.map((button) => (
-                <TouchableOpacity
-                  key={button.key}
-                  onPress={button.onPress}
-                  style={[styles.iconCircleButton, { borderColor: palette.tint }]}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel={button.key}
-                >
-                  <FontAwesome name={button.iconName} size={16} color={palette.tint} />
-                </TouchableOpacity>
-              ))}
-              {event?.barId ? (
-                <TouchableOpacity
-                  onPress={handleViewBarDetails}
-                  style={[styles.iconCircleButton, { borderColor: palette.tint }]}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel="View bar details"
-                >
-                  <FontAwesome name="info-circle" size={16} color={palette.tint} />
-                </TouchableOpacity>
-              ) : null}
-              {event?.barId ? (
-                <TouchableOpacity
-                  onPress={handleViewBarEvents}
-                  style={[styles.iconCircleButton, styles.iconCircleButtonPrimary]}
-                  activeOpacity={0.88}
-                  accessibilityRole="button"
-                  accessibilityLabel="See bar events"
-                >
-                  <FontAwesome name="calendar" size={16} color="#1f2937" />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <TouchableOpacity
-              onPress={handleViewBarEvents}
-              style={[styles.fullWidthButton, !event?.barId && styles.fullWidthButtonDisabled]}
-              activeOpacity={0.9}
-              disabled={!event?.barId}
-            >
-              <Text style={styles.fullWidthButtonText}>See all upcoming events</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
       </ScrollView>
     );
   };
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
-      <Stack.Screen options={{ title: event?.title ?? 'Event Details', headerBackTitle: 'Back' }} />
+      <Stack.Screen
+        options={{
+          headerTransparent: true,
+          headerTitle: '',
+          headerBackTitle: '',
+          headerBackButtonDisplayMode: 'minimal',
+          headerTintColor: '#ffffff',
+          headerShadowVisible: false,
+        }}
+      />
       {content()}
     </View>
   );
@@ -406,9 +456,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
-    padding: 20,
-    gap: 20,
+    paddingBottom: 40,
   },
   centerContent: {
     flex: 1,
@@ -439,19 +491,47 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  heroImage: {
-    borderRadius: 24,
+  heroWrapper: {
     width: '100%',
-    height: 240,
+    height: 360,
+    overflow: 'hidden',
+    backgroundColor: '#0f172a',
   },
-  heroPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1f2937',
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    marginTop: -30,
   },
-  heroPlaceholderText: {
-    fontSize: 14,
-    fontWeight: '600',
+  heroFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '80%',
+  },
+  tagOverlay: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+  },
+  tagOverlayText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#f8fafc',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  bodyContent: {
+    width: '100%',
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  heroSectionOverlap: {
+    marginTop: -48,
   },
   card: {
     borderRadius: 20,
@@ -527,18 +607,20 @@ const styles = StyleSheet.create({
   barLinkSection: {
     gap: 8,
   },
+  barTagLine: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
   barLinkButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
     alignSelf: 'flex-start',
   },
   barLinkText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 19,
+    fontWeight: '700',
   },
   actionList: {
     gap: 12,
