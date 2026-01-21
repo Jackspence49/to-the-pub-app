@@ -32,14 +32,13 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: tint,
         headerShown: true,
-        headerTitle: '',
-        headerLeft: () => <LogoHeader />,
-        headerLeftContainerStyle: {
-          paddingLeft: 0,
-          marginLeft: -8,
-          alignItems: 'flex-start',
-        },
+        headerTitle: () => <LogoHeader />,
         headerTitleAlign: 'left',
+        headerTitleContainerStyle: {
+          alignItems: 'flex-start',
+          paddingLeft: 0,
+          marginLeft: 0,
+        },
         headerStyle: { backgroundColor: background, height: 120 },
         headerShadowVisible: false,
         tabBarButton: HapticTab,
