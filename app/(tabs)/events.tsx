@@ -985,21 +985,26 @@ const EventsScreen = () => {
 			>
 				<Text style={[styles.screenTitle, { color: tokens.headingText }]}>Upcoming events</Text>
 
-				<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
-
-				<EventTagFilterPanel
-					tags={availableTags}
-					selectedTagId={selectedTagId}
-					filtersExpanded={filtersExpanded}
-					onToggleExpand={handleToggleFilterDropdown}
-					onExpand={handleExpandFilters}
-					onSelectTag={handleSelectTag}
-					onClearSelection={handleClearTags}
-					onRetry={fetchAvailableTags}
-					isLoading={areTagsLoading}
-					error={tagsError}
-					theme={theme}
-				/>
+				<View style={styles.filtersRow}>
+					<View style={styles.radiusColumn}>
+						<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
+					</View>
+					<View style={styles.filtersColumn}>
+						<EventTagFilterPanel
+							tags={availableTags}
+							selectedTagId={selectedTagId}
+							filtersExpanded={filtersExpanded}
+							onToggleExpand={handleToggleFilterDropdown}
+							onExpand={handleExpandFilters}
+							onSelectTag={handleSelectTag}
+							onClearSelection={handleClearTags}
+							onRetry={fetchAvailableTags}
+							isLoading={areTagsLoading}
+							error={tagsError}
+							theme={theme}
+						/>
+					</View>
+				</View>
 
 				{error ? (
 					<View
@@ -1133,12 +1138,27 @@ const styles = StyleSheet.create({
 		paddingBottom: 32,
 	},
 	listHeader: {
-		paddingTop: 56,
+		paddingTop: 12,
 		paddingHorizontal: 20,
 		paddingBottom: 12,
 		backgroundColor: '#ffffff',
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
+	},
+	filtersRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		alignItems: 'flex-start',
+		marginTop: 16,
+	},
+	radiusColumn: {
+		flex: 1,
+		minWidth: 220,
+		marginRight: 12,
+	},
+	filtersColumn: {
+		flex: 1,
+		minWidth: 260,
 	},
 	screenTitle: {
 		fontSize: 26,
@@ -1151,7 +1171,7 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 	},
 	radiusCard: {
-		marginTop: 20,
+		marginTop: 0,
 		padding: 12,
 		borderRadius: 14,
 		borderWidth: 1,
@@ -1187,7 +1207,7 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 	filterSection: {
-		marginTop: 20,
+		marginTop: 0,
 		padding: 18,
 		borderRadius: 20,
 		gap: 16,
