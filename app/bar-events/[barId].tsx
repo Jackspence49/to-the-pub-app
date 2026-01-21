@@ -350,15 +350,16 @@ type EventCardProps = {
 };
 
 const EventCard = ({ event, tokens, onPress }: EventCardProps) => {
-  const primaryTagLabel = useMemo(() => {
+  const primaryTagName = useMemo(() => {
     const tagName = event.eventTagName?.trim();
     const fallbackTag = event.tags?.find((tag) => typeof tag === 'string' && tag.trim().length > 0);
-    const finalTag = tagName || (fallbackTag ? fallbackTag.trim() : undefined);
-    return finalTag ?? 'Event Tag';
+    return tagName || (fallbackTag ? fallbackTag.trim() : undefined);
   }, [event.eventTagName, event.tags]);
+  const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
   const dateLabel = formatEventDay(event.eventDate ?? event.startsAt);
   const startTimeLabel = formatEventTime(event.startsAt);
   const endTimeLabel = formatEventTime(event.endsAt);
+
   return (
     <TouchableOpacity
       activeOpacity={0.92}
@@ -375,31 +376,37 @@ const EventCard = ({ event, tokens, onPress }: EventCardProps) => {
       ]}
     >
       <View style={styles.cardBody}>
-        <View style={[styles.tagPill, { borderColor: tokens.accent }]}>
-          <Text style={[styles.tagLabel, { color: tokens.accent }]}>{primaryTagLabel}</Text>
-        </View>
+        {primaryTagName ? (
+          <Text style={[styles.primaryTagLabel, { color: '#2563eb' }]}>{primaryTagName}</Text>
+        ) : null}
         <Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
-        <Text style={[styles.dateText, { color: tokens.eventMeta }]}>{dateLabel}</Text>
+        <Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
 
-        <View
-          style={[
-            styles.timeRow,
-            { borderColor: tokens.timeBorder, backgroundColor: tokens.timeBackground },
-          ]}
-        >
-          <View style={styles.timeColumn}>
-            <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start</Text>
-            <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
-          </View>
+        <View style={styles.metaRow}>
+          <Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
+        </View>
+
+        <View style={styles.scheduleBlock}>
           <View
             style={[
-              styles.timeColumn,
-              styles.timeColumnDivider,
-              { borderLeftColor: tokens.timeBorder },
+              styles.timeRow,
+              { borderColor: tokens.timeBorder, backgroundColor: tokens.timeBackground },
             ]}
           >
-            <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End</Text>
-            <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
+            <View style={styles.timeColumn}>
+              <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start Time</Text>
+              <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
+            </View>
+            <View
+              style={[
+                styles.timeColumn,
+                styles.timeColumnRight,
+                { borderLeftColor: tokens.timeBorder },
+              ]}
+            >
+              <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End Time</Text>
+              <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -647,61 +654,77 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
-    minHeight: 220,
   },
   cardBody: {
-    paddingHorizontal: 22,
-    paddingVertical: 24,
+    padding: 18,
   },
-  tagPill: {
-    borderWidth: 2,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 14,
-    marginLeft: -8,
-    marginTop: -8,
-  },
-  tagLabel: {
-    fontSize: 18,
+  primaryTagLabel: {
+    fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 8,
   },
   eventTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
+    marginTop: 2,
   },
-  dateText: {
-    marginTop: 8,
+  eventBarName: {
+    marginTop: 4,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.25,
+  },
+  metaRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metaDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+  },
+  metaDistanceText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  eventMeta: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  scheduleBlock: {
+    marginTop: 16,
+    gap: 12,
   },
   timeRow: {
     flexDirection: 'row',
-    marginTop: 16,
+    marginTop: 12,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 12,
     backgroundColor: '#f9fafb',
     overflow: 'hidden',
   },
   timeColumn: {
     flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  timeColumnDivider: {
+  timeColumnRight: {
     borderLeftWidth: 1,
   },
   timeLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   timeValue: {
-    marginTop: 8,
-    fontSize: 18,
+    marginTop: 6,
+    fontSize: 16,
     fontWeight: '600',
   },
   emptyState: {
