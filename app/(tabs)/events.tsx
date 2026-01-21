@@ -5,8 +5,6 @@ import type { ListRenderItem } from 'react-native';
 import {
 	ActivityIndicator,
 	FlatList,
-	Image,
-	ImageSourcePropType,
 	RefreshControl,
 	StyleSheet,
 	Text,
@@ -60,32 +58,6 @@ const DEFAULT_COORDINATES = {
 };
 const DEFAULT_RADIUS_MILES = 10;
 const DISTANCE_UNIT = 'miles';
-const RADIUS_PRESET_OPTIONS = [5, 10, 15, 25];
-
-const eventTagImageMap: Record<string, ImageSourcePropType> = {
-	bingo: require('@/assets/images/bingo.png'),
-	'comedy show': require('@/assets/images/comedy.png'),
-	dj: require('@/assets/images/DJ.png'),
-	'drink special': require('@/assets/images/Drink Special.png'),
-	'food special': require('@/assets/images/Food Special.png'),
-	'happy hour': require('@/assets/images/Happy Hour.png'),
-	karaoke: require('@/assets/images/Karaoke.png'),
-	'live music': require('@/assets/images/live music.png'),
-	'sports viewing': require('@/assets/images/Sports Viewing.png'),
-	trivia: require('@/assets/images/Triva.png'),
-};
-
-const normalizeImageKey = (value?: string) => value?.trim().toLowerCase().replace(/\s+/g, ' ') ?? '';
-
-const resolveEventTagImage = (candidates: string[]): ImageSourcePropType | null => {
-	for (const candidate of candidates) {
-		const normalized = normalizeImageKey(candidate);
-		if (normalized && eventTagImageMap[normalized]) {
-			return eventTagImageMap[normalized];
-		}
-	}
-	return null;
-};
 
 const getEventThemeTokens = (theme: ThemeName) => {
 	const isLight = theme === 'light';
@@ -433,6 +405,12 @@ const combineDateAndTime = (
 	return `${datePart}T${timeValue}`;
 };
 
+const startOfDay = (input: Date) => {
+	const copy = new Date(input);
+	copy.setHours(0, 0, 0, 0);
+	return copy;
+};
+
 const formatEventDay = (value?: string): string => {
 	if (!value) {
 		return 'Date coming soon';
@@ -441,6 +419,35 @@ const formatEventDay = (value?: string): string => {
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) {
 		return 'Date coming soon';
+	}
+
+	const today = startOfDay(new Date());
+	const eventDay = startOfDay(date);
+	const startOfWeek = startOfDay(today);
+	startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+	const endOfWeek = startOfDay(startOfWeek);
+	endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+	const startOfNextWeek = startOfDay(startOfWeek);
+	startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+	const endOfNextWeek = startOfDay(startOfNextWeek);
+	endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+
+	const isInRange = (target: Date, rangeStart: Date, rangeEnd: Date) =>
+		target.getTime() >= rangeStart.getTime() && target.getTime() <= rangeEnd.getTime();
+
+	if (isInRange(eventDay, startOfWeek, endOfWeek)) {
+		return new Intl.DateTimeFormat('en-US', {
+			weekday: 'long',
+		}).format(date);
+	}
+
+	if (isInRange(eventDay, startOfNextWeek, endOfNextWeek)) {
+		return new Intl.DateTimeFormat('en-US', {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric',
+		}).format(date);
 	}
 
 	return new Intl.DateTimeFormat('en-US', {
@@ -507,29 +514,7 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 	const tagsToRender = tagIds.map(
 		(tagId) => availableTags.find((t) => t.id === tagId)?.name || tagId
 	);
-	const tagIdSignature = tagIds.join('|');
-
-	const fallbackImageSource = useMemo<ImageSourcePropType | null>(() => {
-		if (event.heroImageUrl) {
-			return null;
-		}
-		const candidateLabels: string[] = [];
-		tagIds.forEach((tagId) => {
-			const matchedTag = availableTags.find((tag) => tag.id === tagId);
-			if (matchedTag?.name) {
-				candidateLabels.push(matchedTag.name);
-			}
-			candidateLabels.push(tagId);
-		});
-		return resolveEventTagImage([
-			event.eventTagName ?? '',
-			...candidateLabels,
-		]);
-	}, [availableTags, event.eventTagName, event.heroImageUrl, tagIdSignature]);
-
-	const cardImageSource: ImageSourcePropType | null = event.heroImageUrl
-		? { uri: event.heroImageUrl }
-		: fallbackImageSource;
+	const primaryTagName = tagsToRender[0];
 
 	return (
 		<TouchableOpacity
@@ -546,38 +531,22 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 				},
 			]}
 		>
-			{cardImageSource ? (
-				<Image
-					source={cardImageSource}
-					style={[styles.cardImage, { backgroundColor: tokens.imageBackground }]}
-					resizeMode="cover"
-				/>
-			) : (
-				<View style={[styles.cardImage, styles.cardImagePlaceholder, { backgroundColor: tokens.imageBackground }]}>
-					<Text style={[styles.cardImagePlaceholderText, { color: tokens.imagePlaceholderText }]}>No image</Text>
-				</View>
-			)}
-
 			<View style={styles.cardBody}>
-				{tagsToRender.length > 0 ? (
-					<View style={[styles.tagRow, styles.tagRowTop]}>
-						{tagsToRender.map((tag, index) => (
-							<View
-								key={`${event.id}-tag-${index}`}
-								style={[
-									styles.tagPill,
-									{ backgroundColor: tokens.tagBackground, borderColor: tokens.tagBorder },
-								]}
-							>
-								<Text style={[styles.tagText, { color: tokens.tagText }]}>{tag}</Text>
-							</View>
-						))}
-					</View>
+				{primaryTagName ? (
+					<Text style={[styles.primaryTagLabel, { color: '#2563eb' }]}>{primaryTagName}</Text>
 				) : null}
 				<Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
 				<Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
-				<View style={styles.scheduleBlock}>
+				<View style={styles.metaRow}>
 					<Text style={[styles.eventMeta, { color: tokens.eventMeta }]}>{dateLabel}</Text>
+					{distanceLabel ? (
+						<>
+							<View style={[styles.metaDot, { backgroundColor: tokens.eventMeta }]} />
+							<Text style={[styles.metaDistanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
+						</>
+					) : null}
+				</View>
+				<View style={styles.scheduleBlock}>
 					<View
 						style={[
 							styles.timeRow,
@@ -600,12 +569,6 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 						</View>
 					</View>
 				</View>
-				{distanceLabel ? (
-					<View style={[styles.distanceRow, styles.distanceRowBottom]}>
-						<MaterialIcons name="place" size={16} color={tokens.eventMeta} style={styles.distanceIcon} />
-						<Text style={[styles.distanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
-					</View>
-				) : null}
 			</View>
 		</TouchableOpacity>
 	);
@@ -624,14 +587,10 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 		setRadiusText(String(value));
 	}, [value]);
 
-	const highlightColor = theme === 'light' ? '#f5a524' : '#f6c15b';
 	const textColor = theme === 'light' ? '#111827' : '#f8fafc';
 	const subtleText = theme === 'light' ? '#4b5563' : '#cbd5f5';
 	const borderColor = theme === 'light' ? '#e5e7eb' : '#2b313c';
 	const backgroundColor = theme === 'light' ? '#ffffff' : '#191f28';
-	const chipInactiveBg = theme === 'light' ? '#f8fafc' : '#1e242d';
-	const chipInactiveBorder = theme === 'light' ? '#dce2ec' : '#2c333c';
-	const chipInactiveText = theme === 'light' ? '#475569' : '#c7d0de';
 	const inputBackground = theme === 'light' ? '#f9fafb' : '#10131a';
 	const inputBorder = theme === 'light' ? '#e5e7eb' : '#2b313c';
 	const inputText = theme === 'light' ? '#111827' : '#f3f4f6';
@@ -646,66 +605,23 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 		}
 	}, [onChange, radiusText, value]);
 
-	const handlePresetPress = useCallback(
-		(option: number) => {
-			setRadiusText(String(option));
-			onChange(option);
-		},
-		[onChange]
-	);
-
 	return (
 		<View style={[styles.radiusCard, { borderColor, backgroundColor }]}>
 			<Text style={[styles.radiusTitle, { color: textColor }]}>Search radius</Text>
-			<Text style={[styles.radiusSubtitle, { color: subtleText }]}>
-				Currently showing events within {value} {DISTANCE_UNIT} of the default location.
-			</Text>
-			<View style={styles.radiusControls}>
-				<View style={styles.radiusChipRow}>
-					{RADIUS_PRESET_OPTIONS.map((option) => {
-						const isActive = option === value;
-						return (
-							<TouchableOpacity
-								key={`radius-${option}`}
-								onPress={() => handlePresetPress(option)}
-								style={[
-									styles.radiusChip,
-									isActive
-										? [styles.radiusChipActive, { backgroundColor: highlightColor, borderColor: highlightColor }]
-										: [
-											styles.radiusChipInactive,
-											{ backgroundColor: chipInactiveBg, borderColor: chipInactiveBorder },
-										],
-								]}
-								activeOpacity={0.85}
-							>
-								<Text
-									style={[
-										styles.radiusChipText,
-										{ color: isActive ? '#1e1202' : chipInactiveText },
-									]}
-								>
-									{option} {DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT}
-								</Text>
-							</TouchableOpacity>
-						);
-					})}
-				</View>
-				<View style={[styles.radiusInputWrapper, { borderColor: inputBorder, backgroundColor: inputBackground }]}>
-					<TextInput
-						style={[styles.radiusInput, { color: inputText }]}
-						keyboardType="numeric"
-						value={radiusText}
-						onChangeText={setRadiusText}
-						onBlur={handleCommit}
-						onSubmitEditing={handleCommit}
-						placeholder={`e.g. ${DEFAULT_RADIUS_MILES}`}
-						placeholderTextColor={placeholder}
-						returnKeyType="done"
-						maxLength={4}
-					/>
-					<Text style={[styles.radiusUnitLabel, { color: subtleText }]}>{DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT}</Text>
-				</View>
+			<View style={[styles.radiusInputWrapper, { borderColor: inputBorder, backgroundColor: inputBackground }]}> 
+				<TextInput
+					style={[styles.radiusInput, { color: inputText }]}
+					keyboardType="numeric"
+					value={radiusText}
+					onChangeText={setRadiusText}
+					onBlur={handleCommit}
+					onSubmitEditing={handleCommit}
+					placeholder={`e.g. ${DEFAULT_RADIUS_MILES}`}
+					placeholderTextColor={placeholder}
+					returnKeyType="done"
+					maxLength={4}
+				/>
+				<Text style={[styles.radiusUnitLabel, { color: subtleText }]}>{DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT}</Text>
 			</View>
 		</View>
 	);
@@ -1236,57 +1152,39 @@ const styles = StyleSheet.create({
 	},
 	radiusCard: {
 		marginTop: 20,
-		padding: 18,
-		borderRadius: 20,
+		padding: 12,
+		borderRadius: 14,
 		borderWidth: 1,
-		gap: 12,
-	},
-	radiusTitle: {
-		fontSize: 18,
-		fontWeight: '600',
-	},
-	radiusSubtitle: {
-		fontSize: 14,
-		lineHeight: 20,
-	},
-	radiusControls: {
-		gap: 12,
-	},
-	radiusChipRow: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
 		gap: 8,
 	},
-	radiusChip: {
-		borderWidth: 1,
-		borderRadius: 999,
-		paddingHorizontal: 14,
-		paddingVertical: 8,
+	radiusTitle: {
+		fontSize: 16,
+		fontWeight: '700',
 	},
-	radiusChipActive: {},
-	radiusChipInactive: {},
-	radiusChipText: {
-		fontSize: 14,
-		fontWeight: '600',
+	radiusSubtitle: {
+		fontSize: 13,
+		lineHeight: 18,
 	},
 	radiusInputWrapper: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		borderWidth: 1,
-		borderRadius: 14,
-		paddingHorizontal: 12,
-		paddingVertical: 6,
+		borderRadius: 10,
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		alignSelf: 'flex-start',
 	},
 	radiusInput: {
 		flex: 1,
-		fontSize: 16,
+		fontSize: 15,
 		fontWeight: '600',
-		paddingVertical: 6,
+		paddingVertical: 4,
+		minWidth: 80,
 	},
 	radiusUnitLabel: {
 		marginLeft: 6,
-		fontSize: 14,
-		fontWeight: '500',
+		fontSize: 13,
+		fontWeight: '600',
 	},
 	filterSection: {
 		marginTop: 20,
@@ -1455,11 +1353,34 @@ const styles = StyleSheet.create({
 		letterSpacing: 0.25,
 		textTransform: 'none',
 	},
+	primaryTagLabel: {
+		fontSize: 13,
+		fontWeight: '700',
+		textTransform: 'uppercase',
+		letterSpacing: 0.4,
+		marginBottom: 8,
+	},
 	eventTitle: {
 		fontSize: 20,
 		fontWeight: '700',
 		color: '#111827',
 		marginTop: 2,
+	},
+	metaRow: {
+		marginTop: 12,
+		flexDirection: 'row',
+		alignItems: 'center',
+		flexWrap: 'wrap',
+		gap: 8,
+	},
+	metaDot: {
+		width: 5,
+		height: 5,
+		borderRadius: 999,
+	},
+	metaDistanceText: {
+		fontSize: 13,
+		fontWeight: '600',
 	},
 	eventMeta: {
 		fontSize: 15,
