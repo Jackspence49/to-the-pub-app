@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Location from 'expo-location';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import {
@@ -47,15 +48,17 @@ type EventTag = {
 type LooseObject = Record<string, any>;
 
 type ThemeName = keyof typeof Colors;
+type Coordinates = { lat: number; lon: number };
 
 const TAG_PREVIEW_COUNT = 3;
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 const PAGE_SIZE = 6;
 const DEFAULT_COORDINATES = {
-	latitude: 42.34105265628477,
-	longitude: -71.0521475972448,
+	latitude: 42.3555,
+	longitude: -71.0565,
 };
+
 const DEFAULT_RADIUS_MILES = 10;
 const DISTANCE_UNIT = 'miles';
 
@@ -409,52 +412,6 @@ const startOfDay = (input: Date) => {
 	const copy = new Date(input);
 	copy.setHours(0, 0, 0, 0);
 	return copy;
-};
-
-const formatEventDay = (value?: string): string => {
-	if (!value) {
-		return 'Date coming soon';
-	}
-
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) {
-		return 'Date coming soon';
-	}
-
-	const today = startOfDay(new Date());
-	const eventDay = startOfDay(date);
-	const startOfWeek = startOfDay(today);
-	startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-	const endOfWeek = startOfDay(startOfWeek);
-	endOfWeek.setDate(startOfWeek.getDate() + 6);
-
-	const startOfNextWeek = startOfDay(startOfWeek);
-	startOfNextWeek.setDate(startOfWeek.getDate() + 7);
-	const endOfNextWeek = startOfDay(startOfNextWeek);
-	endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
-
-	const isInRange = (target: Date, rangeStart: Date, rangeEnd: Date) =>
-		target.getTime() >= rangeStart.getTime() && target.getTime() <= rangeEnd.getTime();
-
-	if (isInRange(eventDay, startOfWeek, endOfWeek)) {
-		return new Intl.DateTimeFormat('en-US', {
-			weekday: 'long',
-		}).format(date);
-	}
-
-	if (isInRange(eventDay, startOfNextWeek, endOfNextWeek)) {
-		return new Intl.DateTimeFormat('en-US', {
-			weekday: 'short',
-			month: 'short',
-			day: 'numeric',
-		}).format(date);
-	}
-
-	return new Intl.DateTimeFormat('en-US', {
-		weekday: 'short',
-		month: 'short',
-		day: 'numeric',
-	}).format(date);
 };
 
 const formatEventTime = (value?: string): string => {
@@ -828,6 +785,7 @@ const EventsScreen = () => {
 	const [tagsError, setTagsError] = useState<string | null>(null);
 	const [filtersExpanded, setFiltersExpanded] = useState(false);
 	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_RADIUS_MILES);
+	const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
 
 	useEffect(() => {
 		setSelectedTagId(initialTagIdsFromParams[0] ?? null);
@@ -901,6 +859,35 @@ const EventsScreen = () => {
 		setSearchRadius(Math.max(1, nextRadius));
 	}, []);
 
+	const ensureLocationPermission = useCallback(async (): Promise<boolean> => {
+		const current = await Location.getForegroundPermissionsAsync();
+		if (current.status === 'granted') {
+			return true;
+		}
+		if (!current.canAskAgain) {
+			console.warn('Location permission permanently denied; using fallback coordinates.');
+			return false;
+		}
+		const requested = await Location.requestForegroundPermissionsAsync();
+		return requested.status === 'granted';
+	}, []);
+
+	const refreshUserLocation = useCallback(async () => {
+		try {
+			const granted = await ensureLocationPermission();
+			if (!granted) {
+				return;
+			}
+			const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+			setUserCoords({
+				lat: position.coords.latitude,
+				lon: position.coords.longitude,
+			});
+		} catch (err) {
+			console.warn('Unable to fetch user location; using fallback coordinates.', err);
+		}
+	}, [ensureLocationPermission]);
+
 	const fetchEvents = useCallback(
 		async (pageToLoad: number, mode: FetchMode) => {
 			if (mode === 'paginate') {
@@ -925,12 +912,16 @@ const EventsScreen = () => {
 
 			try {
 				setError(null);
+				const coordsToUse = userCoords ?? {
+					lat: DEFAULT_COORDINATES.latitude,
+					lon: DEFAULT_COORDINATES.longitude,
+				};
 				const queryParams: Record<string, QueryValue> = {
 					upcoming: true,
 					limit: PAGE_SIZE,
 					page: pageToLoad,
-					lon: DEFAULT_COORDINATES.longitude,
-					lat: DEFAULT_COORDINATES.latitude,
+					lon: coordsToUse.lon,
+					lat: coordsToUse.lat,
 					radius: searchRadius,
 					unit: DISTANCE_UNIT,
 				};
@@ -964,7 +955,24 @@ const EventsScreen = () => {
 				}
 			}
 		},
-		[searchRadius, selectedTagId]
+		[userCoords, searchRadius, selectedTagId]
+	);
+
+	useEffect(() => {
+		refreshUserLocation();
+	}, [refreshUserLocation]);
+
+	useFocusEffect(
+		useCallback(() => {
+			let cancelled = false;
+			(async () => {
+				if (cancelled) return;
+				await refreshUserLocation();
+			})();
+			return () => {
+				cancelled = true;
+			};
+		}, [refreshUserLocation])
 	);
 
 	useEffect(() => {

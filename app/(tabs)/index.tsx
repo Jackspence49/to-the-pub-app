@@ -1,5 +1,6 @@
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import {
@@ -59,16 +60,20 @@ const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 const barsEndpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/bars` : '/get/bars';
 const MILES_PER_KM = 0.621371;
 
-const DEFAULT_LATITUDE = 42.34105265628477;
-const DEFAULT_LONGITUDE = -71.0521475972448;
+const DEFAULT_LATITUDE = 42.3555;
+const DEFAULT_LONGITUDE = -71.0565;
 
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
+type Coordinates = { lat: number; lon: number };
 
-const DEFAULT_QUERY_PARAMS: QueryParams = {
-  unit: 'miles',
+const DEFAULT_COORDS: Coordinates = {
   lat: DEFAULT_LATITUDE,
   lon: DEFAULT_LONGITUDE,
+};
+
+const BASE_QUERY_PARAMS: QueryParams = {
+  unit: 'miles',
   open_now: true,
   include: 'tags,hours',
 };
@@ -788,6 +793,26 @@ const ErrorBanner = ({ message, theme }: { message: string; theme: ThemeName }) 
   );
 };
 
+const LocationPermissionBanner = ({ theme, onOpenSettings, onRetry }: { theme: ThemeName; onOpenSettings: () => void; onRetry: () => void }) => {
+  const palette = Colors[theme];
+  const mutedColor = theme === 'light' ? '#5c6672' : '#a7adb4';
+
+  return (
+    <View style={[styles.errorBanner, { backgroundColor: theme === 'light' ? '#fff3cd' : '#3a2f14' }]}> 
+      <Text style={[styles.errorBannerTitle, { color: palette.text }]}>Location disabled</Text>
+      <Text style={[styles.errorBannerMessage, { color: mutedColor }]}>Enable location in system settings to see nearby bars.</Text>
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+        <TouchableOpacity onPress={onOpenSettings} style={[styles.retryButton, { borderColor: palette.tint }]}>
+          <Text style={[styles.retryButtonText, { color: palette.tint }]}>Open settings</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onRetry} style={[styles.retryButton, { borderColor: palette.text }]}>
+          <Text style={[styles.retryButtonText, { color: palette.text }]}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 type SelectedTagEntry = {
   normalized: string;
   label: string;
@@ -836,12 +861,49 @@ export default function BarsScreen() {
   const palette = Colors[theme];
   const router = useRouter();
   const [bars, setBars] = useState<Bar[]>([]);
+  const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationDeniedPermanently, setLocationDeniedPermanently] = useState(false);
   const lastScrollOffset = useRef(0);
+
+  const ensureLocationPermission = useCallback(async (): Promise<boolean> => {
+    const current = await Location.getForegroundPermissionsAsync();
+    if (current.status === 'granted') {
+      setLocationDeniedPermanently(false);
+      return true;
+    }
+    if (!current.canAskAgain) {
+      setLocationDeniedPermanently(true);
+      console.warn('Location permission permanently denied; using fallback coordinates.');
+      return false;
+    }
+    const requested = await Location.requestForegroundPermissionsAsync();
+    const granted = requested.status === 'granted';
+    setLocationDeniedPermanently(!granted && !requested.canAskAgain);
+    return granted;
+  }, []);
+
+  const refreshUserLocation = useCallback(async () => {
+    try {
+      const granted = await ensureLocationPermission();
+      if (!granted) {
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setUserCoords({
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+      });
+    } catch (err) {
+      console.warn('Unable to fetch user location; using fallback coordinates.', err);
+    }
+  }, [ensureLocationPermission]);
 
   const availableTags = useMemo<TagFilterOption[]>(() => {
     const tagMap = new Map<string, TagFilterOption>();
@@ -950,13 +1012,49 @@ export default function BarsScreen() {
     [filtersExpanded, hasExpandableFilters]
   );
 
+  useEffect(() => {
+    refreshUserLocation();
+  }, [refreshUserLocation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        if (cancelled) return;
+        await refreshUserLocation();
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [refreshUserLocation])
+  );
+
+  const handleOpenSettings = useCallback(() => {
+    if (typeof Linking.openSettings === 'function') {
+      Linking.openSettings().catch((err) => {
+        console.warn('Unable to open app settings.', err);
+      });
+      return;
+    }
+    Linking.openURL('app-settings:').catch((err) => {
+      console.warn('Unable to open app settings.', err);
+    });
+  }, []);
+
   const fetchBars = useCallback(
-    async (mode: FetchMode = 'initial', signal?: AbortSignal) => {
+    async (mode: FetchMode = 'initial', signal?: AbortSignal, coordsOverride?: Coordinates) => {
       const setBusy = mode === 'refresh' ? setIsRefreshing : setIsLoading;
       setBusy(true);
 
       try {
-        const queryString = buildQueryString(DEFAULT_QUERY_PARAMS);
+        const coordsToUse = coordsOverride ?? userCoords ?? DEFAULT_COORDS;
+        const queryParams: QueryParams = {
+          ...BASE_QUERY_PARAMS,
+          lat: coordsToUse.lat,
+          lon: coordsToUse.lon,
+        };
+
+        const queryString = buildQueryString(queryParams);
         const requestUrl = queryString ? `${barsEndpoint}?${queryString}` : barsEndpoint;
         const response = await fetch(requestUrl, { signal });
         if (!response.ok) {
@@ -977,7 +1075,7 @@ export default function BarsScreen() {
         setBusy(false);
       }
     },
-    []
+    [userCoords]
   );
 
   useEffect(() => {
@@ -1009,9 +1107,16 @@ export default function BarsScreen() {
   const keyExtractor = useCallback((item: Bar) => item.id, []);
 
   const headerComponent =
-    availableTags.length > 0 || (bars.length > 0 && error)
+    locationDeniedPermanently || availableTags.length > 0 || (bars.length > 0 && error)
       ? (
           <View style={styles.listHeader}>
+            {locationDeniedPermanently ? (
+              <LocationPermissionBanner
+                theme={theme}
+                onOpenSettings={handleOpenSettings}
+                onRetry={refreshUserLocation}
+              />
+            ) : null}
             {availableTags.length > 0 ? (
               <TagFilterPanel
                 tags={availableTags}
