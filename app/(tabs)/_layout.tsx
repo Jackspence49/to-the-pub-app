@@ -6,19 +6,20 @@ import { HapticTab } from '@/components/haptic-tab';
 import { LogoHeader } from '@/components/logo-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/hooks/use-auth';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 export default function TabLayout() {
   const { status } = useAuth();
-  const colorScheme = useColorScheme();
-  const background = useThemeColor({}, 'background');
-  const tint = useThemeColor({}, 'tint');
+  const container = useThemeColor({}, 'container');
+  const border = useThemeColor({}, 'border');
+  const icon = useThemeColor({}, 'icon');
+  const iconSelected = useThemeColor({}, 'iconSelected');
+  const activePill = useThemeColor({}, 'activePill');
 
   if (status === 'checking') {
     return (
-      <View style={[styles.loaderContainer, { backgroundColor: background }]}>
-        <ActivityIndicator size="large" color={tint} />
+      <View style={[styles.loaderContainer, { backgroundColor: container }]}>
+        <ActivityIndicator size="large" color={iconSelected} />
       </View>
     );
   }
@@ -30,7 +31,14 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: tint,
+        tabBarActiveTintColor: iconSelected,
+        tabBarInactiveTintColor: icon,
+        tabBarActiveBackgroundColor: activePill,
+        tabBarStyle: {
+          backgroundColor: container,
+          borderTopColor: border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+        },
         headerShown: true,
         headerTitle: () => <LogoHeader />,
         headerTitleAlign: 'left',
@@ -39,7 +47,12 @@ export default function TabLayout() {
           paddingLeft: 0,
           marginLeft: 0,
         },
-        headerStyle: { backgroundColor: background, height: 120 },
+        headerStyle: {
+          backgroundColor: container,
+          height: 120,
+          borderBottomColor: border,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+        },
         headerShadowVisible: false,
         tabBarButton: HapticTab,
       }}
@@ -47,8 +60,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Bars',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="wineglass" color={color} />,
+          title: 'Open Bars',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="beerglass" color={color} />,
         }}
       />
       <Tabs.Screen
