@@ -1,8 +1,10 @@
-import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { FontAwesome, MaterialIcons } from '@expo/vector-icons'; // Icon libraries
+import * as Location from 'expo-location'; // Location services
+import { useFocusEffect, useRouter } from 'expo-router'; // Navigation hooks 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
+
+// React Native components
 import {
   ActivityIndicator,
   FlatList,
@@ -15,7 +17,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
+ 
+// Custom constants and hooks
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -23,12 +26,14 @@ type FetchMode = 'initial' | 'refresh';
 type ThemeName = keyof typeof Colors;
 type LooseObject = Record<string, any>;
 
+// Bar tag type definition
 type BarTag = {
   id: string;
   name: string;
   category?: string;
 };
 
+// Bar type definition
 type Bar = {
   id: string;
   name: string;
@@ -45,6 +50,7 @@ type Bar = {
   tags: BarTag[];
 };
 
+// Tag filter option type definition
 type TagFilterOption = {
   id: string;
   name: string;
@@ -52,38 +58,40 @@ type TagFilterOption = {
   count: number;
 };
 
-const TAG_PREVIEW_COUNT = 3;
-const FILTER_COLLAPSE_SCROLL_DELTA = 12;
 
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
-const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+const TAG_PREVIEW_COUNT = 3; // Number of tags to show before expanding
+const FILTER_COLLAPSE_SCROLL_DELTA = 12;  // Scroll delta to collapse filter panel
+
+// API and utility constants
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();  // Base URL for API requests
+const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');  
 const barsEndpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/bars` : '/get/bars';
 const MILES_PER_KM = 0.621371;
-
-const DEFAULT_LATITUDE = 42.3555;
-const DEFAULT_LONGITUDE = -71.0565;
 
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
 type Coordinates = { lat: number; lon: number };
 
 const DEFAULT_COORDS: Coordinates = {
-  lat: DEFAULT_LATITUDE,
-  lon: DEFAULT_LONGITUDE,
+  lat: 42.3555,
+  lon: -71.0565,
 };
 
+// Default query parameters for API requests
 const BASE_QUERY_PARAMS: QueryParams = {
   unit: 'miles',
   open_now: true,
   include: 'tags,hours',
 };
 
+// Helper function to build query string from parameters
 const buildQueryString = (params: QueryParams): string =>
   Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&');
 
+  // Function to extract bar items from API response payload
 const extractBarItems = (payload: unknown): LooseObject[] => {
   if (!payload) {
     return [];
@@ -119,6 +127,7 @@ const extractBarItems = (payload: unknown): LooseObject[] => {
   return [];
 };
 
+// Helper function to safely convert a value to a number
 const toNumber = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -134,6 +143,7 @@ const toNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
+// Function to map raw tag data to BarTag type
 const mapToBarTag = (raw: any, index: number): BarTag | null => {
   if (!raw) {
     return null;
@@ -165,26 +175,18 @@ const mapToBarTag = (raw: any, index: number): BarTag | null => {
   return null;
 };
 
+// Mapping of day names to their respective indices
 const DAY_NAME_INDEX: Record<string, number> = {
   sunday: 0,
-  sun: 0,
   monday: 1,
-  mon: 1,
   tuesday: 2,
-  tue: 2,
-  tues: 2,
   wednesday: 3,
-  wed: 3,
   thursday: 4,
-  thu: 4,
-  thur: 4,
-  thurs: 4,
   friday: 5,
-  fri: 5,
   saturday: 6,
-  sat: 6,
 };
 
+// Function to coerce various day representations to a numeric index
 const coerceDayIndex = (value: unknown): number | null => {
   if (typeof value === 'number' && value >= 0 && value <= 6) {
     return value;
@@ -206,38 +208,24 @@ const coerceDayIndex = (value: unknown): number | null => {
   return null;
 };
 
+
+// Function to extract closing time metadata from a schedule record
 const extractCloseMetaFromRecord = (record?: LooseObject | null): { closesAt?: string; crossesMidnight?: boolean } | null => {
   if (!record || typeof record !== 'object') {
     return null;
   }
-  const closesRaw =
-    record.close_time ??
-    record.closeTime ??
-    record.close ??
-    record.closes_at ??
-    record.closesAt ??
-    record.close_label ??
-    record.closeLabel ??
-    record.end ??
-    record.end_time ??
-    record.endTime;
+  const closesRaw = record.close_time;
   const closesAt = typeof closesRaw === 'string' && closesRaw.trim().length > 0 ? closesRaw.trim() : undefined;
-  const crossesMidnight = Boolean(record.crosses_midnight ?? record.crossesMidnight ?? record.crossesNextDay ?? false);
+  const crossesMidnight = Boolean(record.crosses_midnight ?? false);
   if (!closesAt && !crossesMidnight) {
     return null;
   }
   return { closesAt, crossesMidnight };
 };
 
+// Function to resolve closing time from various schedule buckets
 const resolveClosingFromSchedules = (raw: LooseObject): { closesAt?: string; crossesMidnight?: boolean } | null => {
-  const scheduleBuckets = [
-    raw.hours,
-    raw.operating_hours,
-    raw.operatingHours,
-    raw.schedule,
-    raw.daily_hours,
-    raw.dailyHours,
-  ];
+  const scheduleBuckets = [raw.hours];
   const today = new Date().getDay();
   for (const bucket of scheduleBuckets) {
     if (!Array.isArray(bucket)) {
@@ -263,9 +251,11 @@ const resolveClosingFromSchedules = (raw: LooseObject): { closesAt?: string; cro
   return null;
 };
 
+// Function to extract today's closing time metadata from raw bar data
 const extractTodayClosingMeta = (raw: LooseObject): { closesAt?: string; crossesMidnight?: boolean } => {
   let closesAt: string | undefined;
   let crossesMidnight: boolean | undefined;
+
 
   const assignCandidate = (value?: unknown) => {
     if (!closesAt && typeof value === 'string' && value.trim().length > 0) {
@@ -273,19 +263,8 @@ const extractTodayClosingMeta = (raw: LooseObject): { closesAt?: string; crosses
     }
   };
 
-  const directCandidates: unknown[] = [
-    raw.today_close_time,
-    raw.todayCloseTime,
-    raw.todayClose,
-    raw.today_closes_at,
-    raw.todayClosesAt,
-    raw.close_time_today,
-    raw.closeTimeToday,
-    raw.closes_at,
-    raw.closesAt,
-    raw.close_time,
-    raw.closeTime,
-  ];
+  // Check direct fields for closing time
+  const directCandidates: unknown[] = [raw.close_time];
   directCandidates.forEach(assignCandidate);
 
   const hoursTodayVariants = [
@@ -329,6 +308,7 @@ const extractTodayClosingMeta = (raw: LooseObject): { closesAt?: string; crosses
   };
 };
 
+// Function to map raw bar data to Bar type
 const mapToBar = (raw: LooseObject, index: number): Bar => {
   const idSource =
     raw.id ??
@@ -396,6 +376,7 @@ const mapToBar = (raw: LooseObject, index: number): Bar => {
   };
 };
 
+// Function to normalize Twitter or X.com URLs or handles
 const normalizeTwitterUrl = (value: unknown): string | undefined => {
   if (value === null || value === undefined) {
     return undefined;
@@ -422,8 +403,10 @@ const normalizeTwitterUrl = (value: unknown): string | undefined => {
   return `https://x.com/${handle}`;
 };
 
+// Function to normalize tag names for filtering
 const normalizeTagName = (value: string): string => value.trim().toLowerCase();
 
+// Function to format distance labels for display
 const formatDistanceLabel = (distanceMiles?: number): string | null => {
   if (typeof distanceMiles !== 'number' || Number.isNaN(distanceMiles) || distanceMiles < 0) {
     return null;
@@ -440,6 +423,7 @@ const formatDistanceLabel = (distanceMiles?: number): string | null => {
   return `${distanceMiles.toFixed(1)} mi away`;
 };
 
+// Function to parse various time formats into Date objects
 const parseTimeToken = (value?: string): Date | null => {
   if (!value) {
     return null;
@@ -489,6 +473,7 @@ const parseTimeToken = (value?: string): Date | null => {
   return null;
 };
 
+// Function to format closing time labels for display
 const formatClosingTimeLabel = (value?: string): string | null => {
   const parsed = parseTimeToken(value);
   if (!parsed) {
@@ -500,6 +485,7 @@ const formatClosingTimeLabel = (value?: string): string | null => {
   }).format(parsed);
 };
 
+// Function to ensure a URL has a protocol prefix
 const ensureProtocol = (value: string): string => {
   if (/^https?:\/\//i.test(value)) {
     return value;
@@ -507,6 +493,7 @@ const ensureProtocol = (value: string): string => {
   return `https://${value}`;
 };
 
+// Function to open external links safely
 const openExternalLink = async (value?: string) => {
   if (!value) {
     return;
@@ -519,19 +506,24 @@ const openExternalLink = async (value?: string) => {
   }
 };
 
+// Props for BarCard component
 type BarCardProps = {
   bar: Bar;
   theme: ThemeName;
   onPress?: () => void;
 };
 
+// Component to display individual bar information
 const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
   const palette = Colors[theme];
-  const mutedColor = theme === 'light' ? '#5c6672' : '#a7adb4';
-  const secondaryMutedColor = theme === 'light' ? '#6c7682' : '#9298a0';
-  const cardTone = theme === 'light' ? styles.cardLight : styles.cardDark;
-  const pillBackground = theme === 'light' ? '#f1f5f9' : '#252a30';
-  const pillBorder = theme === 'light' ? '#e2e8f0' : '#2e3339';
+  const titleColor = palette.cardTitle;
+  const cardSubtitle = palette.cardSubtitle;
+  const cardText = palette.cardText;
+  const cardSurface = palette.cardSurface;
+  const cardBorder = palette.border;
+  const pillBackground = palette.pillBackground;
+  const pillBorder = palette.border;
+  const pillText = palette.pillText;
   const distanceLabel = formatDistanceLabel(bar.distanceMiles);
   const addressLabel = bar.addressLabel ?? 'Location coming soon';
   const closingLabel = formatClosingTimeLabel(bar.closesToday);
@@ -546,27 +538,27 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
 
   return (
     <TouchableOpacity
-      style={[styles.card, cardTone]}
+      style={[styles.card, { backgroundColor: cardSurface, borderColor: cardBorder }]}
       activeOpacity={0.9}
       onPress={onPress}
       disabled={!onPress}
     >
       <View style={styles.cardHeader}>
-        <Text style={[styles.barName, { color: palette.text }]} numberOfLines={1}>
+        <Text style={[styles.barName, { color: titleColor }]} numberOfLines={1}>
           {bar.name}
         </Text>
       </View>
 
       <View style={styles.addressTouchable}>
-        <Text style={[styles.addressText, { color: mutedColor }]} numberOfLines={2}>
+        <Text style={[styles.addressText, { color: cardSubtitle }]} numberOfLines={2}>
           {addressLabel}
         </Text>
       </View>
 
       {detailLine ? (
         <View style={styles.distanceDetailRow}>
-          <MaterialIcons name="location-on" size={16} color={secondaryMutedColor} style={{ marginRight: 4 }} />
-          <Text style={[styles.distanceDetail, { color: secondaryMutedColor }]}>{detailLine}</Text>
+          <MaterialIcons name="location-on" size={16} color={cardText} style={{ marginRight: 4 }} />
+          <Text style={[styles.distanceDetail, { color: cardText }]}>{detailLine}</Text>
         </View>
       ) : null}
 
@@ -577,7 +569,7 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
               key={tag.id}
               style={[styles.tagPill, { backgroundColor: pillBackground, borderColor: pillBorder }]}
             >
-              <Text style={[styles.tagText, { color: mutedColor }]} numberOfLines={1}>
+              <Text style={[styles.tagText, { color: pillText }]} numberOfLines={1}>
                 {tag.name}
               </Text>
             </View>
@@ -585,33 +577,33 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
         </View>
       ) : null}
 
-      {(bar.facebook || bar.instagram || bar.twitter) && (
+      {(bar.instagram || bar.twitter || bar.facebook) && (
         <View style={styles.socialRow}>
-          {bar.facebook ? (
-            <TouchableOpacity
-              onPress={() => openExternalLink(bar.facebook)}
-              style={[styles.socialButton, { borderColor: palette.tint }]}
-              activeOpacity={0.8}
-            >
-              <FontAwesome name="facebook-square" size={16} color={palette.tint} />
-            </TouchableOpacity>
-          ) : null}
           {bar.instagram ? (
             <TouchableOpacity
               onPress={() => openExternalLink(bar.instagram)}
-              style={[styles.socialButton, { borderColor: palette.tint }]}
+              style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
-              <FontAwesome name="instagram" size={16} color={palette.tint} />
+              <FontAwesome name="instagram" size={16} color={palette.pillText} />
             </TouchableOpacity>
           ) : null}
           {bar.twitter ? (
             <TouchableOpacity
               onPress={() => openExternalLink(bar.twitter)}
-              style={[styles.socialButton, { borderColor: palette.tint }]}
+              style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
-              <FontAwesome name="twitter" size={16} color={palette.tint} />
+              <FontAwesome name="twitter" size={16} color={palette.pillText} />
+            </TouchableOpacity>
+          ) : null}
+          {bar.facebook ? (
+            <TouchableOpacity
+              onPress={() => openExternalLink(bar.facebook)}
+              style={[styles.socialButton, { borderColor: palette.pillBorder }]}
+              activeOpacity={0.8}
+            >
+              <FontAwesome name="facebook-square" size={16} color={palette.pillText} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -620,6 +612,7 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
   );
 };
 
+// Props for TagFilterPanel component
 type TagFilterPanelProps = {
   tags: TagFilterOption[];
   selectedTags: string[];
@@ -631,6 +624,7 @@ type TagFilterPanelProps = {
   theme: ThemeName;
 };
 
+// Component to display and manage tag filters
 const TagFilterPanel = ({
   tags,
   selectedTags,
@@ -642,11 +636,11 @@ const TagFilterPanel = ({
   theme,
 }: TagFilterPanelProps) => {
   const palette = Colors[theme];
-  const highlightColor = theme === 'light' ? '#f5a524' : '#f6c15b';
-  const highlightText = theme === 'light' ? '#1e1202' : '#120900';
-  const inactiveBackground = theme === 'light' ? '#f8fafc' : '#1e242d';
-  const inactiveBorder = theme === 'light' ? '#dce2ec' : '#2c333c';
-  const inactiveText = theme === 'light' ? '#475569' : '#c7d0de';
+  const highlightColor = palette.filterActivePill;
+  const highlightText = palette.filterTextActive;
+  const inactiveBackground = palette.filterContainer;
+  const inactiveBorder = palette.border;
+  const inactiveText = palette.filterText;
   const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
   const orderedTags = useMemo(() => {
     if (selectedTags.length === 0) {
@@ -716,7 +710,6 @@ const TagFilterPanel = ({
                 styles.filterChip,
                 isActive
                   ? [
-                      styles.filterChipActive,
                       { backgroundColor: highlightColor, borderColor: highlightColor },
                     ]
                   : [
@@ -760,53 +753,99 @@ const TagFilterPanel = ({
   );
 };
 
+// Component to display empty state when no bars are available
 const BarsEmptyState = ({ error, onRetry, theme }: { error: string | null; onRetry: () => void; theme: ThemeName }) => {
   const palette = Colors[theme];
-  const mutedColor = theme === 'light' ? '#5c6672' : '#a7adb4';
+  const networkErrorText = palette.networkErrorText;
+  const networkErrorButton = palette.networkErrorButton;
+  const networkErrorBackground = palette.networkErrorBackground;
+  const networkErrorBorder = palette.networkErrorBorder;
 
   return (
-    <View style={styles.emptyState}>
-      <Text style={[styles.emptyTitle, { color: palette.text }]}>
+    <View
+      style={[
+        styles.emptyState,
+        error
+          ? {
+              backgroundColor: networkErrorBackground,
+              borderColor: networkErrorBorder,
+              borderWidth: 1,
+              borderRadius: 12,
+              paddingVertical: 18,
+              paddingHorizontal: 24,
+              width: '90%',
+              alignSelf: 'center',
+            }
+          : null,
+      ]}
+    >
+      <Text style={[styles.emptyTitle, { color: networkErrorText }]}>
         {error ? 'Unable to load bars' : 'No bars to show'}
       </Text>
-      <Text style={[styles.emptyDescription, { color: mutedColor }]}>
+      <Text style={[styles.emptyDescription, { color: networkErrorText }]}>
         {error ? error : 'Check back soon for nearby watering holes.'}
       </Text>
       {error ? (
-        <TouchableOpacity style={[styles.retryButton, { borderColor: palette.tint }]} onPress={onRetry}>
-          <Text style={[styles.retryButtonText, { color: palette.tint }]}>Try again</Text>
+        <TouchableOpacity style={[styles.retryButton, { borderColor: networkErrorButton }]} onPress={onRetry}>
+          <Text style={[styles.retryButtonText, { color: networkErrorButton }]}>Try again</Text>
         </TouchableOpacity>
       ) : null}
     </View>
   );
 };
 
+// Component to display error banner
 const ErrorBanner = ({ message, theme }: { message: string; theme: ThemeName }) => {
   const palette = Colors[theme];
-  const mutedColor = theme === 'light' ? '#5c6672' : '#a7adb4';
+  const warningBackground = palette.warningBackground;
+  const warningBorder = palette.warningBorder;
+  const warningText = palette.warningText;
 
   return (
-    <View style={[styles.errorBanner, { backgroundColor: theme === 'light' ? '#fff3cd' : '#3a2f14' }]}>
-      <Text style={[styles.errorBannerTitle, { color: palette.text }]}>Unable to refresh</Text>
-      <Text style={[styles.errorBannerMessage, { color: mutedColor }]}>{message}</Text>
+    <View
+      style={[
+        styles.errorBanner,
+        {
+          backgroundColor: warningBackground,
+          borderColor: warningBorder,
+          borderWidth: 1,
+        },
+      ]}
+    >
+      <Text style={[styles.errorBannerTitle, { color: warningText }]}>Unable to refresh</Text>
+      <Text style={[styles.errorBannerMessage, { color: warningText }]}>{message}</Text>
     </View>
   );
 };
 
+// Component to display location permission banner
 const LocationPermissionBanner = ({ theme, onOpenSettings, onRetry }: { theme: ThemeName; onOpenSettings: () => void; onRetry: () => void }) => {
   const palette = Colors[theme];
-  const mutedColor = theme === 'light' ? '#5c6672' : '#a7adb4';
+  const warningBackground = palette.warningBackground;
+  const warningBorder = palette.warningBorder;
+  const warningText = palette.warningText;
+  const actionButton = palette.actionButton;
+  const dismissButton = palette.dismissButton;
 
   return (
-    <View style={[styles.errorBanner, { backgroundColor: theme === 'light' ? '#fff3cd' : '#3a2f14' }]}> 
-      <Text style={[styles.errorBannerTitle, { color: palette.text }]}>Location disabled</Text>
-      <Text style={[styles.errorBannerMessage, { color: mutedColor }]}>Enable location in system settings to see nearby bars.</Text>
+    <View
+      style={[
+        styles.errorBanner,
+        {
+          backgroundColor: warningBackground,
+          borderColor: warningBorder,
+          borderWidth: 1,
+        },
+      ]}
+    > 
+      <Text style={[styles.errorBannerTitle, { color: warningText }]}>Location disabled</Text>
+      <Text style={[styles.errorBannerMessage, { color: warningText }]}>Enable location in system settings to see nearby bars.</Text>
       <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-        <TouchableOpacity onPress={onOpenSettings} style={[styles.retryButton, { borderColor: palette.tint }]}>
-          <Text style={[styles.retryButtonText, { color: palette.tint }]}>Open settings</Text>
+        <TouchableOpacity onPress={onOpenSettings} style={[styles.retryButton, { borderColor: actionButton }]}>
+          <Text style={[styles.retryButtonText, { color: actionButton }]}>Open settings</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onRetry} style={[styles.retryButton, { borderColor: palette.text }]}>
-          <Text style={[styles.retryButtonText, { color: palette.text }]}>Retry</Text>
+        <TouchableOpacity onPress={onRetry} style={[styles.retryButton, { borderColor: dismissButton }]}>
+          <Text style={[styles.retryButtonText, { color: dismissButton }]}>Retry</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -818,6 +857,7 @@ type SelectedTagEntry = {
   label: string;
 };
 
+// Component to display empty state when no bars match selected filters
 const FilteredEmptyState = ({
   selectedTagEntries,
   onClear,
@@ -828,28 +868,31 @@ const FilteredEmptyState = ({
   theme: ThemeName;
 }) => {
   const palette = Colors[theme];
-  const mutedColor = theme === 'light' ? '#5c6672' : '#a7adb4';
-  const chipBackground = theme === 'light' ? '#fff6e8' : '#2a1d10';
-  const chipBorder = theme === 'light' ? '#f5a524' : '#f6c15b';
+  const filterTextActive = palette.filterTextActive;
+  const pillBorder = palette.border;
+  const filterActivePill = palette.filterActivePill;
+  const actionButton = palette.actionButton;
+  const warningText = palette.warningText;
+  const cardSubtitle = palette.cardSubtitle;
 
   return (
     <View style={styles.emptyState}>
-      <Text style={[styles.emptyTitle, { color: palette.text }]}>No bars match those tags</Text>
-      <Text style={[styles.emptyDescription, { color: mutedColor }]}>
+      <Text style={[styles.emptyTitle, { color: warningText}]}>No bars match those tags</Text>
+      <Text style={[styles.emptyDescription, { color: cardSubtitle }]}>
         Try removing a few filters to see more watering holes.
       </Text>
       <View style={styles.selectedFilterTags}>
         {selectedTagEntries.map((entry) => (
           <View
             key={entry.normalized}
-            style={[styles.selectedFilterTagPill, { backgroundColor: chipBackground, borderColor: chipBorder }]}
+            style={[styles.selectedFilterTagPill, { backgroundColor: filterActivePill, borderColor: pillBorder }]}
           >
-            <Text style={[styles.selectedFilterTagText, { color: palette.text }]}>{entry.label}</Text>
+            <Text style={[styles.selectedFilterTagText, { color: filterTextActive }]}>{entry.label}</Text>
           </View>
         ))}
       </View>
-      <TouchableOpacity style={[styles.retryButton, { borderColor: palette.tint }]} onPress={onClear}>
-        <Text style={[styles.retryButtonText, { color: palette.tint }]}>Clear filters</Text>
+      <TouchableOpacity style={[styles.retryButton, { borderColor: actionButton }]} onPress={onClear}>
+        <Text style={[styles.retryButtonText, { color: actionButton }]}>Clear filters</Text>
       </TouchableOpacity>
     </View>
   );
@@ -967,6 +1010,7 @@ export default function BarsScreen() {
       label: lookup.get(normalized) ?? normalized,
     }));
   }, [availableTags, selectedTags]);
+
 
   const handleToggleTag = useCallback((tagName: string) => {
     const normalized = normalizeTagName(tagName);
@@ -1100,7 +1144,13 @@ export default function BarsScreen() {
   );
 
   const renderItem = useCallback<ListRenderItem<Bar>>(
-    ({ item }) => <BarCard bar={item} theme={theme} onPress={() => openBarDetail(item.id)} />,
+    ({ item }) => (
+      <BarCard
+        bar={item}
+        theme={theme}
+        onPress={() => openBarDetail(item.id)}
+      />
+    ),
     [openBarDetail, theme]
   );
 
@@ -1164,7 +1214,7 @@ export default function BarsScreen() {
     <View style={[styles.container, { backgroundColor: palette.background }]}>
       <FlatList
         data={filteredBars}
-        style={styles.list}
+        style={[styles.list, { backgroundColor: palette.background }]}
         contentContainerStyle={
           filteredBars.length === 0
             ? [styles.listContent, styles.listContentCentered]
@@ -1202,8 +1252,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 24,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 24,
   },
   listContentCentered: {
     flexGrow: 1,
@@ -1225,12 +1276,12 @@ const styles = StyleSheet.create({
   },
   cardLight: {
     backgroundColor: '#ffffff',
-    borderColor: 'rgba(15, 23, 42, 0.08)',
+    borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
   },
   cardDark: {
-    backgroundColor: '#1b1f23',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: '#111827',
+    borderColor: '#1f2937',
     shadowColor: '#000000',
   },
   cardHeader: {
@@ -1317,14 +1368,12 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   filterSectionLight: {
-    borderWidth: 1,
-    borderColor: 'rgba(245, 165, 36, 0.35)',
-    backgroundColor: '#fff9ef',
+    borderWidth: 0,
+    backgroundColor: 'transparent',
   },
   filterSectionDark: {
-    borderWidth: 1,
-    borderColor: 'rgba(246, 193, 91, 0.35)',
-    backgroundColor: '#1f1a13',
+    borderWidth: 0,
+    backgroundColor: 'transparent',
   },
   filterHeaderRow: {
     flexDirection: 'row',
@@ -1337,7 +1386,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   filterTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
   filterToggleIcon: {
@@ -1370,16 +1419,10 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: 'center',
   },
-  filterChipActive: {
-    shadowColor: '#f59e0b',
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
   filterChipInactive: {
     borderStyle: 'solid',
   },
+
   filterChipText: {
     fontSize: 14,
     fontWeight: '600',

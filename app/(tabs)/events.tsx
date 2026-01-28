@@ -640,11 +640,11 @@ const EventTagFilterPanel = ({
 	theme,
 }: EventTagFilterPanelProps) => {
 	const palette = Colors[theme];
-	const highlightColor = theme === 'light' ? '#f5a524' : '#f6c15b';
-	const highlightText = theme === 'light' ? '#1e1202' : '#120900';
-	const inactiveBackground = theme === 'light' ? '#f8fafc' : '#1e242d';
-	const inactiveBorder = theme === 'light' ? '#dce2ec' : '#2c333c';
-	const inactiveText = theme === 'light' ? '#475569' : '#c7d0de';
+	const highlightColor = palette.filterActivePill;
+	const highlightText = palette.filterTextActive;
+	const inactiveBackground = palette.filterContainer;
+	const inactiveBorder = palette.border;
+	const inactiveText = palette.filterText;
 	const orderedTags = useMemo(() => {
 		if (!selectedTagId) {
 			return tags;

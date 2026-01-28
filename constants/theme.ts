@@ -17,8 +17,36 @@ export const Colors = {
     iconSelected: '#1976D2',
     activePill: '#E3F2FD',
 
+    //Filters
+    filterContainer: '#E0E0E0',
+    filterText: '#212121',
+    filterTextActive: '#FFFFFF',
+    filterActivePill: '#1976D2',
+
+ //Index
+    background: '#F5F5F5',
+    cardSurface: '#FFFFFF',
+    cardTitle: '#212121',
+    cardSubtitle: '#757575',
+    cardText: '#757575',
+    pillBackground: '#F5F5F5',
+    pillText: '#1976D2',
+    pillBorder: '#1976D2',
+
+      //Warning
+  warningBackground: '#FFF8E1',
+  warningBorder: '#FFC107',
+  warningText: '#424242',
+  actionButton: '#1976D2',
+  dismissButton: '#757575',
+
+    //Network Error
+  networkErrorBackground: '#FDECEA',
+  networkErrorButton: '#1976D2',
+  networkErrorBorder: '#D32F2F',
+  networkErrorText: '#B71C1C',
+
     text: '#11181C',
-    background: '#fff',
     tint: tintColorLight,
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
@@ -31,8 +59,37 @@ export const Colors = {
     iconSelected: '#42A5F5',
     activePill: '#1A2733',
 
-    text: '#F5F5F5',
+     //Filters
+    filterContainer: '#333333',
+    filterText: '#BDBDBD',
+    filterTextActive: '#121212',
+    filterActivePill: '#42A5F5',
+
+    //Index
     background: '#121212',
+    cardSurface: '#1E1E1E',
+    cardTitle: '#F5F5F5',
+    cardSubtitle: '#BDBDBD',
+    cardText: '#BDBDBD',
+    pillBackground: '#2C2C2C',
+    pillText: '#42A5F5',
+    pillBorder: '#42A5F5',
+
+  //Warning
+  warningBackground: '#2C261A',
+  warningBorder: '#FFC107',
+  warningText: '#FFD54F',
+  actionButton: '#42A5F5',
+  dismissButton: '#BDBDBD',
+
+  //Network Error
+  networkErrorBackground: '#1E1E1E',
+  networkErrorButton: '#42A5F5',
+  networkErrorBorder: '#FF5252',
+  networkErrorText: '#F5F5F5',
+
+
+    text: '#F5F5F5',
     tint: tintColorDark,
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,

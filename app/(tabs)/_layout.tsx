@@ -1,22 +1,28 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router'; // Tab layout with authentication check
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+
+// Custom components
 import { HapticTab } from '@/components/haptic-tab';
 import { LogoHeader } from '@/components/logo-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+
+// Custom hooks for theming and authentication
 import { useAuth } from '@/hooks/use-auth';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
+//Get Auth status and theme colors
 export default function TabLayout() {
-  const { status } = useAuth();
+  const { status } = useAuth();  
   const container = useThemeColor({}, 'container');
   const border = useThemeColor({}, 'border');
   const icon = useThemeColor({}, 'icon');
   const iconSelected = useThemeColor({}, 'iconSelected');
   const activePill = useThemeColor({}, 'activePill');
 
-  if (status === 'checking') {
+  // Show loader while checking auth status
+  if (status === 'checking') { 
     return (
       <View style={[styles.loaderContainer, { backgroundColor: container }]}>
         <ActivityIndicator size="large" color={iconSelected} />
@@ -24,12 +30,14 @@ export default function TabLayout() {
     );
   }
 
+  // Redirect to login if not authenticated
   if (status !== 'authenticated') {
     return <Redirect href="/login" />;
   }
 
+  // Render tab navigator if authenticated
   return (
-    <Tabs
+    <Tabs 
       screenOptions={{
         tabBarActiveTintColor: iconSelected,
         tabBarInactiveTintColor: icon,
