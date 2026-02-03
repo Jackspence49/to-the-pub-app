@@ -869,6 +869,7 @@ const FilteredEmptyState = ({
   );
 };
 
+// Main screen component to display list of bars
 export default function BarsScreen() {
   const colorScheme = useColorScheme();
   const theme = (colorScheme ?? 'light') as ThemeName;
@@ -979,8 +980,6 @@ export default function BarsScreen() {
     }));
   }, [availableTags, selectedTags]);
 
-  const selectedTagNames = useMemo(() => selectedTagEntries.map((entry) => entry.label), [selectedTagEntries]);
-
   const handleApplyFilters = useCallback((nextTags: string[]) => {
     setSelectedTags(nextTags);
   }, []);
@@ -995,6 +994,10 @@ export default function BarsScreen() {
 
   const handleClearFilters = useCallback(() => {
     setSelectedTags([]);
+  }, []);
+
+  const handleRemoveTag = useCallback((tagId: string) => {
+    setSelectedTags((prev) => prev.filter((id) => id !== tagId));
   }, []);
 
   useEffect(() => {
@@ -1114,13 +1117,13 @@ export default function BarsScreen() {
               <View
                 style={[
                   styles.filterCard,
-                  { backgroundColor: palette.filterContainer, borderColor: palette.border },
+                  { backgroundColor: palette.background},
                 ]}
               >
                 <View style={styles.filterButtonRow}>
                   <TouchableOpacity
                     onPress={openFilterSheet}
-                    style={[styles.filterButton, { borderColor: palette.border }]}
+                    style={[styles.filterButton, styles.filterButtonLarge, { backgroundColor: palette.actionButton}]}
                     activeOpacity={0.9}
                   >
                     <MaterialIcons name="tune" size={18} color={palette.text} style={styles.filterButtonIcon} />
@@ -1132,16 +1135,31 @@ export default function BarsScreen() {
                       style={[styles.inlineClearButton, { borderColor: palette.filterActivePill }]}
                       activeOpacity={0.85}
                     >
-                      <Text style={[styles.inlineClearText, { color: palette.filterActivePill }]}>Clear</Text>
+                      <Text style={[styles.inlineClearText, { color: palette.filterActivePill }]}>Clear All</Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
 
-                {selectedTagNames.length ? (
-                  <Text style={[styles.selectedTagsPreview, { color: palette.filterText }]}>
-                    {selectedTagNames.slice(0, 2).join(', ')}
-                    {selectedTags.length > 2 ? ` +${selectedTags.length - 2} more` : ''}
-                  </Text>
+                {selectedTagEntries.length ? (
+                  <View style={styles.selectedTagChipRow}>
+                    {selectedTagEntries.map((entry) => (
+                      <View
+                        key={entry.normalized}
+                        style={[styles.selectedTagChip, { borderColor: palette.border, backgroundColor: palette.filterContainer }]}
+                      >
+                        <Text style={[styles.selectedTagChipLabel, { color: palette.text }]} numberOfLines={1}>
+                          {entry.label}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => handleRemoveTag(entry.normalized)}
+                          style={[styles.selectedTagChipClose, { backgroundColor: palette.filterContainer }]}
+                          hitSlop={6}
+                        >
+                          <MaterialIcons name="close" size={14} color={palette.text} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
                 ) : null}
               </View>
             ) : null}
@@ -1152,7 +1170,7 @@ export default function BarsScreen() {
       : null;
 
   const footerComponent = bars.length > 0 && filteredBars.length > 0 ? (
-    <Text style={[styles.footerHint, { color: theme === 'light' ? '#5c6672' : '#a7adb4' }]}>Pull to refresh for the latest list.</Text>
+    <Text style={[styles.footerHint, { color: palette.text }]}>Pull to refresh for the latest list.</Text>
   ) : null;
 
   const listEmptyComponent =
@@ -1182,11 +1200,7 @@ export default function BarsScreen() {
       <FlatList
         data={filteredBars}
         style={[styles.list, { backgroundColor: palette.background }]}
-        contentContainerStyle={
-          filteredBars.length === 0
-            ? [styles.listContent, styles.listContentCentered]
-            : styles.listContent
-        }
+        contentContainerStyle={styles.listContent}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ListEmptyComponent={listEmptyComponent}
@@ -1234,7 +1248,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listHeader: {
+    paddingTop: 12,
     paddingBottom: 16,
+    paddingHorizontal: 20,
     gap: 16,
   },
   screenTitle: {
@@ -1250,16 +1266,6 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
-  },
-  cardLight: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-  },
-  cardDark: {
-    backgroundColor: '#111827',
-    borderColor: '#1f2937',
-    shadowColor: '#000000',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1466,9 +1472,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   filterCard: {
-    padding: 16,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
     borderRadius: 16,
-    borderWidth: 1,
     gap: 12,
   },
   filterButtonRow: {
@@ -1480,17 +1486,22 @@ const styles = StyleSheet.create({
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
     borderWidth: 1,
+    minWidth: 140,
+  },
+  filterButtonLarge: {
+    minHeight: 48,
   },
   filterButtonIcon: {
     marginRight: 8,
   },
   filterButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   inlineClearButton: {
     paddingHorizontal: 12,
@@ -1504,6 +1515,32 @@ const styles = StyleSheet.create({
   },
   selectedTagsPreview: {
     fontSize: 14,
+  },
+  selectedTagChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  selectedTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    gap: 6,
+  },
+  selectedTagChipLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  selectedTagChipClose: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterSheetScrim: {
     flex: 1,
@@ -1526,7 +1563,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 5,
     borderRadius: 999,
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#FFC107',
     marginBottom: 12,
   },
   filterSheetTitle: {
