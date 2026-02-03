@@ -5,6 +5,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import {
 	ActivityIndicator,
+	FlatList,
+	Modal,
+	Pressable,
 	RefreshControl,
 	SectionList,
 	StyleSheet,
@@ -49,8 +52,6 @@ type LooseObject = Record<string, any>;
 
 type ThemeName = keyof typeof Colors;
 type Coordinates = { lat: number; lon: number };
-
-const TAG_PREVIEW_COUNT = 3;
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 const PAGE_SIZE = 6;
@@ -612,151 +613,179 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 	);
 };
 
-type EventTagFilterPanelProps = {
+type TagFilterSheetProps = {
+	visible: boolean;
 	tags: EventTag[];
-	selectedTagId: string | null;
-	filtersExpanded: boolean;
-	onToggleExpand: () => void;
-	onExpand: () => void;
-	onSelectTag: (tagId: string) => void;
-	onClearSelection: () => void;
+	selectedTagIds: string[];
+	onApply: (tagIds: string[]) => void;
+	onClose: () => void;
 	onRetry: () => void;
 	isLoading: boolean;
 	error: string | null;
 	theme: ThemeName;
+	tokens: EventThemeTokens;
 };
 
-const EventTagFilterPanel = ({
+const TagFilterSheet = ({
+	visible,
 	tags,
-	selectedTagId,
-	filtersExpanded,
-	onToggleExpand,
-	onExpand,
-	onSelectTag,
-	onClearSelection,
+	selectedTagIds,
+	onApply,
+	onClose,
 	onRetry,
 	isLoading,
 	error,
 	theme,
-}: EventTagFilterPanelProps) => {
+	tokens,
+}: TagFilterSheetProps) => {
 	const palette = Colors[theme];
 	const highlightColor = palette.filterActivePill;
-	const highlightText = palette.filterTextActive;
-	const inactiveBackground = palette.filterContainer;
-	const inactiveBorder = palette.border;
-	const inactiveText = palette.filterText;
-	const orderedTags = useMemo(() => {
-		if (!selectedTagId) {
+	const [query, setQuery] = useState('');
+	const [draftSelection, setDraftSelection] = useState<string[]>(selectedTagIds);
+
+	useEffect(() => {
+		if (visible) {
+			setDraftSelection(selectedTagIds);
+			setQuery('');
+		}
+	}, [selectedTagIds, visible]);
+
+	const filteredTags = useMemo(() => {
+		if (!query.trim()) {
 			return tags;
 		}
-		const prioritized = tags.filter((tag) => tag.id === selectedTagId);
-		const remaining = tags.filter((tag) => tag.id !== selectedTagId);
-		return [...prioritized, ...remaining];
-	}, [tags, selectedTagId]);
-	const hasHiddenTags = tags.length > TAG_PREVIEW_COUNT;
-	const showChips = !isLoading && !error && tags.length > 0;
-	const displayTags = filtersExpanded || !hasHiddenTags ? orderedTags : orderedTags.slice(0, TAG_PREVIEW_COUNT);
+		const lowered = query.trim().toLowerCase();
+		return tags.filter((tag) => tag.name.toLowerCase().includes(lowered));
+	}, [query, tags]);
 
-	const handleChipPress = (tagId: string) => {
-		if (hasHiddenTags && !filtersExpanded) {
-			onExpand();
-		}
-		onSelectTag(tagId);
-	};
+	const toggleTag = useCallback((tagId: string) => {
+		setDraftSelection((previous) =>
+			previous.includes(tagId)
+				? previous.filter((id) => id !== tagId)
+				: [...previous, tagId]
+		);
+	}, []);
 
-	if (!showChips && !isLoading && !error) {
-		return null;
-	}
+	const handleApply = useCallback(() => {
+		onApply(draftSelection);
+		onClose();
+	}, [draftSelection, onApply, onClose]);
+
+	const handleClearAll = useCallback(() => {
+		setDraftSelection([]);
+	}, []);
+
+	const renderTagRow = useCallback(
+		({ item }: { item: EventTag }) => {
+			const isChecked = draftSelection.includes(item.id);
+			return (
+				<TouchableOpacity
+					style={styles.filterRow}
+					onPress={() => toggleTag(item.id)}
+					activeOpacity={0.8}
+					accessibilityRole="checkbox"
+					accessibilityState={{ checked: isChecked }}
+				>
+					<MaterialIcons
+						name={isChecked ? 'check-box' : 'check-box-outline-blank'}
+						size={22}
+						color={isChecked ? highlightColor : palette.text}
+						style={styles.filterRowCheckbox}
+					/>
+					<Text style={[styles.filterRowLabel, { color: palette.text }]} numberOfLines={1}>
+						{item.name}
+					</Text>
+				</TouchableOpacity>
+			);
+		},
+		[draftSelection, highlightColor, palette.text, toggleTag]
+	);
 
 	return (
-		<View
-			style={[
-				styles.filterSection,
-				theme === 'light' ? styles.filterSectionLight : styles.filterSectionDark,
-			]}
-		>
-			<View style={styles.filterHeaderRow}>
-				<Text style={[styles.filterTitle, { color: palette.text }]}>Filters</Text>
-				{selectedTagId ? (
-					<TouchableOpacity
-						onPress={onClearSelection}
-						style={[styles.clearFilterButton, { borderColor: highlightColor }]}
-						accessibilityRole="button"
-					>
-						<Text style={[styles.clearFilterText, { color: highlightColor }]}>Clear</Text>
-					</TouchableOpacity>
-				) : null}
-			</View>
-			{isLoading ? (
-				<View style={styles.filterStateRow}>
-					<ActivityIndicator size="small" color={highlightColor} />
-					<Text style={[styles.filterStateText, { color: palette.text }]}>Loading tags...</Text>
-				</View>
-			) : error ? (
-				<View style={styles.filterStateColumn}>
-					<Text style={[styles.filterStateErrorText, { color: palette.text }]}>{error}</Text>
-					<TouchableOpacity
-						onPress={onRetry}
-						style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
-						activeOpacity={0.85}
-					>
-						<Text style={[styles.filterStateRetryText, { color: highlightColor }]}>Retry</Text>
-					</TouchableOpacity>
-				</View>
-			) : (
-				<>
-					<View style={styles.filterChipContainer}>
-						{displayTags.map((tag) => {
-							const isActive = tag.id === selectedTagId;
-							return (
-								<TouchableOpacity
-									key={tag.id}
-									onPress={() => handleChipPress(tag.id)}
-									activeOpacity={0.85}
-									style={[
-										styles.filterChip,
-										isActive
-											? [
-												styles.filterChipActive,
-												{ backgroundColor: highlightColor, borderColor: highlightColor },
-										  ]
-										: [
-											styles.filterChipInactive,
-											{ backgroundColor: inactiveBackground, borderColor: inactiveBorder },
-										  ],
-									]}
-									accessibilityState={{ selected: isActive }}
-								>
-									<Text
-										style={[styles.filterChipText, { color: isActive ? highlightText : inactiveText }]}
-										numberOfLines={1}
-									>
-										{tag.name}
-									</Text>
-								</TouchableOpacity>
-							);
-						})}
-					</View>
-					{hasHiddenTags ? (
-						<TouchableOpacity
-							onPress={onToggleExpand}
-							style={styles.filterToggleRow}
-							accessibilityRole="button"
-							activeOpacity={0.8}
-						>
-							<Text style={[styles.filterToggleLabel, { color: highlightColor }]}>
-								{filtersExpanded ? 'Hide tags' : `Show all (${tags.length})`}
-							</Text>
-							<MaterialIcons
-								name={filtersExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-								size={20}
-								color={highlightColor}
-							/>
+		<Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+			<Pressable style={styles.sheetScrim} onPress={onClose} />
+			<View
+				style={[
+					styles.sheetContainer,
+					{ backgroundColor: tokens.headerBackground, borderColor: tokens.headerBorder },
+				]}
+			>
+				<View style={styles.sheetHandle} />
+				<Text style={[styles.sheetTitle, { color: tokens.headingText }]}>Filter Events</Text>
+				<View
+					style={[
+						styles.filterSearchRow,
+						{ backgroundColor: tokens.pageBackground, borderColor: tokens.headerBorder },
+					]}
+				>
+					<MaterialIcons name="search" size={20} color={palette.filterText} />
+					<TextInput
+						style={[styles.filterSearchInput, { color: tokens.headingText }]}
+						placeholder="Search tags..."
+						placeholderTextColor={palette.filterText}
+						value={query}
+						onChangeText={setQuery}
+						returnKeyType="search"
+						autoCorrect={false}
+					/>
+					{query.length ? (
+						<TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+							<MaterialIcons name="close" size={18} color={palette.filterText} />
 						</TouchableOpacity>
 					) : null}
-				</>
-			)}
-		</View>
+				</View>
+
+				{isLoading ? (
+					<View style={styles.filterStateRow}>
+						<ActivityIndicator color={highlightColor} />
+						<Text style={[styles.filterStateText, { color: tokens.headingText }]}>Loading tags...</Text>
+					</View>
+				) : error ? (
+					<View style={styles.filterStateColumn}>
+						<Text style={[styles.filterStateErrorText, { color: tokens.headingText }]}>{error}</Text>
+						<TouchableOpacity
+							onPress={onRetry}
+							style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
+							activeOpacity={0.85}
+						>
+							<Text style={[styles.filterStateRetryText, { color: highlightColor }]}>Retry</Text>
+						</TouchableOpacity>
+					</View>
+				) : (
+					<FlatList
+						data={filteredTags}
+						keyExtractor={(item) => item.id}
+						renderItem={renderTagRow}
+						contentContainerStyle={filteredTags.length === 0 ? styles.filterEmptyContent : undefined}
+						ListEmptyComponent={
+							<View style={styles.filterEmptyState}>
+								<Text style={[styles.filterStateText, { color: tokens.subheadingText }]}>No tags match your search.</Text>
+							</View>
+						}
+						style={styles.filterList}
+						showsVerticalScrollIndicator={false}
+						keyboardShouldPersistTaps="handled"
+					/>
+				)}
+
+				<View style={styles.filterActionRow}>
+					<TouchableOpacity
+						onPress={handleClearAll}
+						style={[styles.filterActionButton, styles.filterActionGhost, { borderColor: tokens.headerBorder }]}
+						activeOpacity={0.85}
+					>
+						<Text style={[styles.filterActionGhostText, { color: tokens.headingText }]}>Clear All</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						onPress={handleApply}
+						style={[styles.filterActionButton, styles.filterActionPrimary, { backgroundColor: highlightColor }]}
+						activeOpacity={0.9}
+					>
+						<Text style={styles.filterActionPrimaryText}>Apply Filters</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
+		</Modal>
 	);
 };
 
@@ -770,7 +799,7 @@ const EventsScreen = () => {
 		() => normalizeTagParamList(searchParams.eventTagId),
 		[searchParams.eventTagId]
 	);
-	const initialSelectedTagId = initialTagIdsFromParams[0] ?? null;
+	const initialSelectedTagIds = initialTagIdsFromParams;
 
 	const [events, setEvents] = useState<EventInstance[]>([]);
 	const [page, setPage] = useState(1);
@@ -779,16 +808,16 @@ const EventsScreen = () => {
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [isPaginating, setIsPaginating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [selectedTagId, setSelectedTagId] = useState<string | null>(initialSelectedTagId);
+	const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialSelectedTagIds);
 	const [availableTags, setAvailableTags] = useState<EventTag[]>([]);
 	const [areTagsLoading, setAreTagsLoading] = useState(false);
 	const [tagsError, setTagsError] = useState<string | null>(null);
-	const [filtersExpanded, setFiltersExpanded] = useState(false);
+	const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
 	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_RADIUS_MILES);
 	const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
 
 	useEffect(() => {
-		setSelectedTagId(initialTagIdsFromParams[0] ?? null);
+		setSelectedTagIds(initialTagIdsFromParams);
 	}, [initialTagIdsFromParams]);
 
 	const fetchAvailableTags = useCallback(async () => {
@@ -820,28 +849,25 @@ const EventsScreen = () => {
 		fetchAvailableTags();
 	}, [fetchAvailableTags]);
 
-	const hasExpandableFilters = availableTags.length > TAG_PREVIEW_COUNT;
+	const selectedTagNames = useMemo(
+		() => availableTags.filter((tag) => selectedTagIds.includes(tag.id)).map((tag) => tag.name),
+		[availableTags, selectedTagIds]
+	);
 
-	useEffect(() => {
-		if (!hasExpandableFilters && filtersExpanded) {
-			setFiltersExpanded(false);
-		}
-	}, [filtersExpanded, hasExpandableFilters]);
-
-	const handleSelectTag = useCallback((tagId: string) => {
-		setSelectedTagId((previous) => (previous === tagId ? null : tagId));
+	const handleApplyFilters = useCallback((nextTagIds: string[]) => {
+		setSelectedTagIds(nextTagIds);
 	}, []);
 
 	const handleClearTags = useCallback(() => {
-		setSelectedTagId(null);
+		setSelectedTagIds([]);
 	}, []);
 
-	const handleToggleFilterDropdown = useCallback(() => {
-		setFiltersExpanded((previous) => !previous);
+	const openFilterSheet = useCallback(() => {
+		setIsFilterSheetVisible(true);
 	}, []);
 
-	const handleExpandFilters = useCallback(() => {
-		setFiltersExpanded(true);
+	const closeFilterSheet = useCallback(() => {
+		setIsFilterSheetVisible(false);
 	}, []);
 
 	const handleOpenEvent = useCallback(
@@ -926,8 +952,8 @@ const EventsScreen = () => {
 					unit: DISTANCE_UNIT,
 				};
 
-				if (selectedTagId) {
-					queryParams.event_tag_id = selectedTagId;
+				if (selectedTagIds.length > 0) {
+					queryParams.event_tag_id = selectedTagIds;
 				}
 
 				const query = buildQueryString(queryParams);
@@ -955,7 +981,7 @@ const EventsScreen = () => {
 				}
 			}
 		},
-		[userCoords, searchRadius, selectedTagId]
+		[userCoords, searchRadius, selectedTagIds]
 	);
 
 	useEffect(() => {
@@ -1049,8 +1075,12 @@ const EventsScreen = () => {
 			.map(({ title, data }) => ({ title, data }));
 	}, [events]);
 
-	const renderHeader = useMemo(
-		() => (
+	const renderHeader = useMemo(() => {
+		const highlightColor = Colors[theme].filterActivePill;
+		const preview = selectedTagNames.slice(0, 2).join(', ');
+		const remaining = Math.max(0, selectedTagIds.length - 2);
+
+		return (
 			<View
 				style={[
 					styles.listHeader,
@@ -1061,19 +1091,52 @@ const EventsScreen = () => {
 
 				<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
 
-				<EventTagFilterPanel
-					tags={availableTags}
-					selectedTagId={selectedTagId}
-					filtersExpanded={filtersExpanded}
-					onToggleExpand={handleToggleFilterDropdown}
-					onExpand={handleExpandFilters}
-					onSelectTag={handleSelectTag}
-					onClearSelection={handleClearTags}
-					onRetry={fetchAvailableTags}
-					isLoading={areTagsLoading}
-					error={tagsError}
-					theme={theme}
-				/>
+				<View style={styles.filterButtonRow}>
+					<TouchableOpacity
+						onPress={openFilterSheet}
+						style={[styles.filterButton, { borderColor: tokens.headerBorder }]}
+						activeOpacity={0.9}
+					>
+						<MaterialIcons name="tune" size={18} color={tokens.headingText} style={styles.filterButtonIcon} />
+						<Text style={[styles.filterButtonText, { color: tokens.headingText }]}>
+							Filters{selectedTagIds.length ? ` (${selectedTagIds.length})` : ''}
+						</Text>
+					</TouchableOpacity>
+					{selectedTagIds.length ? (
+						<TouchableOpacity
+							onPress={handleClearTags}
+							style={[styles.inlineClearButton, { borderColor: highlightColor }]}
+							activeOpacity={0.85}
+						>
+							<Text style={[styles.inlineClearText, { color: highlightColor }]}>Clear</Text>
+						</TouchableOpacity>
+					) : null}
+				</View>
+
+				{selectedTagNames.length ? (
+					<Text style={[styles.selectedTagsText, { color: tokens.subheadingText }]}>
+						{preview}
+						{remaining ? ` +${remaining} more` : ''}
+					</Text>
+				) : null}
+
+				{tagsError ? (
+					<TouchableOpacity
+						onPress={fetchAvailableTags}
+						style={[styles.filterLoadRow, { borderColor: highlightColor }]}
+					>
+						<Text style={[styles.filterLoadText, { color: tokens.headingText }]}>
+							Could not load tags. Tap to retry.
+						</Text>
+					</TouchableOpacity>
+				) : null}
+
+				{areTagsLoading ? (
+					<View style={styles.filterLoadRow}>
+						<ActivityIndicator size="small" color={highlightColor} />
+						<Text style={[styles.filterLoadText, { color: tokens.subheadingText }]}>Loading tags...</Text>
+					</View>
+				) : null}
 
 				{error ? (
 					<View
@@ -1093,26 +1156,22 @@ const EventsScreen = () => {
 					</View>
 				) : null}
 			</View>
-		),
-		[
-			areTagsLoading,
-			availableTags,
-			error,
-			fetchAvailableTags,
-			filtersExpanded,
-			handleClearTags,
-			handleExpandFilters,
-			handleRadiusChange,
-			handleRetry,
-			handleSelectTag,
-			handleToggleFilterDropdown,
-			searchRadius,
-			selectedTagId,
-			tagsError,
-			theme,
-			tokens,
-		]
-	);
+		);
+	}, [
+		areTagsLoading,
+		error,
+		fetchAvailableTags,
+		handleClearTags,
+		handleRadiusChange,
+		handleRetry,
+		openFilterSheet,
+		searchRadius,
+		selectedTagIds,
+		selectedTagNames,
+		tagsError,
+		theme,
+		tokens,
+	]);
 
 	const renderEmpty = useMemo(() => {
 		if (isInitialLoading) {
@@ -1204,6 +1263,19 @@ const EventsScreen = () => {
 					/>
 				}
 				showsVerticalScrollIndicator={false}
+			/>
+
+			<TagFilterSheet
+				visible={isFilterSheetVisible}
+				tags={availableTags}
+				selectedTagIds={selectedTagIds}
+				onApply={handleApplyFilters}
+				onClose={closeFilterSheet}
+				onRetry={fetchAvailableTags}
+				isLoading={areTagsLoading}
+				error={tagsError}
+				theme={theme}
+				tokens={tokens}
 			/>
 		</View>
 	);
@@ -1311,6 +1383,57 @@ const styles = StyleSheet.create({
 		borderColor: 'rgba(246, 193, 91, 0.35)',
 		backgroundColor: '#1f1a13',
 	},
+	filterButtonRow: {
+		marginTop: 18,
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 10,
+	},
+	filterButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 10,
+		paddingHorizontal: 14,
+		borderRadius: 12,
+		borderWidth: 1,
+	},
+	filterButtonIcon: {
+		marginRight: 8,
+	},
+	filterButtonText: {
+		fontSize: 15,
+		fontWeight: '700',
+	},
+	inlineClearButton: {
+		paddingHorizontal: 12,
+		paddingVertical: 8,
+		borderRadius: 10,
+		borderWidth: 1,
+	},
+	inlineClearText: {
+		fontSize: 14,
+		fontWeight: '700',
+	},
+	selectedTagsText: {
+		marginTop: 8,
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	filterLoadRow: {
+		marginTop: 10,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		paddingVertical: 8,
+		paddingHorizontal: 10,
+		borderRadius: 10,
+		borderWidth: 1,
+	},
+	filterLoadText: {
+		fontSize: 14,
+		fontWeight: '600',
+	},
 	filterHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -1394,6 +1517,111 @@ const styles = StyleSheet.create({
 	filterStateRetryText: {
 		fontSize: 14,
 		fontWeight: '600',
+	},
+	sheetScrim: {
+		position: 'absolute',
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		backgroundColor: 'rgba(0,0,0,0.35)',
+	},
+	sheetContainer: {
+		position: 'absolute',
+		left: 0,
+		right: 0,
+		bottom: 0,
+		borderTopLeftRadius: 22,
+		borderTopRightRadius: 22,
+		borderWidth: 1,
+		padding: 20,
+		maxHeight: '75%',
+		shadowColor: '#000',
+		shadowOpacity: 0.25,
+		shadowRadius: 12,
+		shadowOffset: { width: 0, height: -4 },
+		elevation: 10,
+	},
+	sheetHandle: {
+		alignSelf: 'center',
+		width: 40,
+		height: 5,
+		borderRadius: 999,
+		backgroundColor: '#d1d5db',
+		marginBottom: 14,
+	},
+	sheetTitle: {
+		fontSize: 18,
+		fontWeight: '700',
+		textAlign: 'center',
+		marginBottom: 14,
+	},
+	filterSearchRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		borderWidth: 1,
+		borderRadius: 12,
+		paddingHorizontal: 12,
+		paddingVertical: 10,
+	},
+	filterSearchInput: {
+		flex: 1,
+		fontSize: 15,
+		fontWeight: '600',
+	},
+	filterList: {
+		marginTop: 14,
+	},
+	filterEmptyContent: {
+		flexGrow: 1,
+	},
+	filterEmptyState: {
+		alignItems: 'center',
+		paddingVertical: 20,
+	},
+	filterRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		paddingVertical: 10,
+		paddingHorizontal: 4,
+		gap: 12,
+	},
+	filterRowCheckbox: {
+		marginLeft: 4,
+	},
+	filterRowLabel: {
+		fontSize: 15,
+		fontWeight: '600',
+		flexShrink: 1,
+	},
+	filterActionRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 12,
+		marginTop: 16,
+	},
+	filterActionButton: {
+		flex: 1,
+		alignItems: 'center',
+		paddingVertical: 12,
+		borderRadius: 12,
+		borderWidth: 1,
+	},
+	filterActionGhost: {
+		backgroundColor: '#f3f4f6',
+	},
+	filterActionGhostText: {
+		fontSize: 15,
+		fontWeight: '700',
+	},
+	filterActionPrimary: {
+	},
+	filterActionPrimaryText: {
+		color: '#ffffff',
+		fontSize: 15,
+		fontWeight: '700',
 	},
 	errorBanner: {
 		marginTop: 16,
