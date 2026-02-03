@@ -640,40 +640,26 @@ const TagFilterSheet = ({
 }: TagFilterSheetProps) => {
 	const palette = Colors[theme];
 	const highlightColor = palette.filterActivePill;
-	const [query, setQuery] = useState('');
 	const [draftSelection, setDraftSelection] = useState<string[]>(selectedTagIds);
 
 	useEffect(() => {
 		if (visible) {
 			setDraftSelection(selectedTagIds);
-			setQuery('');
 		}
 	}, [selectedTagIds, visible]);
 
 	const filteredTags = useMemo(() => {
-		if (!query.trim()) {
-			return tags;
-		}
-		const lowered = query.trim().toLowerCase();
-		return tags.filter((tag) => tag.name.toLowerCase().includes(lowered));
-	}, [query, tags]);
+		return tags;
+	}, [tags]);
 
 	const toggleTag = useCallback((tagId: string) => {
-		setDraftSelection((previous) =>
-			previous.includes(tagId)
-				? previous.filter((id) => id !== tagId)
-				: [...previous, tagId]
-		);
-	}, []);
-
-	const handleApply = useCallback(() => {
-		onApply(draftSelection);
-		onClose();
-	}, [draftSelection, onApply, onClose]);
-
-	const handleClearAll = useCallback(() => {
-		setDraftSelection([]);
-	}, []);
+		setDraftSelection((previous) => {
+			const next = previous.includes(tagId) ? [] : [tagId];
+			onApply(next);
+			onClose();
+			return next;
+		});
+	}, [onApply, onClose]);
 
 	const renderTagRow = useCallback(
 		({ item }: { item: EventTag }) => {
@@ -683,11 +669,11 @@ const TagFilterSheet = ({
 					style={styles.filterRow}
 					onPress={() => toggleTag(item.id)}
 					activeOpacity={0.8}
-					accessibilityRole="checkbox"
-					accessibilityState={{ checked: isChecked }}
+					accessibilityRole="radio"
+					accessibilityState={{ selected: isChecked }}
 				>
 					<MaterialIcons
-						name={isChecked ? 'check-box' : 'check-box-outline-blank'}
+						name={isChecked ? 'radio-button-checked' : 'radio-button-unchecked'}
 						size={22}
 						color={isChecked ? highlightColor : palette.text}
 						style={styles.filterRowCheckbox}
@@ -712,28 +698,6 @@ const TagFilterSheet = ({
 			>
 				<View style={styles.sheetHandle} />
 				<Text style={[styles.sheetTitle, { color: tokens.headingText }]}>Filter Events</Text>
-				<View
-					style={[
-						styles.filterSearchRow,
-						{ backgroundColor: tokens.pageBackground, borderColor: tokens.headerBorder },
-					]}
-				>
-					<MaterialIcons name="search" size={20} color={palette.filterText} />
-					<TextInput
-						style={[styles.filterSearchInput, { color: tokens.headingText }]}
-						placeholder="Search tags..."
-						placeholderTextColor={palette.filterText}
-						value={query}
-						onChangeText={setQuery}
-						returnKeyType="search"
-						autoCorrect={false}
-					/>
-					{query.length ? (
-						<TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
-							<MaterialIcons name="close" size={18} color={palette.filterText} />
-						</TouchableOpacity>
-					) : null}
-				</View>
 
 				{isLoading ? (
 					<View style={styles.filterStateRow}>
@@ -759,7 +723,7 @@ const TagFilterSheet = ({
 						contentContainerStyle={filteredTags.length === 0 ? styles.filterEmptyContent : undefined}
 						ListEmptyComponent={
 							<View style={styles.filterEmptyState}>
-								<Text style={[styles.filterStateText, { color: tokens.subheadingText }]}>No tags match your search.</Text>
+								<Text style={[styles.filterStateText, { color: tokens.subheadingText }]}>No tags available.</Text>
 							</View>
 						}
 						style={styles.filterList}
@@ -767,23 +731,6 @@ const TagFilterSheet = ({
 						keyboardShouldPersistTaps="handled"
 					/>
 				)}
-
-				<View style={styles.filterActionRow}>
-					<TouchableOpacity
-						onPress={handleClearAll}
-						style={[styles.filterActionButton, styles.filterActionGhost, { borderColor: tokens.headerBorder }]}
-						activeOpacity={0.85}
-					>
-						<Text style={[styles.filterActionGhostText, { color: tokens.headingText }]}>Clear All</Text>
-					</TouchableOpacity>
-					<TouchableOpacity
-						onPress={handleApply}
-						style={[styles.filterActionButton, styles.filterActionPrimary, { backgroundColor: highlightColor }]}
-						activeOpacity={0.9}
-					>
-						<Text style={styles.filterActionPrimaryText}>Apply Filters</Text>
-					</TouchableOpacity>
-				</View>
 			</View>
 		</Modal>
 	);

@@ -1,7 +1,7 @@
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons'; // Icon libraries
 import * as Location from 'expo-location'; // Location services
 import { useFocusEffect, useRouter } from 'expo-router'; // Navigation hooks 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 
 // React Native components
@@ -9,8 +9,8 @@ import {
   ActivityIndicator,
   FlatList,
   Linking,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  Modal,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -59,8 +59,6 @@ type TagFilterOption = {
 };
 
 
-const TAG_PREVIEW_COUNT = 3; // Number of tags to show before expanding
-const FILTER_COLLAPSE_SCROLL_DELTA = 12;  // Scroll delta to collapse filter panel
 
 // API and utility constants
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();  // Base URL for API requests
@@ -208,7 +206,6 @@ const coerceDayIndex = (value: unknown): number | null => {
   return null;
 };
 
-
 // Function to extract closing time metadata from a schedule record
 const extractCloseMetaFromRecord = (record?: LooseObject | null): { closesAt?: string; crossesMidnight?: boolean } | null => {
   if (!record || typeof record !== 'object') {
@@ -255,7 +252,6 @@ const resolveClosingFromSchedules = (raw: LooseObject): { closesAt?: string; cro
 const extractTodayClosingMeta = (raw: LooseObject): { closesAt?: string; crossesMidnight?: boolean } => {
   let closesAt: string | undefined;
   let crossesMidnight: boolean | undefined;
-
 
   const assignCandidate = (value?: unknown) => {
     if (!closesAt && typeof value === 'string' && value.trim().length > 0) {
@@ -612,144 +608,119 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
   );
 };
 
-// Props for TagFilterPanel component
-type TagFilterPanelProps = {
+// Props for tag filter bottom sheet
+type TagFilterSheetProps = {
+  visible: boolean;
   tags: TagFilterOption[];
   selectedTags: string[];
-  filtersExpanded: boolean;
-  onToggleExpand: () => void;
-  onExpand: () => void;
-  onToggleTag: (tagName: string) => void;
-  onClearTags: () => void;
+  onApply: (tagIds: string[]) => void;
+  onClose: () => void;
   theme: ThemeName;
 };
 
-// Component to display and manage tag filters
-const TagFilterPanel = ({
-  tags,
-  selectedTags,
-  filtersExpanded,
-  onToggleExpand,
-  onExpand,
-  onToggleTag,
-  onClearTags,
-  theme,
-}: TagFilterPanelProps) => {
+// Tag selection sheet (mirrors event filters UI)
+const TagFilterSheet = ({ visible, tags, selectedTags, onApply, onClose, theme }: TagFilterSheetProps) => {
   const palette = Colors[theme];
   const highlightColor = palette.filterActivePill;
-  const highlightText = palette.filterTextActive;
-  const inactiveBackground = palette.filterContainer;
-  const inactiveBorder = palette.border;
-  const inactiveText = palette.filterText;
-  const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
-  const orderedTags = useMemo(() => {
-    if (selectedTags.length === 0) {
-      return tags;
-    }
-    const prioritized: TagFilterOption[] = [];
-    const remaining: TagFilterOption[] = [];
-    tags.forEach((tag) => {
-      if (selectedTagSet.has(tag.normalizedName)) {
-        prioritized.push(tag);
-      } else {
-        remaining.push(tag);
-      }
-    });
-    return [...prioritized, ...remaining];
-  }, [tags, selectedTags, selectedTagSet]);
-  const hasHiddenTags = tags.length > TAG_PREVIEW_COUNT;
-  const displayTags = filtersExpanded || !hasHiddenTags ? orderedTags : orderedTags.slice(0, TAG_PREVIEW_COUNT);
+  const [draftSelection, setDraftSelection] = useState<string[]>(selectedTags);
 
-  const handleChipPress = (tagName: string) => {
-    if (hasHiddenTags && !filtersExpanded) {
-      onExpand();
-      // Allow the dropdown to open while still applying the selection.
+  useEffect(() => {
+    if (visible) {
+      setDraftSelection(selectedTags);
     }
-    onToggleTag(tagName);
-  };
+  }, [selectedTags, visible]);
 
-  if (tags.length === 0) {
-    return null;
-  }
+  const toggleTag = useCallback((normalizedName: string) => {
+    setDraftSelection((previous) =>
+      previous.includes(normalizedName)
+        ? previous.filter((id) => id !== normalizedName)
+        : [...previous, normalizedName]
+    );
+  }, []);
+
+  const handleApply = useCallback(() => {
+    onApply(draftSelection);
+    onClose();
+  }, [draftSelection, onApply, onClose]);
+
+  const handleClearAll = useCallback(() => {
+    setDraftSelection([]);
+  }, []);
 
   return (
-    <View
-      style={[
-        styles.filterSection,
-        theme === 'light' ? styles.filterSectionLight : styles.filterSectionDark,
-      ]}
-    >
-      <View style={styles.filterHeaderRow}>
-        <TouchableOpacity
-          style={styles.filterTitleButton}
-          activeOpacity={hasHiddenTags ? 0.8 : 1}
-          onPress={hasHiddenTags ? onToggleExpand : undefined}
-          disabled={!hasHiddenTags}
-        >
-          <Text style={[styles.filterTitle, { color: palette.text }]}>Filters</Text>
-        </TouchableOpacity>
-        {selectedTags.length > 0 ? (
-          <TouchableOpacity
-            onPress={onClearTags}
-            style={[styles.clearFilterButton, { borderColor: highlightColor }]}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.clearFilterText, { color: highlightColor }]}>Clear</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
-      <View style={styles.filterChipContainer}>
-        {displayTags.map((tag) => {
-          const isActive = selectedTagSet.has(tag.normalizedName);
-          return (
-            <TouchableOpacity
-              key={tag.id}
-              onPress={() => handleChipPress(tag.name)}
-              activeOpacity={0.85}
-              style={[
-                styles.filterChip,
-                isActive
-                  ? [
-                      { backgroundColor: highlightColor, borderColor: highlightColor },
-                    ]
-                  : [
-                      styles.filterChipInactive,
-                      { backgroundColor: inactiveBackground, borderColor: inactiveBorder },
-                    ],
-              ]}
-              accessibilityState={{ selected: isActive }}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  { color: isActive ? highlightText : inactiveText },
-                ]}
-                numberOfLines={1}
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <Pressable style={styles.filterSheetScrim} onPress={onClose} />
+      <View
+        style={[
+          styles.filterSheetContainer,
+          { backgroundColor: palette.background, borderColor: palette.border },
+        ]}
+      >
+        <View style={styles.filterSheetHandle} />
+        <Text style={[styles.filterSheetTitle, { color: palette.text }]}>Filter bars</Text>
+
+        <FlatList
+          data={tags}
+          keyExtractor={(item) => item.normalizedName}
+          renderItem={({ item }) => {
+            const isChecked = draftSelection.includes(item.normalizedName);
+            return (
+              <TouchableOpacity
+                style={styles.filterSheetRow}
+                onPress={() => toggleTag(item.normalizedName)}
+                activeOpacity={0.85}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isChecked }}
               >
-                {tag.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                <MaterialIcons
+                  name={isChecked ? 'check-box' : 'check-box-outline-blank'}
+                  size={22}
+                  color={isChecked ? highlightColor : palette.text}
+                  style={styles.filterSheetCheckbox}
+                />
+                <Text style={[styles.filterSheetRowLabel, { color: palette.text }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
+          contentContainerStyle={tags.length === 0 ? styles.filterSheetEmptyContent : undefined}
+          ListEmptyComponent={
+            <View style={styles.filterSheetEmptyContent}>
+              <Text style={[styles.filterSheetEmptyText, { color: palette.filterText }]}>No tags available.</Text>
+            </View>
+          }
+          style={styles.filterSheetList}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
+
+        <View style={styles.filterSheetActionRow}>
+          <TouchableOpacity
+            onPress={handleClearAll}
+            style={[
+              styles.filterSheetActionButton,
+              styles.filterSheetActionGhost,
+              { borderColor: palette.border },
+            ]}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.filterSheetActionGhostText, { color: palette.text }]}>Clear All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleApply}
+            style={[
+              styles.filterSheetActionButton,
+              styles.filterSheetActionPrimary,
+              { backgroundColor: highlightColor },
+            ]}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.filterSheetActionPrimaryText}>Apply Filters</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      {hasHiddenTags ? (
-        <TouchableOpacity
-          onPress={onToggleExpand}
-          style={styles.filterToggleRow}
-          accessibilityRole="button"
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.filterToggleLabel, { color: highlightColor }]}>
-            {filtersExpanded ? 'Hide tags' : `Show all (${tags.length})`}
-          </Text>
-          <MaterialIcons
-            name={filtersExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={20}
-            color={highlightColor}
-          />
-        </TouchableOpacity>
-      ) : null}
-    </View>
+    </Modal>
   );
 };
 
@@ -906,12 +877,11 @@ export default function BarsScreen() {
   const [bars, setBars] = useState<Bar[]>([]);
   const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locationDeniedPermanently, setLocationDeniedPermanently] = useState(false);
-  const lastScrollOffset = useRef(0);
 
   const ensureLocationPermission = useCallback(async (): Promise<boolean> => {
     const current = await Location.getForegroundPermissionsAsync();
@@ -975,8 +945,6 @@ export default function BarsScreen() {
     return Array.from(tagMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [bars]);
 
-  const hasExpandableFilters = availableTags.length > TAG_PREVIEW_COUNT;
-
   const filteredBars = useMemo(() => {
     if (selectedTags.length === 0) {
       return bars;
@@ -1011,50 +979,23 @@ export default function BarsScreen() {
     }));
   }, [availableTags, selectedTags]);
 
+  const selectedTagNames = useMemo(() => selectedTagEntries.map((entry) => entry.label), [selectedTagEntries]);
 
-  const handleToggleTag = useCallback((tagName: string) => {
-    const normalized = normalizeTagName(tagName);
-    setSelectedTags((prev) =>
-      prev.includes(normalized) ? prev.filter((tag) => tag !== normalized) : [...prev, normalized]
-    );
+  const handleApplyFilters = useCallback((nextTags: string[]) => {
+    setSelectedTags(nextTags);
+  }, []);
+
+  const openFilterSheet = useCallback(() => {
+    setIsFilterSheetVisible(true);
+  }, []);
+
+  const closeFilterSheet = useCallback(() => {
+    setIsFilterSheetVisible(false);
   }, []);
 
   const handleClearFilters = useCallback(() => {
     setSelectedTags([]);
   }, []);
-
-  const handleToggleFilterDropdown = useCallback(() => {
-    setFiltersExpanded((prev) => !prev);
-  }, []);
-
-  const handleExpandFilters = useCallback(() => {
-    setFiltersExpanded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasExpandableFilters && filtersExpanded) {
-      setFiltersExpanded(false);
-    }
-  }, [hasExpandableFilters, filtersExpanded]);
-
-  const handleListScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!filtersExpanded || !hasExpandableFilters) {
-        lastScrollOffset.current = event.nativeEvent.contentOffset.y;
-        return;
-      }
-
-      const currentOffset = event.nativeEvent.contentOffset.y;
-      const previousOffset = lastScrollOffset.current;
-      lastScrollOffset.current = currentOffset;
-
-      const isScrollingUp = previousOffset - currentOffset > FILTER_COLLAPSE_SCROLL_DELTA;
-      if (isScrollingUp && currentOffset >= 0) {
-        setFiltersExpanded(false);
-      }
-    },
-    [filtersExpanded, hasExpandableFilters]
-  );
 
   useEffect(() => {
     refreshUserLocation();
@@ -1157,9 +1098,10 @@ export default function BarsScreen() {
   const keyExtractor = useCallback((item: Bar) => item.id, []);
 
   const headerComponent =
-    locationDeniedPermanently || availableTags.length > 0 || (bars.length > 0 && error)
+    locationDeniedPermanently || availableTags.length > 0 || selectedTags.length > 0 || (bars.length > 0 && error)
       ? (
           <View style={styles.listHeader}>
+            <Text style={[styles.screenTitle, { color: palette.text }]}>Open Bars</Text>
             {locationDeniedPermanently ? (
               <LocationPermissionBanner
                 theme={theme}
@@ -1167,18 +1109,43 @@ export default function BarsScreen() {
                 onRetry={refreshUserLocation}
               />
             ) : null}
-            {availableTags.length > 0 ? (
-              <TagFilterPanel
-                tags={availableTags}
-                selectedTags={selectedTags}
-                filtersExpanded={filtersExpanded}
-                onToggleExpand={handleToggleFilterDropdown}
-                onExpand={handleExpandFilters}
-                onToggleTag={handleToggleTag}
-                onClearTags={handleClearFilters}
-                theme={theme}
-              />
+
+            {availableTags.length > 0 || selectedTags.length > 0 ? (
+              <View
+                style={[
+                  styles.filterCard,
+                  { backgroundColor: palette.filterContainer, borderColor: palette.border },
+                ]}
+              >
+                <View style={styles.filterButtonRow}>
+                  <TouchableOpacity
+                    onPress={openFilterSheet}
+                    style={[styles.filterButton, { borderColor: palette.border }]}
+                    activeOpacity={0.9}
+                  >
+                    <MaterialIcons name="tune" size={18} color={palette.text} style={styles.filterButtonIcon} />
+                    <Text style={[styles.filterButtonText, { color: palette.text }]}>Filters{selectedTags.length ? ` (${selectedTags.length})` : ''}</Text>
+                  </TouchableOpacity>
+                  {selectedTags.length ? (
+                    <TouchableOpacity
+                      onPress={handleClearFilters}
+                      style={[styles.inlineClearButton, { borderColor: palette.filterActivePill }]}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[styles.inlineClearText, { color: palette.filterActivePill }]}>Clear</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {selectedTagNames.length ? (
+                  <Text style={[styles.selectedTagsPreview, { color: palette.filterText }]}>
+                    {selectedTagNames.slice(0, 2).join(', ')}
+                    {selectedTags.length > 2 ? ` +${selectedTags.length - 2} more` : ''}
+                  </Text>
+                ) : null}
+              </View>
             ) : null}
+
             {bars.length > 0 && error ? <ErrorBanner message={error} theme={theme} /> : null}
           </View>
         )
@@ -1226,9 +1193,15 @@ export default function BarsScreen() {
         ListHeaderComponent={headerComponent}
         ListFooterComponent={footerComponent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={palette.tint} />}
-        onScroll={handleListScroll}
-        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+      />
+      <TagFilterSheet
+        visible={isFilterSheetVisible}
+        tags={availableTags}
+        selectedTags={selectedTags}
+        onApply={handleApplyFilters}
+        onClose={closeFilterSheet}
+        theme={theme}
       />
     </View>
   );
@@ -1263,6 +1236,10 @@ const styles = StyleSheet.create({
   listHeader: {
     paddingBottom: 16,
     gap: 16,
+  },
+  screenTitle: {
+    fontSize: 26,
+    fontWeight: '700',
   },
   card: {
     borderRadius: 16,
@@ -1487,5 +1464,141 @@ const styles = StyleSheet.create({
   },
   selectedFilterTagText: {
     fontSize: 14,
+  },
+  filterCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12,
+  },
+  filterButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  filterButtonIcon: {
+    marginRight: 8,
+  },
+  filterButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  inlineClearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  inlineClearText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedTagsPreview: {
+    fontSize: 14,
+  },
+  filterSheetScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  filterSheetContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+  },
+  filterSheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#9ca3af',
+    marginBottom: 12,
+  },
+  filterSheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  filterSheetSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  filterSheetSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 6,
+  },
+  filterSheetList: {
+    maxHeight: 340,
+  },
+  filterSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 8,
+  },
+  filterSheetCheckbox: {
+    marginRight: 8,
+  },
+  filterSheetRowLabel: {
+    fontSize: 15,
+    flex: 1,
+  },
+  filterSheetEmptyContent: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  filterSheetEmptyText: {
+    fontSize: 14,
+  },
+  filterSheetActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 12,
+  },
+  filterSheetActionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  filterSheetActionGhost: {
+    backgroundColor: 'transparent',
+  },
+  filterSheetActionPrimary: {
+    borderWidth: 0,
+  },
+  filterSheetActionGhostText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  filterSheetActionPrimaryText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
   },
 });
