@@ -82,12 +82,14 @@ const DEFAULT_COORDINATES = {
 
 // Function to get theme tokens based on current theme
 const getEventThemeTokens = (theme: ThemeName) => {
-	const palette = Colors[theme];	
+	const palette = Colors[theme];
 	return {
 		background: palette.background,
 		container: palette.container,
 		border: palette.border,
+		headerBorder: palette.border,
 		cardTitle: palette.cardTitle,
+		subcardTitle: palette.cardSubtitle,
 		icon: palette.icon,
 		iconSelected: palette.iconSelected,
 		activePill: palette.activePill,
@@ -102,14 +104,24 @@ const getEventThemeTokens = (theme: ThemeName) => {
 		pillText: palette.pillText,
 		pillBorder: palette.pillBorder,
 		warningBackground: palette.warningBackground,
-  		warningBorder: palette.warningBorder,
-  		warningText: palette.warningText,
-  		actionButton: palette.actionButton,
-  		dismissButton: palette.dismissButton,
+		warningBorder: palette.warningBorder,
+		warningText: palette.warningText,
+		actionButton: palette.actionButton,
+		dismissButton: palette.dismissButton,
 		networkErrorBackground: palette.networkErrorBackground,
 		networkErrorButton: palette.networkErrorButton,
 		networkErrorBorder: palette.networkErrorBorder,
 		networkErrorText: palette.networkErrorText,
+		errorBackground: palette.networkErrorBackground,
+		errorBorder: palette.networkErrorBorder,
+		errorTitle: palette.cardTitle,
+		errorDescription: palette.cardSubtitle,
+		retryBackground: palette.networkErrorBackground,
+		retryText: palette.networkErrorText,
+		indicator: palette.iconSelected,
+		emptyText: palette.cardSubtitle,
+		emptyTitle: palette.cardTitle,
+		footerText: palette.filterText,
 		cardBackground: palette.cardSurface,
 		cardBorder: palette.border,
 	};
@@ -127,6 +139,8 @@ const normalizeTagParamList = (value?: string | string[]): string[] => {
 		.map((entry) => entry.trim())
 		.filter((entry) => entry.length > 0);
 };
+
+// Utility function to build query strings
 
 // Utility function to build query strings
 const buildQueryString = (params: Record<string, QueryValue>) =>
@@ -1575,7 +1589,7 @@ const styles = StyleSheet.create({
 		borderTopRightRadius: 22,
 		borderWidth: 1,
 		padding: 20,
-		maxHeight: '75%',
+		maxHeight: '50%',
 		shadowColor: '#000',
 		shadowOpacity: 0.25,
 		shadowRadius: 12,
