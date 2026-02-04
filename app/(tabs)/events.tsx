@@ -1,27 +1,53 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons'; // Icon library
+import * as Location from 'expo-location'; // Location services
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'; // Navigation and routing
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
+
+// React Native components
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    Pressable,
-    RefreshControl,
-    SectionList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+	ActivityIndicator,
+	FlatList,
+	Modal,
+	Pressable,
+	RefreshControl,
+	SectionList,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
 } from 'react-native';
 
+// Custom constants and hooks
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-type FetchMode = 'initial' | 'refresh' | 'paginate';
 
+// Type definitions
+type FetchMode = 'initial' | 'refresh' | 'paginate';
+type LooseObject = Record<string, any>;
+type ThemeName = keyof typeof Colors; 
+type Coordinates = { lat: number; lon: number };
+type EventThemeTokens = ReturnType<typeof getEventThemeTokens>;
+type QueryValue = string | number | boolean | undefined | (string | number | boolean)[];
+
+// Event card props type definition
+type EventCardProps = {
+	event: EventInstance;
+	availableTags: EventTag[];
+	tokens: EventThemeTokens;
+	onPress?: () => void;
+};
+
+// Event tag type definition
+type EventTag = {
+	id: string;
+	name: string;
+	description?: string;
+	slug?: string;
+};
+
+// Event instance type definition
 type EventInstance = {
 	id: string;
 	instanceId: string;
@@ -41,69 +67,56 @@ type EventInstance = {
 	distanceMiles?: number;
 };
 
-type EventTag = {
-	id: string;
-	name: string;
-	description?: string;
-	slug?: string;
-};
-
-type LooseObject = Record<string, any>;
-
-type ThemeName = keyof typeof Colors;
-type Coordinates = { lat: number; lon: number };
-
+// Default Parameters
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 const PAGE_SIZE = 6;
+const DEFAULT_RADIUS_MILES = 10;
+const DISTANCE_UNIT = 'miles';
+const RADIUS_OPTIONS = [1, 3, 5, 10];
+const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+
 const DEFAULT_COORDINATES = {
 	latitude: 42.3555,
 	longitude: -71.0565,
 };
 
-const DEFAULT_RADIUS_MILES = 10;
-const DISTANCE_UNIT = 'miles';
-
+// Function to get theme tokens based on current theme
 const getEventThemeTokens = (theme: ThemeName) => {
-	const isLight = theme === 'light';
+	const palette = Colors[theme];	
 	return {
-		pageBackground: isLight ? '#f5f5f5' : '#050608',
-		headerBackground: isLight ? '#ffffff' : '#161a20',
-		headerBorder: isLight ? '#e5e7eb' : '#2a2f36',
-		headingText: isLight ? '#111827' : '#f3f4f6',
-		subheadingText: isLight ? '#6b7280' : '#9ca3af',
-		cardBackground: isLight ? '#ffffff' : '#191f28',
-		cardBorder: isLight ? '#e5e7eb' : '#2b313c',
-		cardShadowColor: isLight ? '#111827' : '#000000',
-		cardShadowOpacity: isLight ? 0.05 : 0.35,
-		imageBackground: isLight ? '#f3f4f6' : '#101318',
-		imagePlaceholderText: isLight ? '#9ca3af' : '#6b7280',
-		eventBarLabel: isLight ? '#6b7280' : '#a0a8ba',
-		eventTitle: isLight ? '#111827' : '#f8fafc',
-		eventMeta: isLight ? '#4b5563' : '#cbd5f5',
-		timeBorder: isLight ? '#e5e7eb' : '#2f3642',
-		timeBackground: isLight ? '#f9fafb' : '#10131a',
-		timeLabel: isLight ? '#6b7280' : '#a3acc2',
-		timeValue: isLight ? '#111827' : '#f3f4f6',
-		tagBackground: isLight ? '#f0fdf4' : '#0f1c14',
-		tagBorder: isLight ? '#86efac' : '#14532d',
-		tagText: isLight ? '#15803d' : '#4ade80',
-		errorBackground: isLight ? '#fef2f2' : '#2d1313',
-		errorBorder: isLight ? '#fecaca' : '#7f1d1d',
-		errorTitle: isLight ? '#b91c1c' : '#fecdd3',
-		errorDescription: isLight ? '#991b1b' : '#fda4af',
-		retryBackground: isLight ? '#b91c1c' : '#7f1d1d',
-		retryText: '#ffffff',
-		emptyTitle: isLight ? '#111827' : '#f8fafc',
-		emptyText: isLight ? '#6b7280' : '#9ca3af',
-		footerText: isLight ? '#6b7280' : '#9ca3af',
-		indicator: isLight ? '#111827' : '#f8fafc',
+		background: palette.background,
+		container: palette.container,
+		border: palette.border,
+		cardTitle: palette.cardTitle,
+		icon: palette.icon,
+		iconSelected: palette.iconSelected,
+		activePill: palette.activePill,
+		filterContainer: palette.filterContainer,
+		filterText: palette.filterText,
+		filterTextActive: palette.filterTextActive,
+		filterActivePill: palette.filterActivePill,
+		cardSurface: palette.cardSurface,
+		cardSubtitle: palette.cardSubtitle,
+		cardText: palette.cardText,
+		pillBackground: palette.pillBackground,
+		pillText: palette.pillText,
+		pillBorder: palette.pillBorder,
+		warningBackground: palette.warningBackground,
+  		warningBorder: palette.warningBorder,
+  		warningText: palette.warningText,
+  		actionButton: palette.actionButton,
+  		dismissButton: palette.dismissButton,
+		networkErrorBackground: palette.networkErrorBackground,
+		networkErrorButton: palette.networkErrorButton,
+		networkErrorBorder: palette.networkErrorBorder,
+		networkErrorText: palette.networkErrorText,
+		cardBackground: palette.cardSurface,
+		cardBorder: palette.border,
 	};
 };
 
-type EventThemeTokens = ReturnType<typeof getEventThemeTokens>;
 
-type QueryValue = string | number | boolean | undefined | (string | number | boolean)[];
-
+// Utility function to normalize tag parameter list
 const normalizeTagParamList = (value?: string | string[]): string[] => {
 	if (!value) {
 		return [];
@@ -115,6 +128,7 @@ const normalizeTagParamList = (value?: string | string[]): string[] => {
 		.filter((entry) => entry.length > 0);
 };
 
+// Utility function to build query strings
 const buildQueryString = (params: Record<string, QueryValue>) =>
 	Object.entries(params)
 		.flatMap(([key, value]) => {
@@ -134,6 +148,7 @@ const buildQueryString = (params: Record<string, QueryValue>) =>
 		})
 		.join('&');
 
+// Function to extract event items from various API response structures
 const extractEventItems = (payload: unknown): LooseObject[] => {
 	if (!payload) {
 		return [];
@@ -163,6 +178,7 @@ const extractEventItems = (payload: unknown): LooseObject[] => {
 	return [];
 };
 
+// Function to extract tag items from various API response structures
 const extractTagItems = (payload: unknown): LooseObject[] => {
 	if (!payload) {
 		return [];
@@ -192,6 +208,7 @@ const extractTagItems = (payload: unknown): LooseObject[] => {
 	return [];
 };
 
+// Function to extract pagination metadata from various API response structures
 const extractPaginationMeta = (payload: unknown): LooseObject | null => {
 	if (!payload || typeof payload !== 'object') {
 		return null;
@@ -209,6 +226,7 @@ const extractPaginationMeta = (payload: unknown): LooseObject | null => {
 	return null;
 };
 
+// Function to determine if more pages should be fetched based on pagination metadata
 const shouldKeepPaginating = (payload: unknown, receivedCount: number): boolean => {
 	const pagination = extractPaginationMeta(payload);
 
@@ -233,6 +251,7 @@ const shouldKeepPaginating = (payload: unknown, receivedCount: number): boolean 
 	return receivedCount === PAGE_SIZE;
 };
 
+// Function to map raw event data to EventInstance type
 const mapToEventInstance = (raw: LooseObject): EventInstance => {
 	const fallbackLabel = `${raw.name ?? raw.title ?? 'event'}-${raw.start_time ?? raw.starts_at ?? Date.now()}`;
 	const primaryId =
@@ -337,6 +356,7 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 	};
 };
 
+// Function to map raw tag data to EventTag type
 const mapToEventTag = (raw: LooseObject): EventTag => {
 	const fallbackId =
 		raw.id ??
@@ -354,6 +374,7 @@ const mapToEventTag = (raw: LooseObject): EventTag => {
 	};
 };
 
+// Function to merge current and incoming event lists, deduping by ID
 const mergeEvents = (current: EventInstance[], incoming: EventInstance[]): EventInstance[] => {
 	if (current.length === 0) {
 		return incoming;
@@ -373,6 +394,7 @@ const mergeEvents = (current: EventInstance[], incoming: EventInstance[]): Event
 	return next;
 };
 
+// Function to normalize date-only strings (YYYY-MM-DD) and apply optional day offset
 const normalizeDateOnly = (value?: string, offsetDays = 0): string | null => {
 	if (!value) {
 		return null;
@@ -392,6 +414,7 @@ const normalizeDateOnly = (value?: string, offsetDays = 0): string | null => {
 	return `${date.getFullYear()}-${month}-${day}`;
 };
 
+// Function to combine date-only and time-only strings into a full datetime string
 const combineDateAndTime = (
 	dateValue?: string,
 	timeValue?: string,
@@ -409,12 +432,14 @@ const combineDateAndTime = (
 	return `${datePart}T${timeValue}`;
 };
 
+// Function to get the start of day for a given date
 const startOfDay = (input: Date) => {
 	const copy = new Date(input);
 	copy.setHours(0, 0, 0, 0);
 	return copy;
 };
 
+// Function to format event time strings
 const formatEventTime = (value?: string): string => {
 	if (!value) {
 		return 'Time TBD';
@@ -431,6 +456,7 @@ const formatEventTime = (value?: string): string => {
 	}).format(date);
 };
 
+// Function to format event day strings relatively
 const formatRelativeEventDay = (value?: string): string => {
 	if (!value) {
 		return 'Date coming soon';
@@ -464,6 +490,8 @@ const formatRelativeEventDay = (value?: string): string => {
 	}).format(date);
 };
 
+
+// Function to format distance values
 const formatDistance = (value?: number): string | null => {
 	if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
 		return null;
@@ -480,14 +508,7 @@ const formatDistance = (value?: number): string | null => {
 	return `${formatter.format(value)} ${DISTANCE_UNIT} away`;
 };
 
-const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-
-type EventCardProps = {
-	event: EventInstance;
-	availableTags: EventTag[];
-	tokens: EventThemeTokens;
-	onPress?: () => void;
-};
+// Event card component
 const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) => {
 	const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
 	const startTimeLabel = formatEventTime(event.startsAt);
@@ -504,7 +525,7 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 	const tagsToRender = tagIds.map(
 		(tagId) => availableTags.find((t) => t.id === tagId)?.name || tagId
 	);
-	const primaryTagName = tagsToRender[0];
+	const eventTagName = tagsToRender[0];
 
 	return (
 		<TouchableOpacity
@@ -516,42 +537,53 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 				{
 					backgroundColor: tokens.cardBackground,
 					borderColor: tokens.cardBorder,
-					shadowColor: tokens.cardShadowColor,
-					shadowOpacity: tokens.cardShadowOpacity,
 				},
 			]}
 		>
 			<View style={styles.cardBody}>
-				{primaryTagName ? (
-					<Text style={[styles.primaryTagLabel, { color: '#2563eb' }]}>{primaryTagName}</Text>
+				{eventTagName ? (
+					<View
+						style={[
+							styles.primaryTagPill,
+							{
+								backgroundColor: tokens.filterActivePill,
+							},
+						]}
+					>
+						<Text style={[styles.eventTagLabel, { color: tokens.cardTitle }]}>{eventTagName}</Text>
+					</View>
 				) : null}
-				<Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
-				<Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
+				<Text style={[styles.eventTitle, { color: tokens.cardTitle }]}>{event.title}</Text>
+				<View style={[styles.eventTitleDivider, { backgroundColor: tokens.cardBorder }]} />
+				<View style={styles.eventBarRow}>
+					<MaterialIcons name="location-on" size={18} color={tokens.iconSelected} style={styles.eventBarIcon} />
+					<Text style={[styles.eventBarName, { color: tokens.cardSubtitle }]}>{barName}</Text>
+				</View>
 				{distanceLabel ? (
 					<View style={styles.metaRow}>
-						<Text style={[styles.metaDistanceText, { color: tokens.eventMeta }]}>{distanceLabel}</Text>
+						<View
+							style={[
+								styles.distancePill,
+								{
+									backgroundColor: tokens.pillBackground,
+								},
+							]}
+						>
+							<Text style={[styles.metaDistanceText, { color: tokens.pillText }]}>{distanceLabel}</Text>
+						</View>
 					</View>
 				) : null}
 				<View style={styles.scheduleBlock}>
-					<View
-						style={[
-							styles.timeRow,
-							{ borderColor: tokens.timeBorder, backgroundColor: tokens.timeBackground },
-						]}
-					>
-						<View style={styles.timeColumn}>
-							<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start Time</Text>
-							<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
+					<View style={styles.timeRowSimple}>
+						<MaterialIcons name="schedule" size={18} color={tokens.iconSelected} style={styles.timeIcon} />
+						<View style={styles.timePair}>
+							<Text style={[styles.timeLabelInline, { color: tokens.cardSubtitle }]}>Start</Text>
+							<Text style={[styles.timeValueInline, { color: tokens.cardTitle }]}>{startTimeLabel}</Text>
 						</View>
-						<View
-							style={[
-								styles.timeColumn,
-								styles.timeColumnRight,
-								{ borderLeftColor: tokens.timeBorder },
-							]}
-						>
-							<Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End Time</Text>
-							<Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
+						<MaterialIcons name="arrow-forward" size={16} color={tokens.cardSubtitle} style={styles.timeArrowIcon} />
+						<View style={styles.timePair}>
+							<Text style={[styles.timeLabelInline, { color: tokens.cardSubtitle }]}>End</Text>
+							<Text style={[styles.timeValueInline, { color: tokens.cardTitle }]}>{endTimeLabel}</Text>
 						</View>
 					</View>
 				</View>
@@ -567,11 +599,7 @@ type RadiusSelectorProps = {
 };
 
 const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
-	const [radiusText, setRadiusText] = useState(String(value));
-
-	useEffect(() => {
-		setRadiusText(String(value));
-	}, [value]);
+	const [isPickerVisible, setPickerVisible] = useState(false);
 
 	const textColor = theme === 'light' ? '#111827' : '#f8fafc';
 	const subtleText = theme === 'light' ? '#4b5563' : '#cbd5f5';
@@ -580,34 +608,46 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 	const inputBackground = theme === 'light' ? '#f9fafb' : '#10131a';
 	const inputBorder = theme === 'light' ? '#e5e7eb' : '#2b313c';
 	const inputText = theme === 'light' ? '#111827' : '#f3f4f6';
-	const placeholder = theme === 'light' ? '#9ca3af' : '#6b7280';
 
-	const handleCommit = useCallback(() => {
-		const parsed = Number(radiusText);
-		if (!Number.isNaN(parsed) && parsed > 0) {
-			onChange(parsed);
-		} else {
-			setRadiusText(String(value));
-		}
-	}, [onChange, radiusText, value]);
+	const handleSelect = useCallback(
+		(next: number) => {
+			onChange(next);
+			setPickerVisible(false);
+		},
+		[onChange]
+	);
+
+	const unitLabel = DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT;
+	const currentLabel = `Location: ${value} ${unitLabel}`;
 
 	return (
 		<View style={[styles.radiusCard, { borderColor, backgroundColor }]}>
 			<Text style={[styles.radiusTitle, { color: textColor }]}>Search radius</Text>
-			<View style={[styles.radiusInputWrapper, { borderColor: inputBorder, backgroundColor: inputBackground }]}> 
-				<TextInput
-					style={[styles.radiusInput, { color: inputText }]}
-					keyboardType="numeric"
-					value={radiusText}
-					onChangeText={setRadiusText}
-					onBlur={handleCommit}
-					onSubmitEditing={handleCommit}
-					placeholder={`e.g. ${DEFAULT_RADIUS_MILES}`}
-					placeholderTextColor={placeholder}
-					returnKeyType="done"
-					maxLength={4}
-				/>
-				<Text style={[styles.radiusUnitLabel, { color: subtleText }]}>{DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT}</Text>
+			<View style={styles.radiusPickerContainer}>
+				<TouchableOpacity
+					style={[styles.radiusPickerButton, { borderColor: inputBorder, backgroundColor: inputBackground }]}
+					onPress={() => setPickerVisible((prev) => !prev)}
+					activeOpacity={0.85}
+				>
+					<Text style={[styles.radiusPickerValue, { color: inputText }]}>{currentLabel}</Text>
+					<MaterialIcons name={isPickerVisible ? 'arrow-drop-up' : 'arrow-drop-down'} size={22} color={textColor} />
+				</TouchableOpacity>
+
+				{isPickerVisible ? (
+					<View style={[styles.radiusPickerDropdown, { backgroundColor, borderColor: inputBorder }]}>
+						{RADIUS_OPTIONS.map((option) => (
+							<TouchableOpacity
+								key={option}
+								style={styles.radiusPickerOption}
+								onPress={() => handleSelect(option)}
+							>
+								<Text style={[styles.radiusPickerOptionText, { color: option === value ? textColor : subtleText }]}>
+									{option} {unitLabel}
+								</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				) : null}
 			</View>
 		</View>
 	);
@@ -693,20 +733,20 @@ const TagFilterSheet = ({
 			<View
 				style={[
 					styles.sheetContainer,
-					{ backgroundColor: tokens.headerBackground, borderColor: tokens.headerBorder },
+					{ backgroundColor: tokens.container, borderColor: tokens.headerBorder },
 				]}
 			>
 				<View style={styles.sheetHandle} />
-				<Text style={[styles.sheetTitle, { color: tokens.headingText }]}>Filter Events</Text>
+				<Text style={[styles.sheetTitle, { color: tokens.cardTitle }]}>Filter Events</Text>
 
 				{isLoading ? (
 					<View style={styles.filterStateRow}>
 						<ActivityIndicator color={highlightColor} />
-						<Text style={[styles.filterStateText, { color: tokens.headingText }]}>Loading tags...</Text>
+						<Text style={[styles.filterStateText, { color: tokens.cardTitle }]}>Loading tags...</Text>
 					</View>
 				) : error ? (
 					<View style={styles.filterStateColumn}>
-						<Text style={[styles.filterStateErrorText, { color: tokens.headingText }]}>{error}</Text>
+						<Text style={[styles.filterStateErrorText, { color: tokens.cardTitle }]}>{error}</Text>
 						<TouchableOpacity
 							onPress={onRetry}
 							style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
@@ -723,7 +763,7 @@ const TagFilterSheet = ({
 						contentContainerStyle={filteredTags.length === 0 ? styles.filterEmptyContent : undefined}
 						ListEmptyComponent={
 							<View style={styles.filterEmptyState}>
-								<Text style={[styles.filterStateText, { color: tokens.subheadingText }]}>No tags available.</Text>
+								<Text style={[styles.filterStateText, { color: tokens.subcardTitle }]}>No tags available.</Text>
 							</View>
 						}
 						style={styles.filterList}
@@ -1031,37 +1071,40 @@ const EventsScreen = () => {
 			<View
 				style={[
 					styles.listHeader,
-					{ backgroundColor: tokens.headerBackground, borderBottomColor: tokens.headerBorder },
+					{ backgroundColor: tokens.background, borderBottomColor: tokens.headerBorder },
 				]}
 			>
-				<Text style={[styles.screenTitle, { color: tokens.headingText }]}>Upcoming events</Text>
+				<Text style={[styles.screenTitle, { color: tokens.cardTitle }]}>Upcoming events</Text>
 
-				<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
-
-				<View style={styles.filterButtonRow}>
-					<TouchableOpacity
-						onPress={openFilterSheet}
-						style={[styles.filterButton, { borderColor: tokens.headerBorder }]}
-						activeOpacity={0.9}
-					>
-						<MaterialIcons name="tune" size={18} color={tokens.headingText} style={styles.filterButtonIcon} />
-						<Text style={[styles.filterButtonText, { color: tokens.headingText }]}>
-							Filters{selectedTagIds.length ? ` (${selectedTagIds.length})` : ''}
-						</Text>
-					</TouchableOpacity>
-					{selectedTagIds.length ? (
+				<View style={styles.headerControlsRow}>
+					<View style={styles.filterButtonRow}>
 						<TouchableOpacity
-							onPress={handleClearTags}
-							style={[styles.inlineClearButton, { borderColor: highlightColor }]}
-							activeOpacity={0.85}
+							onPress={openFilterSheet}
+							style={[styles.filterButton, { borderColor: tokens.headerBorder }]}
+							activeOpacity={0.9}
 						>
-							<Text style={[styles.inlineClearText, { color: highlightColor }]}>Clear</Text>
+							<MaterialIcons name="tune" size={18} color={tokens.cardTitle} style={styles.filterButtonIcon} />
+							<Text style={[styles.filterButtonText, { color: tokens.cardTitle }]}>
+								Filters{selectedTagIds.length ? ` (${selectedTagIds.length})` : ''}
+							</Text>
 						</TouchableOpacity>
-					) : null}
+						{selectedTagIds.length ? (
+							<TouchableOpacity
+								onPress={handleClearTags}
+								style={[styles.inlineClearButton, { borderColor: highlightColor }]}
+								activeOpacity={0.85}
+							>
+								<Text style={[styles.inlineClearText, { color: highlightColor }]}>Clear</Text>
+							</TouchableOpacity>
+						) : null}
+					</View>
+					<View style={styles.radiusColumn}>
+						<RadiusSelector value={searchRadius} onChange={handleRadiusChange} theme={theme} />
+					</View>
 				</View>
 
 				{selectedTagNames.length ? (
-					<Text style={[styles.selectedTagsText, { color: tokens.subheadingText }]}>
+					<Text style={[styles.selectedTagsText, { color: tokens.subcardTitle }]}>
 						{preview}
 						{remaining ? ` +${remaining} more` : ''}
 					</Text>
@@ -1072,7 +1115,7 @@ const EventsScreen = () => {
 						onPress={fetchAvailableTags}
 						style={[styles.filterLoadRow, { borderColor: highlightColor }]}
 					>
-						<Text style={[styles.filterLoadText, { color: tokens.headingText }]}>
+						<Text style={[styles.filterLoadText, { color: tokens.cardTitle }]}>
 							Could not load tags. Tap to retry.
 						</Text>
 					</TouchableOpacity>
@@ -1081,7 +1124,7 @@ const EventsScreen = () => {
 				{areTagsLoading ? (
 					<View style={styles.filterLoadRow}>
 						<ActivityIndicator size="small" color={highlightColor} />
-						<Text style={[styles.filterLoadText, { color: tokens.subheadingText }]}>Loading tags...</Text>
+						<Text style={[styles.filterLoadText, { color: tokens.subcardTitle }]}>Loading tags...</Text>
 					</View>
 				) : null}
 
@@ -1172,20 +1215,20 @@ const EventsScreen = () => {
 	}, [events.length, hasMore, isPaginating, tokens]);
 
 	return (
-		<View style={[styles.container, { backgroundColor: tokens.pageBackground }]}>
+		<View style={[styles.container, { backgroundColor: tokens.background }]}>
 			<SectionList
 				sections={sections}
 				keyExtractor={(item) => item.id}
 				renderItem={renderItem}
 				renderSectionHeader={({ section }) => (
-					<View style={[styles.sectionHeader, { backgroundColor: tokens.pageBackground }]}>
+					<View style={[styles.sectionHeader, { backgroundColor: tokens.background }]}>
 						<View
 							style={[
 								styles.sectionHeaderPill,
-								{ backgroundColor: tokens.headerBackground, borderColor: tokens.headerBorder },
+								{ backgroundColor: tokens.container, borderColor: tokens.headerBorder },
 							]}
 						>
-							<Text style={[styles.sectionHeaderText, { color: tokens.headingText }]}>
+							<Text style={[styles.sectionHeaderText, { color: tokens.cardTitle }]}>
 								{section.title}
 							</Text>
 						</View>
@@ -1206,7 +1249,7 @@ const EventsScreen = () => {
 						onRefresh={handleRefresh}
 						tintColor={tokens.indicator}
 						colors={[tokens.indicator]}
-						progressBackgroundColor={tokens.headerBackground}
+						progressBackgroundColor={tokens.container}
 					/>
 				}
 				showsVerticalScrollIndicator={false}
@@ -1249,6 +1292,29 @@ const styles = StyleSheet.create({
 		backgroundColor: '#ffffff',
 		borderBottomWidth: 1,
 		borderBottomColor: '#e5e7eb',
+		zIndex: 30,
+		elevation: 30,
+		overflow: 'visible',
+		position: 'relative',
+	},
+	headerControlsRow: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: 12,
+		marginTop: 12,
+		flexWrap: 'wrap',
+		position: 'relative',
+		overflow: 'visible',
+	},
+	radiusColumn: {
+		flex: 1,
+		minWidth: 0,
+	},
+	filterButtonRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		flexShrink: 0,
 	},
 	sectionHeader: {
 		paddingHorizontal: 20,
@@ -1302,17 +1368,53 @@ const styles = StyleSheet.create({
 		paddingVertical: 4,
 		alignSelf: 'flex-start',
 	},
-	radiusInput: {
-		flex: 1,
-		fontSize: 15,
-		fontWeight: '600',
-		paddingVertical: 4,
-		minWidth: 80,
+	radiusPickerContainer: {
+		position: 'relative',
+		alignSelf: 'flex-start',
+		zIndex: 20,
+		elevation: 20,
 	},
-	radiusUnitLabel: {
-		marginLeft: 6,
-		fontSize: 13,
-		fontWeight: '600',
+	radiusPickerButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		borderWidth: 1,
+		borderRadius: 12,
+		paddingHorizontal: 14,
+		paddingVertical: 10,
+		minWidth: 160,
+		gap: 10,
+		backgroundColor: '#fff',
+	},
+	radiusPickerValue: {
+		fontSize: 15,
+		fontWeight: '700',
+	},
+	radiusPickerDropdown: {
+		position: 'absolute',
+		top: '100%',
+		left: 0,
+		right: 0,
+		marginTop: 6,
+		borderRadius: 12,
+		borderWidth: 1,
+		paddingVertical: 6,
+		overflow: 'hidden',
+		shadowColor: '#000',
+		shadowOpacity: 0.18,
+		shadowRadius: 12,
+		shadowOffset: { width: 0, height: 6 },
+		elevation: 22,
+		zIndex: 22,
+		backgroundColor: '#fff',
+	},
+	radiusPickerOption: {
+		paddingVertical: 12,
+		paddingHorizontal: 16,
+	},
+	radiusPickerOptionText: {
+		fontSize: 15,
+		fontWeight: '700',
 	},
 	filterSection: {
 		marginTop: 20,
@@ -1329,13 +1431,6 @@ const styles = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: 'rgba(246, 193, 91, 0.35)',
 		backgroundColor: '#1f1a13',
-	},
-	filterButtonRow: {
-		marginTop: 18,
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		gap: 10,
 	},
 	filterButton: {
 		flexDirection: 'row',
@@ -1629,20 +1724,34 @@ const styles = StyleSheet.create({
 	cardBody: {
 		padding: 18,
 	},
-	eventBarName: {
+	eventBarRow: {
 		marginTop: 4,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+	},
+	eventBarIcon: {
+		opacity: 0.9,
+	},
+	eventBarName: {
 		fontSize: 16,
 		fontWeight: '600',
 		color: '#6b7280',
 		letterSpacing: 0.25,
 		textTransform: 'none',
 	},
-	primaryTagLabel: {
+	primaryTagPill: {
+		alignSelf: 'flex-start',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 999,
+		marginBottom: 10,
+	},
+	eventTagLabel: {
 		fontSize: 13,
 		fontWeight: '700',
 		textTransform: 'uppercase',
 		letterSpacing: 0.4,
-		marginBottom: 8,
 	},
 	eventTitle: {
 		fontSize: 20,
@@ -1650,12 +1759,25 @@ const styles = StyleSheet.create({
 		color: '#111827',
 		marginTop: 2,
 	},
+	eventTitleDivider: {
+		height: 1,
+		marginTop: 20,
+		marginBottom: 8,
+		borderRadius: 999,
+		width: '100%',
+		alignSelf: 'stretch',
+	},
 	metaRow: {
 		marginTop: 12,
 		flexDirection: 'row',
 		alignItems: 'center',
 		flexWrap: 'wrap',
 		gap: 8,
+	},
+	distancePill: {
+		borderRadius: 999,
+		paddingHorizontal: 12,
+		paddingVertical: 4,
 	},
 	metaDot: {
 		width: 5,
@@ -1672,7 +1794,7 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 	scheduleBlock: {
-		marginTop: 16,
+		marginTop: 8,
 		gap: 12,
 	},
 	distanceRow: {
@@ -1690,6 +1812,34 @@ const styles = StyleSheet.create({
 	distanceText: {
 		fontSize: 13,
 		fontWeight: '500',
+	},
+	timeRowSimple: {
+		marginTop: 8,
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		flexWrap: 'wrap',
+	},
+	timePair: {
+		flexDirection: 'column',
+		gap: 2,
+	},
+	timeIcon: {
+		opacity: 0.85,
+	},
+	timeArrowIcon: {
+		marginHorizontal: 2,
+		opacity: 0.7,
+	},
+	timeLabelInline: {
+		fontSize: 12,
+		fontWeight: '600',
+		letterSpacing: 0.2,
+		textTransform: 'uppercase',
+	},
+	timeValueInline: {
+		fontSize: 16,
+		fontWeight: '700',
 	},
 	timeRow: {
 		flexDirection: 'row',

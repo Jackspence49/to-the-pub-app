@@ -1104,7 +1104,7 @@ export default function BarsScreen() {
     locationDeniedPermanently || availableTags.length > 0 || selectedTags.length > 0 || (bars.length > 0 && error)
       ? (
           <View style={styles.listHeader}>
-            <Text style={[styles.screenTitle, { color: palette.text }]}>Open Bars</Text>
+            <Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Open Bars</Text>
             {locationDeniedPermanently ? (
               <LocationPermissionBanner
                 theme={theme}
@@ -1188,7 +1188,7 @@ export default function BarsScreen() {
     return (
       <View style={[styles.container, { backgroundColor: palette.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={palette.tint} />
+          <ActivityIndicator size="large" color={palette.text} />
           <Text style={[styles.statusText, { color: palette.text }]}>Loading nearby bars...</Text>
         </View>
       </View>
@@ -1206,7 +1206,7 @@ export default function BarsScreen() {
         ListEmptyComponent={listEmptyComponent}
         ListHeaderComponent={headerComponent}
         ListFooterComponent={footerComponent}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={palette.tint} />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={palette.text} />}
         showsVerticalScrollIndicator={false}
       />
       <TagFilterSheet
