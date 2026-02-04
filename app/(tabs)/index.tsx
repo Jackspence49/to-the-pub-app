@@ -22,9 +22,19 @@ import {
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-type FetchMode = 'initial' | 'refresh';
-type ThemeName = keyof typeof Colors;
-type LooseObject = Record<string, any>;
+// API and utility constants
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();  // Base URL for API requests
+const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');  
+const barsEndpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/bars` : '/get/bars';
+const MILES_PER_KM = 0.621371;
+
+// Type definitions
+type FetchMode = 'initial' | 'refresh';  // Data fetching modes
+type ThemeName = keyof typeof Colors;  // Theme name type
+type LooseObject = Record<string, any>;  // Generic object type
+type QueryValue = string | number | boolean | undefined;
+type QueryParams = Record<string, QueryValue>;
+type Coordinates = { lat: number; lon: number };
 
 // Bar tag type definition
 type BarTag = {
@@ -58,24 +68,12 @@ type TagFilterOption = {
   count: number;
 };
 
-
-
-// API and utility constants
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();  // Base URL for API requests
-const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');  
-const barsEndpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/bars` : '/get/bars';
-const MILES_PER_KM = 0.621371;
-
-type QueryValue = string | number | boolean | undefined;
-type QueryParams = Record<string, QueryValue>;
-type Coordinates = { lat: number; lon: number };
-
+//Default parameters
 const DEFAULT_COORDS: Coordinates = {
   lat: 42.3555,
   lon: -71.0565,
 };
 
-// Default query parameters for API requests
 const BASE_QUERY_PARAMS: QueryParams = {
   unit: 'miles',
   open_now: true,
@@ -512,7 +510,7 @@ type BarCardProps = {
 // Component to display individual bar information
 const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
   const palette = Colors[theme];
-  const titleColor = palette.cardTitle;
+  const cardTitle = palette.cardTitle;
   const cardSubtitle = palette.cardSubtitle;
   const cardText = palette.cardText;
   const cardSurface = palette.cardSurface;
@@ -520,6 +518,7 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
   const pillBackground = palette.pillBackground;
   const pillBorder = palette.border;
   const pillText = palette.pillText;
+  const iconSelected = palette.iconSelected;
   const distanceLabel = formatDistanceLabel(bar.distanceMiles);
   const addressLabel = bar.addressLabel ?? 'Location coming soon';
   const closingLabel = formatClosingTimeLabel(bar.closesToday);
@@ -540,12 +539,12 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
       disabled={!onPress}
     >
       <View style={styles.cardHeader}>
-        <Text style={[styles.barName, { color: titleColor }]} numberOfLines={1}>
+        <Text style={[styles.barName, { color: cardTitle }]} numberOfLines={1}>
           {bar.name}
         </Text>
       </View>
 
-      <View style={styles.addressTouchable}>
+      <View>
         <Text style={[styles.addressText, { color: cardSubtitle }]} numberOfLines={2}>
           {addressLabel}
         </Text>
@@ -553,7 +552,7 @@ const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
 
       {detailLine ? (
         <View style={styles.distanceDetailRow}>
-          <MaterialIcons name="location-on" size={16} color={cardText} style={{ marginRight: 4 }} />
+          <MaterialIcons name="location-on" size={16} color={iconSelected} style={{ marginRight: 4 }} />
           <Text style={[styles.distanceDetail, { color: cardText }]}>{detailLine}</Text>
         </View>
       ) : null}
@@ -648,7 +647,13 @@ const TagFilterSheet = ({ visible, tags, selectedTags, onApply, onClose, theme }
   }, []);
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      presentationStyle="overFullScreen"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.filterSheetScrim} onPress={onClose} />
       <View
         style={[
@@ -656,8 +661,7 @@ const TagFilterSheet = ({ visible, tags, selectedTags, onApply, onClose, theme }
           { backgroundColor: palette.background, borderColor: palette.border },
         ]}
       >
-        <View style={styles.filterSheetHandle} />
-        <Text style={[styles.filterSheetTitle, { color: palette.text }]}>Filter bars</Text>
+        <Text style={[styles.filterSheetTitle, { color: palette.text }]}>Bar Tags</Text>
 
         <FlatList
           data={tags}
@@ -678,7 +682,10 @@ const TagFilterSheet = ({ visible, tags, selectedTags, onApply, onClose, theme }
                   color={isChecked ? highlightColor : palette.text}
                   style={styles.filterSheetCheckbox}
                 />
-                <Text style={[styles.filterSheetRowLabel, { color: palette.text }]} numberOfLines={1}>
+                <Text
+                  style={[styles.filterSheetRowLabel, { color: isChecked ? palette.pillText : palette.text }]}
+                  numberOfLines={1}
+                >
                   {item.name}
                 </Text>
               </TouchableOpacity>
@@ -701,7 +708,7 @@ const TagFilterSheet = ({ visible, tags, selectedTags, onApply, onClose, theme }
             style={[
               styles.filterSheetActionButton,
               styles.filterSheetActionGhost,
-              { borderColor: palette.border },
+              { borderColor: palette.pillBorder },
             ]}
             activeOpacity={0.85}
           >
@@ -848,7 +855,7 @@ const FilteredEmptyState = ({
 
   return (
     <View style={styles.emptyState}>
-      <Text style={[styles.emptyTitle, { color: warningText}]}>No bars match those tags</Text>
+      <Text style={[styles.emptyTitle, { color: warningText}]}>No Open Bars Match Those Tags</Text>
       <Text style={[styles.emptyDescription, { color: cardSubtitle }]}>
         Try removing a few filters to see more watering holes.
       </Text>
@@ -858,7 +865,7 @@ const FilteredEmptyState = ({
             key={entry.normalized}
             style={[styles.selectedFilterTagPill, { backgroundColor: filterActivePill, borderColor: pillBorder }]}
           >
-            <Text style={[styles.selectedFilterTagText, { color: filterTextActive }]}>{entry.label}</Text>
+            <Text style={[styles.selectedFilterTagText, { color: palette.filterTextActive }]}>{entry.label}</Text>
           </View>
         ))}
       </View>
@@ -1126,8 +1133,8 @@ export default function BarsScreen() {
                     style={[styles.filterButton, styles.filterButtonLarge, { backgroundColor: palette.actionButton}]}
                     activeOpacity={0.9}
                   >
-                    <MaterialIcons name="tune" size={18} color={palette.text} style={styles.filterButtonIcon} />
-                    <Text style={[styles.filterButtonText, { color: palette.text }]}>Filters{selectedTags.length ? ` (${selectedTags.length})` : ''}</Text>
+                    <MaterialIcons name="tune" size={18} color={palette.filterTextActive} style={styles.filterButtonIcon} />
+                    <Text style={[styles.filterButtonText, { color: palette.filterTextActive }]}>Filters{selectedTags.length ? ` (${selectedTags.length})` : ''}</Text>
                   </TouchableOpacity>
                   {selectedTags.length ? (
                     <TouchableOpacity
@@ -1147,7 +1154,7 @@ export default function BarsScreen() {
                         key={entry.normalized}
                         style={[styles.selectedTagChip, { borderColor: palette.border, backgroundColor: palette.filterContainer }]}
                       >
-                        <Text style={[styles.selectedTagChipLabel, { color: palette.text }]} numberOfLines={1}>
+                        <Text style={[styles.selectedTagChipLabel, { color: palette.pillText }]} numberOfLines={1}>
                           {entry.label}
                         </Text>
                         <TouchableOpacity
@@ -1273,29 +1280,31 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   barName: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     flex: 1,
+		marginBottom: 5,
   },
   distanceText: {
     fontSize: 14,
     textAlign: 'right',
   },
-  addressTouchable: {
-    marginTop: 12,
-  },
   addressText: {
-    fontSize: 14,
+    fontSize: 16,
     lineHeight: 20,
+		fontWeight: '600',
+		letterSpacing: 0.25,
+		textTransform: 'none',
   },
   distanceDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
     gap: 4,
   },
   distanceDetail: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '400',
   },
   tagList: {
     flexDirection: 'row',
@@ -1311,6 +1320,7 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontSize: 13,
+		fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
@@ -1489,7 +1499,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 14,
-    borderWidth: 1,
     minWidth: 140,
   },
   filterButtonLarge: {
@@ -1499,7 +1508,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   filterButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -1544,7 +1553,7 @@ const styles = StyleSheet.create({
   },
   filterSheetScrim: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'transparent',
   },
   filterSheetContainer: {
     position: 'absolute',
@@ -1557,14 +1566,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
-  },
-  filterSheetHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: '#FFC107',
-    marginBottom: 12,
   },
   filterSheetTitle: {
     fontSize: 18,

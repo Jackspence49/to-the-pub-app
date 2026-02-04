@@ -544,13 +544,13 @@ const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) =>
 				{eventTagName ? (
 					<View
 						style={[
-							styles.primaryTagPill,
+							styles.eventTagPill,
 							{
 								backgroundColor: tokens.filterActivePill,
 							},
 						]}
 					>
-						<Text style={[styles.eventTagLabel, { color: tokens.cardTitle }]}>{eventTagName}</Text>
+						<Text style={[styles.eventTagLabel, { color: tokens.filterTextActive }]}>{eventTagName}</Text>
 					</View>
 				) : null}
 				<Text style={[styles.eventTitle, { color: tokens.cardTitle }]}>{event.title}</Text>
@@ -603,7 +603,6 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 
 	const textColor = theme === 'light' ? '#111827' : '#f8fafc';
 	const subtleText = theme === 'light' ? '#4b5563' : '#cbd5f5';
-	const borderColor = theme === 'light' ? '#e5e7eb' : '#2b313c';
 	const backgroundColor = theme === 'light' ? '#ffffff' : '#191f28';
 	const inputBackground = theme === 'light' ? '#f9fafb' : '#10131a';
 	const inputBorder = theme === 'light' ? '#e5e7eb' : '#2b313c';
@@ -621,8 +620,6 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 	const currentLabel = `Location: ${value} ${unitLabel}`;
 
 	return (
-		<View style={[styles.radiusCard, { borderColor, backgroundColor }]}>
-			<Text style={[styles.radiusTitle, { color: textColor }]}>Search radius</Text>
 			<View style={styles.radiusPickerContainer}>
 				<TouchableOpacity
 					style={[styles.radiusPickerButton, { borderColor: inputBorder, backgroundColor: inputBackground }]}
@@ -649,7 +646,6 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 					</View>
 				) : null}
 			</View>
-		</View>
 	);
 };
 
@@ -728,7 +724,13 @@ const TagFilterSheet = ({
 	);
 
 	return (
-		<Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+		<Modal
+			visible={visible}
+			animationType="fade"
+			transparent
+			presentationStyle="overFullScreen"
+			onRequestClose={onClose}
+		>
 			<Pressable style={styles.sheetScrim} onPress={onClose} />
 			<View
 				style={[
@@ -736,7 +738,6 @@ const TagFilterSheet = ({
 					{ backgroundColor: tokens.container, borderColor: tokens.headerBorder },
 				]}
 			>
-				<View style={styles.sheetHandle} />
 				<Text style={[styles.sheetTitle, { color: tokens.cardTitle }]}>Filter Events</Text>
 
 				{isLoading ? (
@@ -1071,7 +1072,7 @@ const EventsScreen = () => {
 			<View
 				style={[
 					styles.listHeader,
-					{ backgroundColor: tokens.background, borderBottomColor: tokens.headerBorder },
+					{ backgroundColor: tokens.background },
 				]}
 			>
 				<Text style={[styles.screenTitle, { color: tokens.cardTitle }]}>Upcoming events</Text>
@@ -1080,7 +1081,7 @@ const EventsScreen = () => {
 					<View style={styles.filterButtonRow}>
 						<TouchableOpacity
 							onPress={openFilterSheet}
-							style={[styles.filterButton, { borderColor: tokens.headerBorder }]}
+							style={[styles.filterButton]}
 							activeOpacity={0.9}
 						>
 							<MaterialIcons name="tune" size={18} color={tokens.cardTitle} style={styles.filterButtonIcon} />
@@ -1289,9 +1290,6 @@ const styles = StyleSheet.create({
 		paddingTop: 12,
 		paddingHorizontal: 20,
 		paddingBottom: 12,
-		backgroundColor: '#ffffff',
-		borderBottomWidth: 1,
-		borderBottomColor: '#e5e7eb',
 		zIndex: 30,
 		elevation: 30,
 		overflow: 'visible',
@@ -1566,7 +1564,7 @@ const styles = StyleSheet.create({
 		left: 0,
 		right: 0,
 		bottom: 0,
-		backgroundColor: 'rgba(0,0,0,0.35)',
+		backgroundColor: 'transparent',
 	},
 	sheetContainer: {
 		position: 'absolute',
@@ -1583,14 +1581,6 @@ const styles = StyleSheet.create({
 		shadowRadius: 12,
 		shadowOffset: { width: 0, height: -4 },
 		elevation: 10,
-	},
-	sheetHandle: {
-		alignSelf: 'center',
-		width: 40,
-		height: 5,
-		borderRadius: 999,
-		backgroundColor: '#d1d5db',
-		marginBottom: 14,
 	},
 	sheetTitle: {
 		fontSize: 18,
@@ -1736,11 +1726,10 @@ const styles = StyleSheet.create({
 	eventBarName: {
 		fontSize: 16,
 		fontWeight: '600',
-		color: '#6b7280',
 		letterSpacing: 0.25,
 		textTransform: 'none',
 	},
-	primaryTagPill: {
+	eventTagPill: {
 		alignSelf: 'flex-start',
 		paddingHorizontal: 12,
 		paddingVertical: 6,
@@ -1756,7 +1745,6 @@ const styles = StyleSheet.create({
 	eventTitle: {
 		fontSize: 20,
 		fontWeight: '700',
-		color: '#111827',
 		marginTop: 2,
 	},
 	eventTitleDivider: {
@@ -1786,7 +1774,7 @@ const styles = StyleSheet.create({
 	},
 	metaDistanceText: {
 		fontSize: 13,
-		fontWeight: '600',
+		fontWeight: '500',
 	},
 	eventMeta: {
 		fontSize: 15,
