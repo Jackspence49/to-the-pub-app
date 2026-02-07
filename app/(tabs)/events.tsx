@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons'; // Icon library
 import * as Location from 'expo-location'; // Location services
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'; // Navigation and routing
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 
 // React Native components
@@ -823,6 +823,8 @@ const EventsScreen = () => {
 	const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
 	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_RADIUS_MILES);
 	const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
+	const eventsRequestAbortRef = useRef<AbortController | null>(null);
+	const eventsRequestSeqRef = useRef(0);
 
 	useEffect(() => {
 		setSelectedTagIds(initialTagIdsFromParams);
@@ -940,6 +942,13 @@ const EventsScreen = () => {
 	// Fetch events function
 	const fetchEvents = useCallback(
 		async (pageToLoad: number, mode: FetchMode) => {
+			// Cancel any in-flight request so stale responses cannot clobber fresh data
+			eventsRequestAbortRef.current?.abort();
+			const controller = new AbortController();
+			eventsRequestAbortRef.current = controller;
+			const requestId = eventsRequestSeqRef.current + 1;
+			eventsRequestSeqRef.current = requestId;
+
 			if (mode === 'paginate') {
 				setIsPaginating(true);
 			} else if (mode === 'refresh') {
@@ -981,7 +990,9 @@ const EventsScreen = () => {
 				}
 
 				const query = buildQueryString(queryParams);
-				const response = await fetch(`${normalizedBaseUrl}/events/instances?${query}`);
+				const response = await fetch(`${normalizedBaseUrl}/events/instances?${query}`, {
+					signal: controller.signal,
+				});
 
 				if (!response.ok) {
 					throw new Error(`Request failed with status ${response.status}`);
@@ -990,12 +1001,23 @@ const EventsScreen = () => {
 				const payload = await response.json();
 				const incoming = extractEventItems(payload).map(mapToEventInstance);
 
+				if (eventsRequestSeqRef.current !== requestId) {
+					return;
+				}
+
 				setEvents((prev) => (mode === 'paginate' ? mergeEvents(prev, incoming) : incoming));
 				setPage(pageToLoad);
 				setHasMore(shouldKeepPaginating(payload, incoming.length));
 			} catch (err) {
+				if ((err as Error).name === 'AbortError') {
+					return;
+				}
 				setError(err instanceof Error ? err.message : 'Unable to load events right now.');
 			} finally {
+				if (eventsRequestSeqRef.current !== requestId) {
+					return;
+				}
+				eventsRequestAbortRef.current = null;
 				if (mode === 'paginate') {
 					setIsPaginating(false);
 				} else if (mode === 'refresh') {
@@ -1007,6 +1029,13 @@ const EventsScreen = () => {
 		},
 		[userCoords, searchRadius, selectedTagIds]
 	);
+
+	useEffect(() => {
+		return () => {
+			eventsRequestAbortRef.current?.abort();
+			eventsRequestAbortRef.current = null;
+		};
+	}, []);
 
 	useEffect(() => {
 		refreshUserLocation();

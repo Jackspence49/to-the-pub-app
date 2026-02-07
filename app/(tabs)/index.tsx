@@ -7,6 +7,7 @@ import type { ListRenderItem } from 'react-native';
 // React Native components
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Linking,
   Modal,
@@ -88,7 +89,6 @@ type TagFilterOption = {
   id: string;
   name: string;
   normalizedName: string;
-  count: number;
 };
 
 //Default parameters
@@ -111,6 +111,8 @@ const INFINITE_SCROLL_CONFIG: InfiniteScrollConfig = {
   prefetchPages: 1,
   cacheTimeout: 300000,
 };
+
+const LOCATION_CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Helper function to build query string from parameters
 const buildQueryString = (params: QueryParams): string =>
@@ -280,53 +282,16 @@ const resolveClosingFromSchedules = (raw: LooseObject): { closesAt?: string; cro
 
 // Function to extract today's closing time metadata from raw bar data
 const extractTodayClosingMeta = (raw: LooseObject): { closesAt?: string; crossesMidnight?: boolean } => {
-  let closesAt: string | undefined;
-  let crossesMidnight: boolean | undefined;
-
-  const assignCandidate = (value?: unknown) => {
-    if (!closesAt && typeof value === 'string' && value.trim().length > 0) {
-      closesAt = value.trim();
-    }
-  };
-
-  // Check direct fields for closing time
-  const directCandidates: unknown[] = [raw.close_time];
-  directCandidates.forEach(assignCandidate);
-
-  const hoursTodayVariants = [
-    raw.hours_today,
-    raw.hoursToday,
-    raw.today_hours,
-    raw.todayHours,
-    raw.current_hours,
-    raw.currentHours,
-  ];
-  for (const variant of hoursTodayVariants) {
-    const meta = extractCloseMetaFromRecord(variant as LooseObject | null);
-    if (meta) {
-      if (!closesAt && meta.closesAt) {
-        closesAt = meta.closesAt;
-      }
-      if (typeof meta.crossesMidnight === 'boolean') {
-        crossesMidnight = meta.crossesMidnight;
-      }
-      if (closesAt) {
-        break;
-      }
-    }
+  // Prefer schedule-based resolution from the hours array
+  const scheduleMeta = resolveClosingFromSchedules(raw);
+  if (scheduleMeta) {
+    return scheduleMeta;
   }
 
-  if (!closesAt || crossesMidnight === undefined) {
-    const scheduleMeta = resolveClosingFromSchedules(raw);
-    if (scheduleMeta) {
-      if (!closesAt && scheduleMeta.closesAt) {
-        closesAt = scheduleMeta.closesAt;
-      }
-      if (typeof scheduleMeta.crossesMidnight === 'boolean') {
-        crossesMidnight = scheduleMeta.crossesMidnight;
-      }
-    }
-  }
+  // Fallback: direct close_time field if provided
+  const closesAt = typeof raw.close_time === 'string' && raw.close_time.trim().length > 0 ? raw.close_time.trim() : undefined;
+  const crosses = raw.crosses_midnight_today ?? raw.crossesMidnightToday ?? raw.crosses_midnight ?? raw.crossesMidnight;
+  const crossesMidnight = typeof crosses === 'boolean' ? crosses : undefined;
 
   return {
     closesAt,
@@ -400,6 +365,27 @@ const mapToBar = (raw: LooseObject, index: number): Bar => {
     crossesMidnightToday,
     tags: dedupedTags,
   };
+};
+
+// Map raw bar items to Bar objects in small batches to keep the UI thread responsive
+const mapBarsInBatches = async (
+  items: LooseObject[],
+  startIndex = 0,
+  batchSize = 40
+): Promise<Bar[]> => {
+  const mapped: Bar[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const slice = items.slice(i, i + batchSize);
+    slice.forEach((item, offset) => {
+      mapped.push(mapToBar(item, startIndex + i + offset));
+    });
+
+    // Yield to the event loop between batches to avoid blocking rendering
+    if (i + batchSize < items.length) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+  return mapped;
 };
 
 // Function to normalize Twitter or X.com URLs or handles
@@ -642,10 +628,19 @@ const openExternalLink = async (value?: string) => {
     return;
   }
 
+  const url = ensureProtocol(value.trim());
+
   try {
-    await Linking.openURL(ensureProtocol(value));
+    const supported = await Linking.canOpenURL(url);
+    if (!supported) {
+      Alert.alert('Unable to open link', 'The link appears to be invalid.');
+      return;
+    }
+
+    await Linking.openURL(url);
   } catch (error) {
     console.warn('Unable to open URL', error);
+    Alert.alert('Unable to open link', 'Please try again or check the URL.');
   }
 };
 
@@ -1063,6 +1058,8 @@ export default function BarsScreen() {
   } | null>(null);
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map());
   const hasMoreRef = useRef(true);
+  const permissionStatusRef = useRef<Location.PermissionStatus | null>(null);
+  const lastCoordsRef = useRef<{ coords: Coordinates; fetchedAt: number } | null>(null);
 
   const errorMessage = pagination.error?.message ?? null;
   const { isLoading, isLoadingMore, hasMore, currentPage } = pagination;
@@ -1106,7 +1103,11 @@ export default function BarsScreen() {
   }, [bars.length, restoreScrollPosition]);
 
   const ensureLocationPermission = useCallback(async (): Promise<boolean> => {
+    if (permissionStatusRef.current === 'granted') {
+      return true;
+    }
     const current = await Location.getForegroundPermissionsAsync();
+    permissionStatusRef.current = current.status;
     if (current.status === 'granted') {
       setLocationDeniedPermanently(false);
       return true;
@@ -1117,6 +1118,7 @@ export default function BarsScreen() {
       return false;
     }
     const requested = await Location.requestForegroundPermissionsAsync();
+    permissionStatusRef.current = requested.status;
     const granted = requested.status === 'granted';
     setLocationDeniedPermanently(!granted && !requested.canAskAgain);
     return granted;
@@ -1124,6 +1126,12 @@ export default function BarsScreen() {
 
   const refreshUserLocation = useCallback(async (): Promise<Coordinates | null> => {
     try {
+      const cached = lastCoordsRef.current;
+      if (cached && Date.now() - cached.fetchedAt < LOCATION_CACHE_TTL_MS) {
+        setUserCoords(cached.coords);
+        return cached.coords;
+      }
+
       const granted = await ensureLocationPermission();
       if (!granted) {
         return null;
@@ -1136,6 +1144,7 @@ export default function BarsScreen() {
         lon: position.coords.longitude,
       } satisfies Coordinates;
       setUserCoords(coords);
+      lastCoordsRef.current = { coords, fetchedAt: Date.now() };
       return coords;
     } catch (err) {
       console.warn('Unable to fetch user location; using fallback coordinates.', err);
@@ -1213,7 +1222,9 @@ export default function BarsScreen() {
         }
 
         const payload = await response.json();
-        const items = extractBarItems(payload).map(mapToBar);
+        const rawItems = extractBarItems(payload);
+        const startIndex = (page - 1) * pageSize;
+        const items = await mapBarsInBatches(rawItems, startIndex);
         nextHasMore = shouldContinuePagination(payload, items.length, pageSize);
         const totalCount = extractTotalCount(payload);
 
@@ -1292,16 +1303,49 @@ export default function BarsScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const coords = await refreshUserLocation();
-      if (cancelled) return;
-      const coordsToUse = coords ?? DEFAULT_COORDS;
-      loadBarsPage(1, 'initial', { coordsOverride: coordsToUse });
-    })();
+
+    const kickoff = async () => {
+      // If we already have a fresh cached fix, prefer it before hitting the network.
+      const freshCached = lastCoordsRef.current && Date.now() - lastCoordsRef.current.fetchedAt < LOCATION_CACHE_TTL_MS
+        ? lastCoordsRef.current.coords
+        : null;
+
+      if (freshCached) {
+        setUserCoords(freshCached);
+      }
+
+      // If permission is already granted, try to fetch location first; otherwise fall back.
+      let initialCoords: Coordinates | null = freshCached;
+      const permission = await Location.getForegroundPermissionsAsync();
+      permissionStatusRef.current = permission.status;
+      if (permission.status === 'granted') {
+        initialCoords = (await refreshUserLocation()) ?? initialCoords;
+      }
+
+      const fallbackCoords = initialCoords ?? userCoords ?? DEFAULT_COORDS;
+
+      loadBarsPage(1, 'initial', { coordsOverride: fallbackCoords });
+
+      // If we didn't have a location yet, keep trying to refresh and reload once we get it.
+      if (!initialCoords) {
+        const coords = await refreshUserLocation();
+        if (cancelled || !coords) return;
+        const coordsChanged =
+          Math.abs(coords.lat - fallbackCoords.lat) > 0.000001 ||
+          Math.abs(coords.lon - fallbackCoords.lon) > 0.000001;
+
+        if (coordsChanged) {
+          loadBarsPage(1, 'refresh', { ignoreCache: true, coordsOverride: coords });
+        }
+      }
+    };
+
+    kickoff();
+
     return () => {
       cancelled = true;
     };
-  }, [loadBarsPage, refreshUserLocation]);
+  }, [loadBarsPage, refreshUserLocation, userCoords]);
 
   useEffect(() => {
     return () => {
@@ -1321,15 +1365,11 @@ export default function BarsScreen() {
         if (!normalizedName) {
           return;
         }
-        const existing = tagMap.get(normalizedName);
-        if (existing) {
-          existing.count += 1;
-        } else {
+        if (!tagMap.has(normalizedName)) {
           tagMap.set(normalizedName, {
             id: normalizedName,
             name: tag.name,
             normalizedName,
-            count: 1,
           });
         }
       });
@@ -1390,10 +1430,6 @@ export default function BarsScreen() {
   const handleRemoveTag = useCallback((tagId: string) => {
     setSelectedTags((prev) => prev.filter((id) => id !== tagId));
   }, []);
-
-  useEffect(() => {
-    refreshUserLocation();
-  }, [refreshUserLocation]);
 
   useFocusEffect(
     useCallback(() => {
