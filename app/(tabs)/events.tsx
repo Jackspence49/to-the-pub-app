@@ -612,6 +612,7 @@ type RadiusSelectorProps = {
 	theme: ThemeName;
 };
 
+// Radius selector component
 const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 	const [isPickerVisible, setPickerVisible] = useState(false);
 
@@ -632,7 +633,6 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 
 	const unitLabel = DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT;
 	const currentLabel = `Location: ${value} ${unitLabel}`;
-
 	return (
 			<View style={styles.radiusPickerContainer}>
 				<TouchableOpacity
@@ -663,6 +663,7 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 	);
 };
 
+// Props type definition for TagFilterSheet
 type TagFilterSheetProps = {
 	visible: boolean;
 	tags: EventTag[];
@@ -676,6 +677,7 @@ type TagFilterSheetProps = {
 	tokens: EventThemeTokens;
 };
 
+// Tag filter sheet Modal component
 const TagFilterSheet = ({
 	visible,
 	tags,
@@ -687,6 +689,7 @@ const TagFilterSheet = ({
 	error,
 	theme,
 	tokens,
+
 }: TagFilterSheetProps) => {
 	const palette = Colors[theme];
 	const highlightColor = palette.filterActivePill;
@@ -711,6 +714,7 @@ const TagFilterSheet = ({
 		});
 	}, [onApply, onClose]);
 
+	// Render function for each tag row
 	const renderTagRow = useCallback(
 		({ item }: { item: EventTag }) => {
 			const isChecked = draftSelection.includes(item.id);
@@ -725,10 +729,10 @@ const TagFilterSheet = ({
 					<MaterialIcons
 						name={isChecked ? 'radio-button-checked' : 'radio-button-unchecked'}
 						size={22}
-						color={isChecked ? highlightColor : palette.text}
+						color={isChecked ? highlightColor : palette.cardTitle}
 						style={styles.filterRowCheckbox}
 					/>
-					<Text style={[styles.filterRowLabel, { color: palette.text }]} numberOfLines={1}>
+					<Text style={[styles.filterRowLabel, { color: palette.cardTitle }]} numberOfLines={1}>
 						{item.name}
 					</Text>
 				</TouchableOpacity>
@@ -737,6 +741,7 @@ const TagFilterSheet = ({
 		[draftSelection, highlightColor, palette.text, toggleTag]
 	);
 
+	// Render the modal sheet
 	return (
 		<Modal
 			visible={visible}
@@ -791,6 +796,7 @@ const TagFilterSheet = ({
 	);
 };
 
+// Main Events Screen component
 const EventsScreen = () => {
 	const router = useRouter();
 	const colorScheme = useColorScheme();
@@ -822,6 +828,8 @@ const EventsScreen = () => {
 		setSelectedTagIds(initialTagIdsFromParams);
 	}, [initialTagIdsFromParams]);
 
+
+	// Function to fetch available event tags
 	const fetchAvailableTags = useCallback(async () => {
 		if (!API_BASE_URL) {
 			setTagsError('Set EXPO_PUBLIC_API_URL in your .env file to load event tags.');
@@ -851,27 +859,35 @@ const EventsScreen = () => {
 		fetchAvailableTags();
 	}, [fetchAvailableTags]);
 
+
+	// Memoized list of selected tag names for display
 	const selectedTagNames = useMemo(
 		() => availableTags.filter((tag) => selectedTagIds.includes(tag.id)).map((tag) => tag.name),
 		[availableTags, selectedTagIds]
 	);
 
+	// Handler for applying tag filters
 	const handleApplyFilters = useCallback((nextTagIds: string[]) => {
 		setSelectedTagIds(nextTagIds);
 	}, []);
 
+	// Handler for clearing tag filters
 	const handleClearTags = useCallback(() => {
 		setSelectedTagIds([]);
 	}, []);
 
+	// Handlers for opening and closing the filter sheet
 	const openFilterSheet = useCallback(() => {
 		setIsFilterSheetVisible(true);
 	}, []);
 
+	// Handlers for opening and closing the filter sheet
 	const closeFilterSheet = useCallback(() => {
 		setIsFilterSheetVisible(false);
 	}, []);
 
+
+	// Handler for opening event details
 	const handleOpenEvent = useCallback(
 		(event: EventInstance) => {
 			const instanceId = event.instanceId ?? event.id;
@@ -883,10 +899,14 @@ const EventsScreen = () => {
 		[router]
 	);
 
+
+	// Handler for radius change
 	const handleRadiusChange = useCallback((nextRadius: number) => {
 		setSearchRadius(Math.max(1, nextRadius));
 	}, []);
 
+
+	// Function to ensure location permission is granted
 	const ensureLocationPermission = useCallback(async (): Promise<boolean> => {
 		const current = await Location.getForegroundPermissionsAsync();
 		if (current.status === 'granted') {
@@ -900,6 +920,7 @@ const EventsScreen = () => {
 		return requested.status === 'granted';
 	}, []);
 
+	// Function to refresh user location
 	const refreshUserLocation = useCallback(async () => {
 		try {
 			const granted = await ensureLocationPermission();
@@ -916,6 +937,7 @@ const EventsScreen = () => {
 		}
 	}, [ensureLocationPermission]);
 
+	// Fetch events function
 	const fetchEvents = useCallback(
 		async (pageToLoad: number, mode: FetchMode) => {
 			if (mode === 'paginate') {

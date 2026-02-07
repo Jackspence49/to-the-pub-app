@@ -1,7 +1,7 @@
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons'; // Icon libraries
 import * as Location from 'expo-location'; // Location services
 import { useFocusEffect, useRouter } from 'expo-router'; // Navigation hooks 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 
 // React Native components
@@ -29,12 +29,35 @@ const barsEndpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/bars` : '/get/bar
 const MILES_PER_KM = 0.621371;
 
 // Type definitions
-type FetchMode = 'initial' | 'refresh';  // Data fetching modes
 type ThemeName = keyof typeof Colors;  // Theme name type
 type LooseObject = Record<string, any>;  // Generic object type
 type QueryValue = string | number | boolean | undefined;
 type QueryParams = Record<string, QueryValue>;
 type Coordinates = { lat: number; lon: number };
+
+// Infinite scroll configuration
+type InfiniteScrollConfig = {
+  initialPageSize: number;
+  subsequentPageSize: number;
+  loadMoreThreshold: number;
+  maxConcurrentRequests: number;
+  prefetchPages: number;
+  cacheTimeout: number;
+};
+
+// Pagination state for lists
+type PaginationState = {
+  data: Bar[];
+  currentPage: number;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  error: Error | null;
+  totalCount?: number;
+};
+
+// Internal load modes
+type LoadMode = 'initial' | 'refresh' | 'load-more' | 'prefetch';
 
 // Bar tag type definition
 type BarTag = {
@@ -78,6 +101,15 @@ const BASE_QUERY_PARAMS: QueryParams = {
   unit: 'miles',
   open_now: true,
   include: 'tags,hours',
+};
+
+const INFINITE_SCROLL_CONFIG: InfiniteScrollConfig = {
+  initialPageSize: 20,
+  subsequentPageSize: 20,
+  loadMoreThreshold: 0.8,
+  maxConcurrentRequests: 2,
+  prefetchPages: 1,
+  cacheTimeout: 300000,
 };
 
 // Helper function to build query string from parameters
@@ -415,6 +447,106 @@ const formatDistanceLabel = (distanceMiles?: number): string | null => {
   }
 
   return `${distanceMiles.toFixed(1)} mi away`;
+};
+
+// Extract pagination metadata from common response shapes
+const extractPaginationMeta = (payload: unknown): LooseObject | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const record = payload as LooseObject;
+  const buckets = [record.meta?.pagination, record.meta, record.pagination, record.data?.pagination];
+
+  for (const bucket of buckets) {
+    if (bucket && typeof bucket === 'object') {
+      return bucket as LooseObject;
+    }
+  }
+
+  return null;
+};
+
+// Determine if another page likely exists
+const shouldContinuePagination = (
+  payload: unknown,
+  receivedCount: number,
+  expectedPageSize: number
+): boolean => {
+  const pagination = extractPaginationMeta(payload);
+  if (pagination) {
+    if (typeof pagination.has_next_page === 'boolean') {
+      return pagination.has_next_page;
+    }
+    if (typeof pagination.next_page !== 'undefined') {
+      return Boolean(pagination.next_page);
+    }
+    const current =
+      pagination.current_page ??
+      pagination.page ??
+      pagination.page_number ??
+      pagination.pageNumber;
+    const total = pagination.total_pages ?? pagination.totalPages;
+
+    if (typeof current === 'number' && typeof total === 'number') {
+      return current < total;
+    }
+  }
+
+  return receivedCount === expectedPageSize;
+};
+
+// Extract total count if provided
+const extractTotalCount = (payload: unknown): number | undefined => {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const record = payload as LooseObject;
+  const candidates = [
+    record.total,
+    record.total_count,
+    record.count,
+    record.meta?.total,
+    record.meta?.total_count,
+    record.meta?.pagination?.total,
+    record.pagination?.total,
+    record.data?.total,
+    record.data?.total_count,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number') {
+      return candidate;
+    }
+  }
+
+  return undefined;
+};
+
+// Merge bar lists while preserving order and deduping by id
+const mergeBars = (current: Bar[], incoming: Bar[], replace = false): Bar[] => {
+  if (replace || current.length === 0) {
+    return incoming;
+  }
+
+  const next = [...current];
+  incoming.forEach((bar) => {
+    const index = next.findIndex((item) => item.id === bar.id);
+    if (index === -1) {
+      next.push(bar);
+    } else {
+      next[index] = bar;
+    }
+  });
+
+  return next;
+};
+
+// Build a cache key based on coordinates and selected tags
+const getCacheKey = (coords: Coordinates, normalizedTags: string[]): string => {
+  const tagsKey = normalizedTags.slice().sort().join(',');
+  return `${coords.lat}|${coords.lon}|${tagsKey}`;
 };
 
 // Function to parse various time formats into Date objects
@@ -882,14 +1014,79 @@ export default function BarsScreen() {
   const theme = (colorScheme ?? 'light') as ThemeName;
   const palette = Colors[theme];
   const router = useRouter();
-  const [bars, setBars] = useState<Bar[]>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    data: [],
+    currentPage: 0,
+    isLoading: true,
+    isLoadingMore: false,
+    hasMore: true,
+    error: null,
+    totalCount: undefined,
+  });
+  const bars = pagination.data;
   const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [locationDeniedPermanently, setLocationDeniedPermanently] = useState(false);
+
+  const listRef = useRef<FlatList<Bar>>(null);
+  const lastScrollOffsetRef = useRef(0);
+  const restorePendingRef = useRef(false);
+  const inFlightPagesRef = useRef<Set<number>>(new Set());
+  const activeRequestCountRef = useRef(0);
+  const queuedRequestRef = useRef<{ page: number; mode: LoadMode; options?: { ignoreCache?: boolean; coordsOverride?: Coordinates } } | null>(null);
+  const cacheRef = useRef<{
+    key: string;
+    timestamp: number;
+    data: Bar[];
+    currentPage: number;
+    hasMore: boolean;
+    totalCount?: number;
+  } | null>(null);
+  const abortControllersRef = useRef<Map<number, AbortController>>(new Map());
+  const hasMoreRef = useRef(true);
+
+  const errorMessage = pagination.error?.message ?? null;
+  const { isLoading, isLoadingMore, hasMore, currentPage } = pagination;
+
+  useEffect(() => {
+    hasMoreRef.current = pagination.hasMore;
+  }, [pagination.hasMore]);
+
+  const getPageSize = useCallback((page: number) => {
+    return page === 1
+      ? INFINITE_SCROLL_CONFIG.initialPageSize
+      : INFINITE_SCROLL_CONFIG.subsequentPageSize;
+  }, []);
+
+  const restoreScrollPosition = useCallback(() => {
+    const offset = Math.max(0, lastScrollOffsetRef.current);
+    if (listRef.current && offset > 0) {
+      listRef.current.scrollToOffset({ offset, animated: false });
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      restorePendingRef.current = true;
+      const timer = setTimeout(() => {
+        restoreScrollPosition();
+        restorePendingRef.current = false;
+      }, 50);
+      return () => {
+        clearTimeout(timer);
+        restorePendingRef.current = true;
+      };
+    }, [restoreScrollPosition])
+  );
+
+  useEffect(() => {
+    if (restorePendingRef.current && bars.length > 0) {
+      restoreScrollPosition();
+      restorePendingRef.current = false;
+    }
+  }, [bars.length, restoreScrollPosition]);
 
   const ensureLocationPermission = useCallback(async (): Promise<boolean> => {
     const current = await Location.getForegroundPermissionsAsync();
@@ -908,23 +1105,193 @@ export default function BarsScreen() {
     return granted;
   }, []);
 
-  const refreshUserLocation = useCallback(async () => {
+  const refreshUserLocation = useCallback(async (): Promise<Coordinates | null> => {
     try {
       const granted = await ensureLocationPermission();
       if (!granted) {
-        return;
+        return null;
       }
       const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      setUserCoords({
+      const coords = {
         lat: position.coords.latitude,
         lon: position.coords.longitude,
-      });
+      } satisfies Coordinates;
+      setUserCoords(coords);
+      return coords;
     } catch (err) {
       console.warn('Unable to fetch user location; using fallback coordinates.', err);
+      return null;
     }
   }, [ensureLocationPermission]);
+
+  const loadBarsPage = useCallback(
+    async function loadBarsPage(page: number, mode: LoadMode = 'initial', options?: { ignoreCache?: boolean; coordsOverride?: Coordinates }) {
+      const coordsToUse = options?.coordsOverride ?? userCoords ?? DEFAULT_COORDS;
+      const normalizedTags = selectedTags;
+      const cacheKey = getCacheKey(coordsToUse, normalizedTags);
+
+      if (page === 1 && !options?.ignoreCache) {
+        const cache = cacheRef.current;
+        if (cache && cache.key === cacheKey && Date.now() - cache.timestamp < INFINITE_SCROLL_CONFIG.cacheTimeout) {
+          setPagination((prev) => ({
+            ...prev,
+            data: cache.data,
+            currentPage: cache.currentPage,
+            hasMore: cache.hasMore,
+            totalCount: cache.totalCount,
+            error: null,
+            isLoading: false,
+            isLoadingMore: false,
+          }));
+          setIsRefreshing(false);
+          return;
+        }
+      }
+
+      if (inFlightPagesRef.current.has(page)) {
+        queuedRequestRef.current = { page, mode, options };
+        return;
+      }
+
+      if (activeRequestCountRef.current >= INFINITE_SCROLL_CONFIG.maxConcurrentRequests) {
+        queuedRequestRef.current = { page, mode, options: { ...options, ignoreCache: true } };
+        return;
+      }
+
+      inFlightPagesRef.current.add(page);
+      activeRequestCountRef.current += 1;
+
+      if (mode === 'initial') {
+        setPagination((prev) => ({ ...prev, isLoading: true, error: null }));
+      } else if (mode === 'refresh') {
+        setIsRefreshing(true);
+        setPagination((prev) => ({ ...prev, isLoading: false, isLoadingMore: false, currentPage: 0, hasMore: true, error: null }));
+      } else if (mode === 'load-more' || mode === 'prefetch') {
+        setPagination((prev) => ({ ...prev, isLoadingMore: true }));
+      }
+
+      const controller = new AbortController();
+      abortControllersRef.current.set(page, controller);
+
+      const pageSize = getPageSize(page);
+      let nextHasMore: boolean | null = null;
+
+      try {
+        const queryParams: QueryParams = {
+          ...BASE_QUERY_PARAMS,
+          lat: coordsToUse.lat,
+          lon: coordsToUse.lon,
+          page,
+          limit: pageSize,
+          page_size: pageSize,
+        };
+
+        const queryString = buildQueryString(queryParams);
+        const requestUrl = queryString ? `${barsEndpoint}?${queryString}` : barsEndpoint;
+        const response = await fetch(requestUrl, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const items = extractBarItems(payload).map(mapToBar);
+        nextHasMore = shouldContinuePagination(payload, items.length, pageSize);
+        const totalCount = extractTotalCount(payload);
+
+        hasMoreRef.current = nextHasMore ?? hasMoreRef.current;
+
+        setPagination((prev) => {
+          const replace = page === 1 || mode === 'refresh';
+          const data = mergeBars(prev.data, items, replace);
+          cacheRef.current = {
+            key: cacheKey,
+            timestamp: Date.now(),
+            data,
+            currentPage: page,
+            hasMore: nextHasMore ?? prev.hasMore,
+            totalCount,
+          };
+          return {
+            ...prev,
+            data,
+            currentPage: page,
+            hasMore: nextHasMore ?? prev.hasMore,
+            totalCount: totalCount ?? prev.totalCount,
+            error: null,
+            isLoading: mode === 'initial' ? false : prev.isLoading,
+            isLoadingMore: false,
+          };
+        });
+
+        if (
+          INFINITE_SCROLL_CONFIG.prefetchPages > 0 &&
+          (mode === 'initial' || mode === 'refresh' || mode === 'load-more')
+        ) {
+          const prefetchTarget = page + INFINITE_SCROLL_CONFIG.prefetchPages;
+          if (nextHasMore && !inFlightPagesRef.current.has(prefetchTarget)) {
+            queuedRequestRef.current = null;
+            loadBarsPage(prefetchTarget, 'prefetch', { ignoreCache: true, coordsOverride: coordsToUse });
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          return;
+        }
+        const message = err instanceof Error ? err.message : 'Something went wrong while loading bars.';
+        setPagination((prev) => ({
+          ...prev,
+          error: new Error(message),
+          isLoading: mode === 'initial' ? false : prev.isLoading,
+          isLoadingMore: false,
+        }));
+      } finally {
+        if (mode === 'refresh') {
+          setIsRefreshing(false);
+        }
+        inFlightPagesRef.current.delete(page);
+        activeRequestCountRef.current = Math.max(0, activeRequestCountRef.current - 1);
+        abortControllersRef.current.delete(page);
+
+        if (
+          queuedRequestRef.current &&
+          activeRequestCountRef.current < INFINITE_SCROLL_CONFIG.maxConcurrentRequests &&
+          (queuedRequestRef.current.mode !== 'load-more' ? true : hasMoreRef.current)
+        ) {
+          const nextRequest = queuedRequestRef.current;
+          queuedRequestRef.current = null;
+          setTimeout(() => {
+            loadBarsPage(nextRequest.page, nextRequest.mode, {
+              ...(nextRequest.options ?? {}),
+              ignoreCache: true,
+            });
+          }, 0);
+        }
+      }
+    },
+    [getPageSize, selectedTags, userCoords]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const coords = await refreshUserLocation();
+      if (cancelled) return;
+      const coordsToUse = coords ?? DEFAULT_COORDS;
+      loadBarsPage(1, 'initial', { coordsOverride: coordsToUse });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadBarsPage, refreshUserLocation]);
+
+  useEffect(() => {
+    return () => {
+      abortControllersRef.current.forEach((controller) => controller.abort());
+      abortControllersRef.current.clear();
+    };
+  }, []);
 
   const availableTags = useMemo<TagFilterOption[]>(() => {
     const tagMap = new Map<string, TagFilterOption>();
@@ -1036,56 +1403,44 @@ export default function BarsScreen() {
     });
   }, []);
 
-  const fetchBars = useCallback(
-    async (mode: FetchMode = 'initial', signal?: AbortSignal, coordsOverride?: Coordinates) => {
-      const setBusy = mode === 'refresh' ? setIsRefreshing : setIsLoading;
-      setBusy(true);
-
-      try {
-        const coordsToUse = coordsOverride ?? userCoords ?? DEFAULT_COORDS;
-        const queryParams: QueryParams = {
-          ...BASE_QUERY_PARAMS,
-          lat: coordsToUse.lat,
-          lon: coordsToUse.lon,
-        };
-
-        const queryString = buildQueryString(queryParams);
-        const requestUrl = queryString ? `${barsEndpoint}?${queryString}` : barsEndpoint;
-        const response = await fetch(requestUrl, { signal });
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-
-        const payload = await response.json();
-        const items = extractBarItems(payload).map(mapToBar);
-        setBars(items);
-        setError(null);
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') {
-          return;
-        }
-        const message = err instanceof Error ? err.message : 'Something went wrong while loading bars.';
-        setError(message);
-      } finally {
-        setBusy(false);
-      }
-    },
-    [userCoords]
-  );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchBars('initial', controller.signal);
-    return () => controller.abort();
-  }, [fetchBars]);
-
   const handleRefresh = useCallback(() => {
-    fetchBars('refresh');
-  }, [fetchBars]);
+    queuedRequestRef.current = null;
+    inFlightPagesRef.current.forEach((page) => {
+      const controller = abortControllersRef.current.get(page);
+      controller?.abort();
+    });
+    inFlightPagesRef.current.clear();
+    abortControllersRef.current.clear();
+    activeRequestCountRef.current = 0;
+    cacheRef.current = null;
+    loadBarsPage(1, 'refresh', { ignoreCache: true });
+  }, [loadBarsPage]);
 
   const handleRetry = useCallback(() => {
-    fetchBars('initial');
-  }, [fetchBars]);
+    const mode: LoadMode = bars.length ? 'refresh' : 'initial';
+    queuedRequestRef.current = null;
+    inFlightPagesRef.current.forEach((page) => {
+      const controller = abortControllersRef.current.get(page);
+      controller?.abort();
+    });
+    inFlightPagesRef.current.clear();
+    abortControllersRef.current.clear();
+    activeRequestCountRef.current = 0;
+    cacheRef.current = null;
+    loadBarsPage(1, mode, { ignoreCache: true });
+  }, [bars.length, loadBarsPage]);
+
+  const handleEndReached = useCallback(() => {
+    if (isLoading || isLoadingMore || !hasMore) {
+      return;
+    }
+    const nextPage = Math.max(1, currentPage + 1);
+    loadBarsPage(nextPage, 'load-more', { ignoreCache: true });
+  }, [currentPage, hasMore, isLoading, isLoadingMore, loadBarsPage]);
+
+  const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
+    lastScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+  }, []);
 
   const openBarDetail = useCallback(
     (barId: string) => {
@@ -1108,7 +1463,7 @@ export default function BarsScreen() {
   const keyExtractor = useCallback((item: Bar) => item.id, []);
 
   const headerComponent =
-    locationDeniedPermanently || availableTags.length > 0 || selectedTags.length > 0 || (bars.length > 0 && error)
+    locationDeniedPermanently || availableTags.length > 0 || selectedTags.length > 0 || (bars.length > 0 && errorMessage)
       ? (
           <View style={styles.listHeader}>
             <Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Open Bars</Text>
@@ -1171,18 +1526,27 @@ export default function BarsScreen() {
               </View>
             ) : null}
 
-            {bars.length > 0 && error ? <ErrorBanner message={error} theme={theme} /> : null}
+            {bars.length > 0 && errorMessage ? <ErrorBanner message={errorMessage} theme={theme} /> : null}
           </View>
         )
       : null;
 
-  const footerComponent = bars.length > 0 && filteredBars.length > 0 ? (
-    <Text style={[styles.footerHint, { color: palette.text }]}>Pull to refresh for the latest list.</Text>
-  ) : null;
+  const footerComponent = filteredBars.length > 0
+    ? (
+        isLoadingMore ? (
+          <View style={styles.footerLoading}>
+            <ActivityIndicator size="small" color={palette.text} />
+            <Text style={[styles.footerLoadingText, { color: palette.text }]}>Loading more bars...</Text>
+          </View>
+        ) : (
+          <Text style={[styles.footerHint, { color: palette.text }]}>Pull to refresh for the latest list.</Text>
+        )
+      )
+    : null;
 
   const listEmptyComponent =
-    bars.length === 0 ? (
-      <BarsEmptyState error={error} onRetry={handleRetry} theme={theme} />
+    bars.length === 0 && !isLoading && !isRefreshing ? (
+      <BarsEmptyState error={errorMessage} onRetry={handleRetry} theme={theme} />
     ) : filteredBars.length === 0 && selectedTags.length > 0 ? (
       <FilteredEmptyState
         selectedTagEntries={selectedTagEntries}
@@ -1205,6 +1569,7 @@ export default function BarsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
       <FlatList
+        ref={listRef}
         data={filteredBars}
         style={[styles.list, { backgroundColor: palette.background }]}
         contentContainerStyle={styles.listContent}
@@ -1214,6 +1579,10 @@ export default function BarsScreen() {
         ListHeaderComponent={headerComponent}
         ListFooterComponent={footerComponent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={palette.text} />}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={INFINITE_SCROLL_CONFIG.loadMoreThreshold}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       />
       <TagFilterSheet
@@ -1354,6 +1723,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+  },
+  footerLoading: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  footerLoadingText: {
+    fontSize: 14,
   },
   filterSection: {
     padding: 18,
