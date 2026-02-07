@@ -473,14 +473,27 @@ const shouldContinuePagination = (
   receivedCount: number,
   expectedPageSize: number
 ): boolean => {
+  const countSuggestsMore = receivedCount >= expectedPageSize;
   const pagination = extractPaginationMeta(payload);
+
   if (pagination) {
-    if (typeof pagination.has_next_page === 'boolean') {
-      return pagination.has_next_page;
+    const booleanFlags = [
+      pagination.has_next_page,
+      pagination.has_next,
+      pagination.has_more,
+      pagination.has_more_pages,
+      pagination.hasNextPage,
+      pagination.hasMore,
+      pagination.hasMorePages,
+    ];
+
+    for (const flag of booleanFlags) {
+      if (typeof flag === 'boolean') {
+        // Be optimistic if the API says no but we still received a full page.
+        return flag || countSuggestsMore;
+      }
     }
-    if (typeof pagination.next_page !== 'undefined') {
-      return Boolean(pagination.next_page);
-    }
+
     const current =
       pagination.current_page ??
       pagination.page ??
@@ -489,11 +502,15 @@ const shouldContinuePagination = (
     const total = pagination.total_pages ?? pagination.totalPages;
 
     if (typeof current === 'number' && typeof total === 'number') {
-      return current < total;
+      return current < total || countSuggestsMore;
+    }
+
+    if (typeof pagination.next_page !== 'undefined') {
+      return Boolean(pagination.next_page) || countSuggestsMore;
     }
   }
 
-  return receivedCount === expectedPageSize;
+  return countSuggestsMore;
 };
 
 // Extract total count if provided
