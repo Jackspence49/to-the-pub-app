@@ -27,6 +27,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();  // Base URL for API requests
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');  
 const barsEndpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/bars` : '/get/bars';
+const barTagsEndpoint = normalizedBaseUrl ? `${normalizedBaseUrl}/tags` : '/get/tags';
 const MILES_PER_KM = 0.621371;
 
 // Type definitions
@@ -365,6 +366,37 @@ const mapToBar = (raw: LooseObject, index: number): Bar => {
     crossesMidnightToday,
     tags: dedupedTags,
   };
+};
+
+// Extract bar tag items from typical API response shapes
+const extractBarTagItems = (payload: unknown): LooseObject[] => {
+  if (!payload) {
+    return [];
+  }
+
+  if (Array.isArray(payload)) {
+    return payload as LooseObject[];
+  }
+
+  if (typeof payload !== 'object') {
+    return [];
+  }
+
+  const record = payload as LooseObject;
+  const candidates = [
+    record.data?.tags,
+    record.tags,
+    record.items,
+    record.data,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as LooseObject[];
+    }
+  }
+
+  return [];
 };
 
 // Map raw bar items to Bar objects in small batches to keep the UI thread responsive
@@ -990,7 +1022,6 @@ const FilteredEmptyState = ({
   theme: ThemeName;
 }) => {
   const palette = Colors[theme];
-  const filterTextActive = palette.filterTextActive;
   const pillBorder = palette.border;
   const filterActivePill = palette.filterActivePill;
   const actionButton = palette.actionButton;
@@ -1038,6 +1069,9 @@ export default function BarsScreen() {
   const bars = pagination.data;
   const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<TagFilterOption[]>([]);
+  const [areTagsLoading, setAreTagsLoading] = useState(false);
+  const [tagsError, setTagsError] = useState<string | null>(null);
   const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [locationDeniedPermanently, setLocationDeniedPermanently] = useState(false);
@@ -1060,6 +1094,7 @@ export default function BarsScreen() {
   const hasMoreRef = useRef(true);
   const permissionStatusRef = useRef<Location.PermissionStatus | null>(null);
   const lastCoordsRef = useRef<{ coords: Coordinates; fetchedAt: number } | null>(null);
+  const tagSelectionHydratedRef = useRef(false);
 
   const errorMessage = pagination.error?.message ?? null;
   const { isLoading, isLoadingMore, hasMore, currentPage } = pagination;
@@ -1076,9 +1111,13 @@ export default function BarsScreen() {
 
   const restoreScrollPosition = useCallback(() => {
     const offset = Math.max(0, lastScrollOffsetRef.current);
-    if (listRef.current && offset > 0) {
-      listRef.current.scrollToOffset({ offset, animated: false });
+    if (!listRef.current || offset <= 0) {
+      return;
     }
+    // Defer to next frame so FlatList has rendered content before restoring scroll.
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset, animated: false });
+    });
   }, []);
 
   useFocusEffect(
@@ -1156,6 +1195,9 @@ export default function BarsScreen() {
     async function loadBarsPage(page: number, mode: LoadMode = 'initial', options?: { ignoreCache?: boolean; coordsOverride?: Coordinates }) {
       const coordsToUse = options?.coordsOverride ?? userCoords ?? DEFAULT_COORDS;
       const normalizedTags = selectedTags;
+      const selectedTagIds = normalizedTags
+        .map((tag) => availableTags.find((option) => option.normalizedName === tag)?.id)
+        .filter((value): value is string => Boolean(value));
       const cacheKey = getCacheKey(coordsToUse, normalizedTags);
 
       if (page === 1 && !options?.ignoreCache) {
@@ -1212,6 +1254,7 @@ export default function BarsScreen() {
           page,
           limit: pageSize,
           page_size: pageSize,
+          tags: selectedTagIds.length ? selectedTagIds.join(',') : undefined,
         };
 
         const queryString = buildQueryString(queryParams);
@@ -1298,8 +1341,28 @@ export default function BarsScreen() {
         }
       }
     },
-    [getPageSize, selectedTags, userCoords]
+    [availableTags, getPageSize, selectedTags, userCoords]
   );
+
+  // When tag filters change, refresh from the backend with the tag IDs applied.
+  useEffect(() => {
+    if (!tagSelectionHydratedRef.current) {
+      tagSelectionHydratedRef.current = true;
+      return;
+    }
+
+    queuedRequestRef.current = null;
+    inFlightPagesRef.current.forEach((page) => {
+      const controller = abortControllersRef.current.get(page);
+      controller?.abort();
+    });
+    inFlightPagesRef.current.clear();
+    abortControllersRef.current.clear();
+    activeRequestCountRef.current = 0;
+    cacheRef.current = null;
+
+    loadBarsPage(1, 'refresh', { ignoreCache: true });
+  }, [loadBarsPage, selectedTags]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1348,34 +1411,12 @@ export default function BarsScreen() {
   }, [loadBarsPage, refreshUserLocation, userCoords]);
 
   useEffect(() => {
+    const controllers = abortControllersRef.current;
     return () => {
-      abortControllersRef.current.forEach((controller) => controller.abort());
-      abortControllersRef.current.clear();
+      controllers.forEach((controller) => controller.abort());
+      controllers.clear();
     };
   }, []);
-
-  const availableTags = useMemo<TagFilterOption[]>(() => {
-    const tagMap = new Map<string, TagFilterOption>();
-    bars.forEach((bar) => {
-      bar.tags.forEach((tag) => {
-        if (!tag.name) {
-          return;
-        }
-        const normalizedName = normalizeTagName(tag.name);
-        if (!normalizedName) {
-          return;
-        }
-        if (!tagMap.has(normalizedName)) {
-          tagMap.set(normalizedName, {
-            id: normalizedName,
-            name: tag.name,
-            normalizedName,
-          });
-        }
-      });
-    });
-    return Array.from(tagMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [bars]);
 
   const filteredBars = useMemo(() => {
     if (selectedTags.length === 0) {
@@ -1411,9 +1452,49 @@ export default function BarsScreen() {
     }));
   }, [availableTags, selectedTags]);
 
+
   const handleApplyFilters = useCallback((nextTags: string[]) => {
     setSelectedTags(nextTags);
   }, []);
+
+  const fetchAvailableTags = useCallback(async () => {
+    setAreTagsLoading(true);
+    setTagsError(null);
+    try {
+      const response = await fetch(barTagsEndpoint);
+      if (!response.ok) {
+        throw new Error(`Failed to load tags (status ${response.status})`);
+      }
+      const payload = await response.json();
+      const incoming = extractBarTagItems(payload)
+        .map((tag, idx) => mapToBarTag(tag, idx))
+        .filter((tag): tag is BarTag => Boolean(tag))
+        .map((tag) => ({
+          id: tag.id,
+          name: tag.name,
+          normalizedName: normalizeTagName(tag.name),
+        }));
+
+      const deduped = Array.from(
+        incoming.reduce((acc, tag) => {
+          if (!acc.has(tag.normalizedName)) {
+            acc.set(tag.normalizedName, tag);
+          }
+          return acc;
+        }, new Map<string, TagFilterOption>()).values()
+      ).sort((a, b) => a.name.localeCompare(b.name));
+
+      setAvailableTags(deduped);
+    } catch (err) {
+      setTagsError(err instanceof Error ? err.message : 'Unable to load tags.');
+    } finally {
+      setAreTagsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAvailableTags();
+  }, [fetchAvailableTags]);
 
   const openFilterSheet = useCallback(() => {
     setIsFilterSheetVisible(true);
@@ -1516,7 +1597,7 @@ export default function BarsScreen() {
   const keyExtractor = useCallback((item: Bar) => item.id, []);
 
   const headerComponent =
-    locationDeniedPermanently || availableTags.length > 0 || selectedTags.length > 0 || (bars.length > 0 && errorMessage)
+    locationDeniedPermanently || availableTags.length > 0 || selectedTags.length > 0 || areTagsLoading || tagsError || (bars.length > 0 && errorMessage)
       ? (
           <View style={styles.listHeader}>
             <Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Open Bars</Text>
@@ -1528,7 +1609,7 @@ export default function BarsScreen() {
               />
             ) : null}
 
-            {availableTags.length > 0 || selectedTags.length > 0 ? (
+            {availableTags.length > 0 || selectedTags.length > 0 || areTagsLoading || tagsError ? (
               <View
                 style={[
                   styles.filterCard,
@@ -1554,6 +1635,23 @@ export default function BarsScreen() {
                     </TouchableOpacity>
                   ) : null}
                 </View>
+
+                {areTagsLoading ? (
+                  <View style={styles.filterLoadRow}>
+                    <ActivityIndicator size="small" color={palette.text} />
+                    <Text style={[styles.filterLoadText, { color: palette.cardSubtitle }]}>Loading tags…</Text>
+                  </View>
+                ) : null}
+
+                {tagsError ? (
+                  <TouchableOpacity
+                    onPress={fetchAvailableTags}
+                    style={[styles.filterLoadRow, { borderColor: palette.filterActivePill }]}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.filterLoadText, { color: palette.cardSubtitle }]}>Unable to load tags. Tap to retry.</Text>
+                  </TouchableOpacity>
+                ) : null}
 
                 {selectedTagEntries.length ? (
                   <View style={styles.selectedTagChipRow}>
@@ -1931,6 +2029,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 14,
     minWidth: 140,
+  },
+  filterLoadRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  filterLoadText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   filterButtonLarge: {
     minHeight: 48,
