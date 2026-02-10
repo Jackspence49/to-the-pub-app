@@ -77,6 +77,16 @@ export default function BarsScreen() {
       setIsFilterSheetVisible
     );
 
+  // Re-fetch bars from the API when tag filters change (server-side filtering)
+  const tagsRefreshGuardRef = useRef(false);
+  useEffect(() => {
+    if (tagsRefreshGuardRef.current) {
+      handleRefresh();
+      return;
+    }
+    tagsRefreshGuardRef.current = true;
+  }, [selectedTags, handleRefresh]);
+
   // Refs for scroll position restoration
   const listRef = useRef<FlatList<Bar>>(null);
   const lastScrollOffsetRef = useRef(0);
@@ -296,11 +306,7 @@ export default function BarsScreen() {
             Loading more bars...
           </Text>
         </View>
-      ) : (
-        <Text style={[styles.footerHint, { color: palette.text }]}>
-          Pull to refresh for the latest list.
-        </Text>
-      )
+      ) : null
     ) : null;
 
   // Empty component

@@ -21,6 +21,7 @@ import {
 // Custom constants and hooks
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { shouldContinuePagination } from '../../utils/pagination';
 
 
 // Type definitions
@@ -220,49 +221,6 @@ const extractTagItems = (payload: unknown): LooseObject[] => {
 	}
 
 	return [];
-};
-
-// Function to extract pagination metadata from various API response structures
-const extractPaginationMeta = (payload: unknown): LooseObject | null => {
-	if (!payload || typeof payload !== 'object') {
-		return null;
-	}
-
-	const record = payload as LooseObject;
-	const metaBuckets = [record.meta?.pagination, record.meta, record.pagination, record.data?.pagination];
-
-	for (const bucket of metaBuckets) {
-		if (bucket && typeof bucket === 'object') {
-			return bucket as LooseObject;
-		}
-	}
-
-	return null;
-};
-
-// Function to determine if more pages should be fetched based on pagination metadata
-const shouldKeepPaginating = (payload: unknown, receivedCount: number): boolean => {
-	const pagination = extractPaginationMeta(payload);
-
-	if (pagination) {
-		if (typeof pagination.has_next_page === 'boolean') {
-			return pagination.has_next_page;
-		}
-
-		if (typeof pagination.next_page !== 'undefined') {
-			return Boolean(pagination.next_page);
-		}
-
-		const current =
-			pagination.current_page ?? pagination.page ?? pagination.page_number ?? pagination.pageNumber;
-		const total = pagination.total_pages ?? pagination.totalPages;
-
-		if (typeof current === 'number' && typeof total === 'number') {
-			return current < total;
-		}
-	}
-
-	return receivedCount === PAGE_SIZE;
 };
 
 // Function to map raw event data to EventInstance type
@@ -825,6 +783,7 @@ const EventsScreen = () => {
 	const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
 	const eventsRequestAbortRef = useRef<AbortController | null>(null);
 	const eventsRequestSeqRef = useRef(0);
+	const isMountedRef = useRef(true);
 
 	useEffect(() => {
 		setSelectedTagIds(initialTagIdsFromParams);
@@ -943,29 +902,21 @@ const EventsScreen = () => {
 	const fetchEvents = useCallback(
 		async (pageToLoad: number, mode: FetchMode) => {
 			// Cancel any in-flight request so stale responses cannot clobber fresh data
+			const requestId = eventsRequestSeqRef.current + 1;
+			eventsRequestSeqRef.current = requestId;
 			eventsRequestAbortRef.current?.abort();
 			const controller = new AbortController();
 			eventsRequestAbortRef.current = controller;
-			const requestId = eventsRequestSeqRef.current + 1;
-			eventsRequestSeqRef.current = requestId;
 
-			if (mode === 'paginate') {
-				setIsPaginating(true);
-			} else if (mode === 'refresh') {
-				setIsRefreshing(true);
-			} else {
-				setIsInitialLoading(true);
-			}
+			setIsPaginating(mode === 'paginate');
+			setIsRefreshing(mode === 'refresh');
+			setIsInitialLoading(mode === 'initial');
 
 			if (!API_BASE_URL) {
 				setError('Set EXPO_PUBLIC_API_URL in your .env file to load events.');
-				if (mode === 'paginate') {
-					setIsPaginating(false);
-				} else if (mode === 'refresh') {
-					setIsRefreshing(false);
-				} else {
-					setIsInitialLoading(false);
-				}
+				setIsPaginating(false);
+				setIsRefreshing(false);
+				setIsInitialLoading(false);
 				return;
 			}
 
@@ -1001,30 +952,29 @@ const EventsScreen = () => {
 				const payload = await response.json();
 				const incoming = extractEventItems(payload).map(mapToEventInstance);
 
-				if (eventsRequestSeqRef.current !== requestId) {
+				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
 					return;
 				}
 
 				setEvents((prev) => (mode === 'paginate' ? mergeEvents(prev, incoming) : incoming));
 				setPage(pageToLoad);
-				setHasMore(shouldKeepPaginating(payload, incoming.length));
+				setHasMore(shouldContinuePagination(payload, incoming.length, PAGE_SIZE));
 			} catch (err) {
 				if ((err as Error).name === 'AbortError') {
 					return;
 				}
+				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
+					return;
+				}
 				setError(err instanceof Error ? err.message : 'Unable to load events right now.');
 			} finally {
-				if (eventsRequestSeqRef.current !== requestId) {
+				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
 					return;
 				}
 				eventsRequestAbortRef.current = null;
-				if (mode === 'paginate') {
-					setIsPaginating(false);
-				} else if (mode === 'refresh') {
-					setIsRefreshing(false);
-				} else {
-					setIsInitialLoading(false);
-				}
+				setIsPaginating(false);
+				setIsRefreshing(false);
+				setIsInitialLoading(false);
 			}
 		},
 		[userCoords, searchRadius, selectedTagIds]
@@ -1032,6 +982,8 @@ const EventsScreen = () => {
 
 	useEffect(() => {
 		return () => {
+			isMountedRef.current = false;
+			eventsRequestSeqRef.current += 1;
 			eventsRequestAbortRef.current?.abort();
 			eventsRequestAbortRef.current = null;
 		};

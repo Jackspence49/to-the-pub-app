@@ -1,9 +1,9 @@
 // Individual bar display component
 
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { BarCardProps } from '../types';
 import { formatDistanceLabel, openExternalLink } from '../utils/helpers';
 import { formatClosingTimeLabel } from '../utils/Timeformatters';
