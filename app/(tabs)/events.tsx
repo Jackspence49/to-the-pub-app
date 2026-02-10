@@ -21,7 +21,7 @@ import {
 // Custom constants and hooks
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { shouldContinuePagination } from '../../utils/pagination';
+import { extractPaginationMeta, shouldContinuePagination } from '../../utils/pagination';
 
 
 // Type definitions
@@ -70,7 +70,7 @@ type EventInstance = {
 
 // Default Parameters
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 const DEFAULT_RADIUS_MILES = 10;
 const DISTANCE_UNIT = 'miles';
 const RADIUS_OPTIONS = [1, 3, 5, 10];
@@ -140,6 +140,10 @@ const normalizeTagParamList = (value?: string | string[]): string[] => {
 		.map((entry) => entry.trim())
 		.filter((entry) => entry.length > 0);
 };
+
+// Normalize a tag id array to trimmed, unique values
+const normalizeTagIds = (ids: string[]): string[] =>
+	Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
 
 // Utility function to build query strings
 
@@ -765,7 +769,8 @@ const EventsScreen = () => {
 		() => normalizeTagParamList(searchParams.eventTagId),
 		[searchParams.eventTagId]
 	);
-	const initialSelectedTagIds = initialTagIdsFromParams;
+	const initialSelectedTagIds = normalizeTagIds(initialTagIdsFromParams);
+	const hasAppliedInitialTagsRef = useRef(false);
 
 	const [events, setEvents] = useState<EventInstance[]>([]);
 	const [page, setPage] = useState(1);
@@ -786,8 +791,12 @@ const EventsScreen = () => {
 	const isMountedRef = useRef(true);
 
 	useEffect(() => {
-		setSelectedTagIds(initialTagIdsFromParams);
-	}, [initialTagIdsFromParams]);
+		if (hasAppliedInitialTagsRef.current) {
+			return;
+		}
+		setSelectedTagIds(initialSelectedTagIds);
+		hasAppliedInitialTagsRef.current = true;
+	}, [initialSelectedTagIds]);
 
 
 	// Function to fetch available event tags
@@ -829,12 +838,16 @@ const EventsScreen = () => {
 
 	// Handler for applying tag filters
 	const handleApplyFilters = useCallback((nextTagIds: string[]) => {
-		setSelectedTagIds(nextTagIds);
+		setSelectedTagIds(normalizeTagIds(nextTagIds));
+		setPage(1);
+		setHasMore(true);
 	}, []);
 
 	// Handler for clearing tag filters
 	const handleClearTags = useCallback(() => {
 		setSelectedTagIds([]);
+		setPage(1);
+		setHasMore(true);
 	}, []);
 
 	// Handlers for opening and closing the filter sheet
@@ -926,6 +939,7 @@ const EventsScreen = () => {
 					lat: DEFAULT_COORDINATES.latitude,
 					lon: DEFAULT_COORDINATES.longitude,
 				};
+				// Build the API query to match the backend contract (no extra pagination params)
 				const queryParams: Record<string, QueryValue> = {
 					upcoming: true,
 					limit: PAGE_SIZE,
@@ -937,7 +951,7 @@ const EventsScreen = () => {
 				};
 
 				if (selectedTagIds.length > 0) {
-					queryParams.event_tag_id = selectedTagIds;
+					queryParams.event_tag_id = selectedTagIds.join(',');
 				}
 
 				const query = buildQueryString(queryParams);
@@ -951,14 +965,22 @@ const EventsScreen = () => {
 
 				const payload = await response.json();
 				const incoming = extractEventItems(payload).map(mapToEventInstance);
+				const pagination = extractPaginationMeta(payload);
+				const hasMoreNext = shouldContinuePagination(payload, incoming.length, PAGE_SIZE);
+				const resolvedPage =
+					typeof pagination?.current_page === 'number'
+						? pagination.current_page
+						: typeof pagination?.page === 'number'
+							? pagination.page
+							: pageToLoad;
 
 				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
 					return;
 				}
 
 				setEvents((prev) => (mode === 'paginate' ? mergeEvents(prev, incoming) : incoming));
-				setPage(pageToLoad);
-				setHasMore(shouldContinuePagination(payload, incoming.length, PAGE_SIZE));
+				setPage(resolvedPage);
+				setHasMore(hasMoreNext);
 			} catch (err) {
 				if ((err as Error).name === 'AbortError') {
 					return;
@@ -968,9 +990,7 @@ const EventsScreen = () => {
 				}
 				setError(err instanceof Error ? err.message : 'Unable to load events right now.');
 			} finally {
-				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
-					return;
-				}
+				// Always clear loading flags even if this request was superseded to avoid stuck spinners
 				eventsRequestAbortRef.current = null;
 				setIsPaginating(false);
 				setIsRefreshing(false);
