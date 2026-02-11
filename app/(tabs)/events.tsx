@@ -6,21 +6,22 @@ import type { ListRenderItem } from 'react-native';
 
 // React Native components
 import {
-	ActivityIndicator,
-	FlatList,
-	Modal,
-	Pressable,
-	RefreshControl,
-	SectionList,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 // Custom constants and hooks
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
+import { getCacheKey } from '../../utils/helpers';
 import { extractPaginationMeta, shouldContinuePagination } from '../../utils/pagination';
 
 
@@ -68,9 +69,22 @@ type EventInstance = {
 	distanceMiles?: number;
 };
 
+// Flat list rows (date separators and events)
+type EventListRow =
+	| { type: 'date'; key: string; label: string }
+	| { type: 'event'; key: string; event: EventInstance };
+
+type EventsCache = {
+	key: string;
+	timestamp: number;
+	data: EventInstance[];
+	currentPage: number;
+	hasMore: boolean;
+};
+
 // Default Parameters
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
-const PAGE_SIZE = 10;
+const PAGE_SIZE = INFINITE_SCROLL_CONFIG.initialPageSize;
 const DEFAULT_RADIUS_MILES = 10;
 const DISTANCE_UNIT = 'miles';
 const RADIUS_OPTIONS = [1, 3, 5, 10];
@@ -789,6 +803,7 @@ const EventsScreen = () => {
 	const eventsRequestAbortRef = useRef<AbortController | null>(null);
 	const eventsRequestSeqRef = useRef(0);
 	const isMountedRef = useRef(true);
+	const eventsCacheRef = useRef<EventsCache | null>(null);
 
 	useEffect(() => {
 		if (hasAppliedInitialTagsRef.current) {
@@ -836,8 +851,12 @@ const EventsScreen = () => {
 		[availableTags, selectedTagIds]
 	);
 
-	// Handler for applying tag filters
+	// Handler for applying tag filters; abort in-flight, clear stale results, and reset paging
 	const handleApplyFilters = useCallback((nextTagIds: string[]) => {
+		eventsRequestAbortRef.current?.abort();
+		setEvents([]);
+		setError(null);
+		eventsCacheRef.current = null;
 		setSelectedTagIds(normalizeTagIds(nextTagIds));
 		setPage(1);
 		setHasMore(true);
@@ -845,6 +864,10 @@ const EventsScreen = () => {
 
 	// Handler for clearing tag filters
 	const handleClearTags = useCallback(() => {
+		eventsRequestAbortRef.current?.abort();
+		setEvents([]);
+		setError(null);
+		eventsCacheRef.current = null;
 		setSelectedTagIds([]);
 		setPage(1);
 		setHasMore(true);
@@ -939,6 +962,25 @@ const EventsScreen = () => {
 					lat: DEFAULT_COORDINATES.latitude,
 					lon: DEFAULT_COORDINATES.longitude,
 				};
+				const cacheKey = getCacheKey(coordsToUse, selectedTagIds);
+
+				// Serve cached data on initial/refresh when valid
+				if (mode !== 'paginate' && eventsCacheRef.current) {
+					const cached = eventsCacheRef.current;
+					const isCacheValid =
+						cached.key === cacheKey &&
+						Date.now() - cached.timestamp < INFINITE_SCROLL_CONFIG.cacheTimeout;
+
+					if (isCacheValid) {
+						setEvents(cached.data);
+						setPage(cached.currentPage);
+						setHasMore(cached.hasMore);
+						setIsInitialLoading(false);
+						setIsRefreshing(false);
+						setIsPaginating(false);
+						return;
+					}
+				}
 				// Build the API query to match the backend contract (no extra pagination params)
 				const queryParams: Record<string, QueryValue> = {
 					upcoming: true,
@@ -981,6 +1023,17 @@ const EventsScreen = () => {
 				setEvents((prev) => (mode === 'paginate' ? mergeEvents(prev, incoming) : incoming));
 				setPage(resolvedPage);
 				setHasMore(hasMoreNext);
+
+				// Cache successful result
+				eventsCacheRef.current = {
+					key: cacheKey,
+					timestamp: Date.now(),
+					data: mode === 'paginate'
+						? mergeEvents(eventsCacheRef.current?.data ?? [], incoming)
+						: incoming,
+					currentPage: resolvedPage,
+					hasMore: hasMoreNext,
+				};
 			} catch (err) {
 				if ((err as Error).name === 'AbortError') {
 					return;
@@ -990,7 +1043,10 @@ const EventsScreen = () => {
 				}
 				setError(err instanceof Error ? err.message : 'Unable to load events right now.');
 			} finally {
-				// Always clear loading flags even if this request was superseded to avoid stuck spinners
+				// Only clear loading flags if this is the latest in-flight request and we are still mounted
+				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
+					return;
+				}
 				eventsRequestAbortRef.current = null;
 				setIsPaginating(false);
 				setIsRefreshing(false);
@@ -1050,24 +1106,39 @@ const EventsScreen = () => {
 		fetchEvents(1, events.length ? 'refresh' : 'initial');
 	}, [events.length, fetchEvents]);
 
-	const renderItem = useCallback<ListRenderItem<EventInstance>>(
-		({ item }) => (
-			<EventCard
-				event={item}
-				availableTags={availableTags}
-				tokens={tokens}
-				onPress={() => handleOpenEvent(item)}
-			/>
-		),
+	const renderItem = useCallback<ListRenderItem<EventListRow>>( 
+		({ item }) => {
+			if (item.type === 'date') {
+				return (
+					<View
+						style={[
+							styles.dateSeparatorPill,
+							{ backgroundColor: tokens.container, borderColor: tokens.headerBorder },
+						]}
+					>
+						<Text style={[styles.dateSeparatorText, { color: tokens.cardTitle }]}>{item.label}</Text>
+					</View>
+				);
+			}
+
+			return (
+				<EventCard
+					event={item.event}
+					availableTags={availableTags}
+					tokens={tokens}
+					onPress={() => handleOpenEvent(item.event)}
+				/>
+			);
+		},
 		[availableTags, handleOpenEvent, tokens]
 	);
 
-	const sections = useMemo(() => {
+	const flatEvents = useMemo(() => {
 		if (events.length === 0) {
-			return [] as { title: string; data: EventInstance[] }[];
+			return [] as EventInstance[];
 		}
 
-		const sorted = [...events].sort((a, b) => {
+		return [...events].sort((a, b) => {
 			const aDate = a.eventDate ?? a.startsAt ?? '';
 			const bDate = b.eventDate ?? b.startsAt ?? '';
 			const aTime = new Date(aDate).getTime();
@@ -1076,29 +1147,38 @@ const EventsScreen = () => {
 			const bValue = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
 			return aValue - bValue;
 		});
+	}, [events]);
 
-		const groups: Record<string, { title: string; data: EventInstance[]; order: number }> = {};
+	// Build rows with date separators
+	const listRows = useMemo<EventListRow[]>(() => {
+		if (flatEvents.length === 0) return [];
 
-		sorted.forEach((event) => {
+		const rows: EventListRow[] = [];
+		let lastLabel: string | null = null;
+
+		flatEvents.forEach((event) => {
 			const dateValue = event.eventDate ?? event.startsAt;
 			const normalized = normalizeDateOnly(dateValue ?? undefined) ?? 'unknown-date';
 			const label = dateValue ? formatRelativeEventDay(dateValue) : 'Date coming soon';
-			const orderValue = (() => {
-				const ts = dateValue ? new Date(dateValue).getTime() : Number.MAX_SAFE_INTEGER;
-				return Number.isNaN(ts) ? Number.MAX_SAFE_INTEGER : ts;
-			})();
 
-			if (!groups[normalized]) {
-				groups[normalized] = { title: label, data: [], order: orderValue };
+			if (label !== lastLabel) {
+				rows.push({ type: 'date', key: `date-${normalized}-${label}`, label });
+				lastLabel = label;
 			}
 
-			groups[normalized].data.push(event);
+			rows.push({ type: 'event', key: `event-${event.id}`, event });
 		});
 
-		return Object.values(groups)
-			.sort((a, b) => a.order - b.order)
-			.map(({ title, data }) => ({ title, data }));
-	}, [events]);
+		return rows;
+	}, [flatEvents]);
+
+	// Indices for sticky date headers (offset by ListHeaderComponent at index 0)
+	const stickyHeaderIndices = useMemo(() => {
+		const headerOffset = 1; // ListHeaderComponent is rendered before data rows
+		return listRows
+			.map((row, index) => (row.type === 'date' ? index + headerOffset : -1))
+			.filter((index) => index >= 0);
+	}, [listRows]);
 
 	const renderHeader = useMemo(() => {
 		const highlightColor = Colors[theme].filterActivePill;
@@ -1254,33 +1334,19 @@ const EventsScreen = () => {
 
 	return (
 		<View style={[styles.container, { backgroundColor: tokens.background }]}>
-			<SectionList
-				sections={sections}
-				keyExtractor={(item) => item.id}
+			<FlatList
+				data={listRows}
+				keyExtractor={(item) => item.key}
 				renderItem={renderItem}
-				renderSectionHeader={({ section }) => (
-					<View style={[styles.sectionHeader, { backgroundColor: tokens.background }]}>
-						<View
-							style={[
-								styles.sectionHeaderPill,
-								{ backgroundColor: tokens.container, borderColor: tokens.headerBorder },
-							]}
-						>
-							<Text style={[styles.sectionHeaderText, { color: tokens.cardTitle }]}>
-								{section.title}
-							</Text>
-						</View>
-					</View>
-				)}
-				stickySectionHeadersEnabled
+				stickyHeaderIndices={stickyHeaderIndices}
 				ListHeaderComponent={renderHeader}
 				contentContainerStyle={
-					sections.length === 0 ? styles.listContentEmpty : styles.listContent
+					listRows.length === 0 ? styles.listContentEmpty : styles.listContent
 				}
 				ListEmptyComponent={renderEmpty}
 				ListFooterComponent={renderFooter}
 				onEndReached={handleEndReached}
-				onEndReachedThreshold={0.35}
+				onEndReachedThreshold={INFINITE_SCROLL_CONFIG.loadMoreThreshold}
 				refreshControl={
 					<RefreshControl
 						refreshing={isRefreshing}
@@ -1290,6 +1356,10 @@ const EventsScreen = () => {
 						progressBackgroundColor={tokens.container}
 					/>
 				}
+				initialNumToRender={INFINITE_SCROLL_CONFIG.initialPageSize}
+				maxToRenderPerBatch={INFINITE_SCROLL_CONFIG.subsequentPageSize}
+				windowSize={5}
+				removeClippedSubviews
 				showsVerticalScrollIndicator={false}
 			/>
 
@@ -1322,6 +1392,22 @@ const styles = StyleSheet.create({
 	listContentEmpty: {
 		flexGrow: 1,
 		paddingBottom: 32,
+	},
+	dateSeparatorPill: {
+		alignSelf: 'flex-start',
+		marginHorizontal: 20,
+		marginTop: 12,
+		marginBottom: 6,
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		borderRadius: 999,
+		borderWidth: 1,
+	},
+	dateSeparatorText: {
+		fontSize: 14,
+		fontWeight: '700',
+		letterSpacing: 0.3,
+		textTransform: 'uppercase',
 	},
 	listHeader: {
 		paddingTop: 12,
@@ -1734,19 +1820,6 @@ const styles = StyleSheet.create({
 		shadowRadius: 12,
 		shadowOffset: { width: 0, height: 4 },
 		elevation: 2,
-	},
-	cardImage: {
-		width: '100%',
-		height: 170,
-		backgroundColor: '#f3f4f6',
-	},
-	cardImagePlaceholder: {
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	cardImagePlaceholderText: {
-		color: '#9ca3af',
-		fontWeight: '600',
 	},
 	cardBody: {
 		padding: 18,
