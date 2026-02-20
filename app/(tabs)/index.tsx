@@ -27,14 +27,14 @@ import { useBars } from '../../hooks/useBars';
 import { useTagFilters } from '../../hooks/useTagFilters';
 
 // Components
-import BarCard from '../../components/barCard';
+import { BarCard } from '../../components/barCard';
 import {
   BarsEmptyState,
   ErrorBanner,
   FilteredEmptyState,
   LocationPermissionBanner,
 } from '../../components/emptyStates';
-import TagFilterSheet from '../../components/tagFilterSheet';
+import { TagFilterSheet } from '../../components/tagFilterSheet';
 
 export default function BarsScreen() {
   const colorScheme = useColorScheme();

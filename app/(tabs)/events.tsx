@@ -6,15 +6,15 @@ import type { ListRenderItem } from 'react-native';
 
 // React Native components
 import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+	ActivityIndicator,
+	FlatList,
+	Modal,
+	Pressable,
+	RefreshControl,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
 } from 'react-native';
 
 // Custom constants and hooks
@@ -714,7 +714,7 @@ const TagFilterSheet = ({
 				</TouchableOpacity>
 			);
 		},
-		[draftSelection, highlightColor, palette.text, toggleTag]
+		[draftSelection, highlightColor, palette.cardTitle, toggleTag]
 	);
 
 	// Render the modal sheet
@@ -1198,11 +1198,20 @@ const EventsScreen = () => {
 					<View style={styles.filterButtonRow}>
 						<TouchableOpacity
 							onPress={openFilterSheet}
-							style={[styles.filterButton]}
+							style={[
+								styles.filterButton,
+								styles.filterButtonLarge,
+								{ backgroundColor: tokens.actionButton },
+							]}
 							activeOpacity={0.9}
 						>
-							<MaterialIcons name="tune" size={18} color={tokens.cardTitle} style={styles.filterButtonIcon} />
-							<Text style={[styles.filterButtonText, { color: tokens.cardTitle }]}>
+							<MaterialIcons
+								name="tune"
+								size={18}
+								color={tokens.filterTextActive}
+								style={styles.filterButtonIcon}
+							/>
+							<Text style={[styles.filterButtonText, { color: tokens.filterTextActive }]}>
 								Filters{selectedTagIds.length ? ` (${selectedTagIds.length})` : ''}
 							</Text>
 						</TouchableOpacity>
@@ -1556,16 +1565,19 @@ const styles = StyleSheet.create({
 	filterButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		paddingVertical: 10,
-		paddingHorizontal: 14,
-		borderRadius: 12,
-		borderWidth: 1,
+		paddingVertical: 12,
+		paddingHorizontal: 20,
+		borderRadius: 14,
+		minWidth: 140,
+	},
+	filterButtonLarge: {
+		minHeight: 48,
 	},
 	filterButtonIcon: {
 		marginRight: 8,
 	},
 	filterButtonText: {
-		fontSize: 15,
+		fontSize: 18,
 		fontWeight: '700',
 	},
 	inlineClearButton: {

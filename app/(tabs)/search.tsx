@@ -1,14 +1,15 @@
 import { Stack, useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Keyboard,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+	ActivityIndicator,
+	FlatList,
+	Keyboard,
+	StyleSheet,
+	Text,
+	TextInput,
+	TouchableOpacity,
+	View,
 } from 'react-native';
 
 import { Colors } from '@/constants/theme';
@@ -27,20 +28,66 @@ type BarSearchResult = {
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+const SAVED_BARS_KEY = 'ttp-saved-bars';
+const MAX_SAVED_BARS = 50;
 
 export default function SearchScreen() {
 	const colorScheme = useColorScheme();
 	const theme = (colorScheme ?? 'light') as ThemeName;
 	const palette = Colors[theme];
-	const borderColor = theme === 'light' ? 'rgba(15, 23, 42, 0.12)' : 'rgba(255, 255, 255, 0.18)';
+	const borderColor = palette.border;
 	const router = useRouter();
 
 	const [query, setQuery] = useState('');
 	const [results, setResults] = useState<BarSearchResult[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [savedBars, setSavedBars] = useState<BarSearchResult[]>([]);
 
-	const canSearch = useMemo(() => query.trim().length >= 2, [query]);
+	const trimmedQuery = query.trim();
+	const canSearch = useMemo(() => trimmedQuery.length >= 2, [trimmedQuery]);
+
+	const persistSavedBars = useCallback(async (bars: BarSearchResult[]) => {
+		try {
+			await SecureStore.setItemAsync(SAVED_BARS_KEY, JSON.stringify(bars.slice(0, MAX_SAVED_BARS)));
+		} catch {
+			// Best effort; ignore persistence errors
+		}
+	}, []);
+
+	const saveBar = useCallback(
+		(bar: BarSearchResult) => {
+			setSavedBars((previous) => {
+				const next = [bar, ...previous.filter((entry) => entry.id !== bar.id)].slice(0, MAX_SAVED_BARS);
+				persistSavedBars(next);
+				return next;
+			});
+		},
+		[persistSavedBars]
+	);
+
+	useEffect(() => {
+		let mounted = true;
+
+		(async () => {
+			try {
+				const storedBars = await SecureStore.getItemAsync(SAVED_BARS_KEY);
+				if (!mounted) return;
+				if (storedBars) {
+					const parsedBars = JSON.parse(storedBars);
+					if (Array.isArray(parsedBars)) {
+						setSavedBars(parsedBars.slice(0, MAX_SAVED_BARS));
+					}
+				}
+			} catch {
+				// Ignore corrupted storage
+			}
+		})();
+
+		return () => {
+			mounted = false;
+		};
+	}, []);
 
 	const performSearch = useCallback(
 		async (searchTerm: string, signal: AbortSignal) => {
@@ -63,11 +110,11 @@ export default function SearchScreen() {
 				setResults(
 					Array.isArray(data)
 						? data.map((item) => ({
-								id: String(item.id ?? ''),
-								name: item.name ?? 'Unnamed bar',
-								address_city: item.address_city ?? item.city ?? '',
-								address_state: item.address_state ?? item.state ?? '',
-							}))
+							id: String(item.id ?? ''),
+							name: item.name ?? 'Unnamed bar',
+							address_city: item.address_city ?? item.city ?? '',
+							address_state: item.address_state ?? item.state ?? '',
+						}))
 						: []
 				);
 			} catch (err) {
@@ -83,7 +130,7 @@ export default function SearchScreen() {
 	);
 
 	useEffect(() => {
-		const term = query.trim();
+		const term = trimmedQuery;
 		if (!term || term.length < 2) {
 			setResults([]);
 			setError(null);
@@ -93,35 +140,43 @@ export default function SearchScreen() {
 		const controller = new AbortController();
 		performSearch(term, controller.signal);
 		return () => controller.abort();
-	}, [performSearch, query]);
+	}, [performSearch, trimmedQuery]);
+
+	const handlePressResult = useCallback(
+		(bar: BarSearchResult) => {
+			saveBar(bar);
+			router.push({
+				pathname: '/bar/[barId]',
+				params: { barId: bar.id, barName: bar.name },
+			});
+		},
+		[router, saveBar]
+	);
 
 	const renderResult = ({ item }: { item: BarSearchResult }) => {
 		return (
 			<TouchableOpacity
-				style={[
-					styles.resultCard,
-					theme === 'light' ? styles.resultCardLight : styles.resultCardDark,
-					{ borderColor },
-				]}
+				style={[styles.resultCard, { backgroundColor: palette.cardSurface, borderColor }]}
 				activeOpacity={0.85}
-				onPress={() =>
-					router.push({
-						pathname: '/bar/[barId]',
-						params: { barId: item.id, barName: item.name },
-					})
-				}
+				onPress={() => handlePressResult(item)}
 				accessibilityRole="button"
 				accessibilityLabel={`Open ${item.name}`}
 			>
-				<Text style={[styles.resultName, { color: palette.text }]}>{item.name}</Text>
-				<Text style={[styles.resultLocation, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>
+				<Text style={[styles.resultName, { color: palette.cardTitle }]}>{item.name}</Text>
+				<Text style={[styles.resultLocation, { color: palette.cardSubtitle }]}>
 					{[item.address_city, item.address_state].filter(Boolean).join(', ') || 'Location coming soon'}
 				</Text>
 			</TouchableOpacity>
 		);
 	};
 
+	const showRecentBars = !canSearch && savedBars.length > 0;
+	const listData = showRecentBars ? savedBars : results;
+
 	const helperText = useMemo(() => {
+		if (showRecentBars) {
+			return null;
+		}
 		if (!canSearch) {
 			return 'Start typing to find a bar (min 2 characters).';
 		}
@@ -131,21 +186,23 @@ export default function SearchScreen() {
 		if (error) {
 			return error;
 		}
-		if (results.length === 0) {
+		if (listData.length === 0) {
 			return 'No bars found yet. Try another name?';
 		}
 		return null;
-	}, [canSearch, error, isLoading, results.length]);
+	}, [canSearch, error, isLoading, listData.length, showRecentBars]);
 
 	return (
-		<View style={[styles.container, { backgroundColor: palette.background }]}
-		>
+		<View style={[styles.container, { backgroundColor: palette.background }]}>
 			<Stack.Screen options={{ title: 'Search', headerLargeTitle: false }} />
 			<View style={styles.searchBarWrapper}>
 				<TextInput
 					placeholder="Search for a bar"
-					placeholderTextColor={theme === 'light' ? '#94a3b8' : '#64748b'}
-					style={[styles.searchInput, { color: palette.text, borderColor }]}
+					placeholderTextColor={palette.cardSubtitle}
+					style={[
+						styles.searchInput,
+						{ color: palette.cardTitle, borderColor, backgroundColor: palette.cardSurface },
+					]}
 					value={query}
 					onChangeText={setQuery}
 					autoCapitalize="none"
@@ -156,14 +213,20 @@ export default function SearchScreen() {
 				{query ? (
 					<TouchableOpacity
 						onPress={() => setQuery('')}
-						style={[styles.clearButton, { backgroundColor: theme === 'light' ? '#e2e8f0' : '#1e293b' }]}
+						style={[styles.clearButton, { backgroundColor: palette.pillBackground, borderColor }]}
 						accessibilityRole="button"
 						accessibilityLabel="Clear search"
 					>
-						<Text style={{ color: theme === 'light' ? '#0f172a' : '#e2e8f0', fontWeight: '600' }}>×</Text>
+						<Text style={{ color: palette.cardTitle, fontWeight: '600' }}>×</Text>
 					</TouchableOpacity>
 				) : null}
 			</View>
+
+			{showRecentBars ? (
+				<View style={styles.sectionHeaderRow}>
+					<Text style={[styles.sectionTitle, { color: palette.cardTitle }]}>Recent</Text>
+				</View>
+			) : null}
 
 			{isLoading && results.length === 0 ? (
 				<View style={styles.statusWrapper}>
@@ -172,7 +235,7 @@ export default function SearchScreen() {
 			) : null}
 
 			<FlatList
-				data={results}
+				data={listData}
 				keyExtractor={(item) => item.id}
 				renderItem={renderResult}
 				contentContainerStyle={styles.resultsList}
@@ -180,7 +243,7 @@ export default function SearchScreen() {
 				ListEmptyComponent={
 					helperText ? (
 						<View style={styles.statusWrapper}>
-							<Text style={[styles.helperText, { color: theme === 'light' ? '#475569' : '#cbd5f5' }]}>{helperText}</Text>
+							<Text style={[styles.helperText, { color: palette.cardSubtitle }]}>{helperText}</Text>
 						</View>
 					) : null
 				}
@@ -224,21 +287,27 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 	},
 	resultsList: {
-		paddingHorizontal: 20,
+		paddingHorizontal: 0,
 		paddingVertical: 24,
-		gap: 12,
+		gap: 0,
+	},
+	sectionHeaderRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginHorizontal: 20,
+		marginTop: 12,
+	},
+	sectionTitle: {
+		fontSize: 16,
+		fontWeight: '700',
 	},
 	resultCard: {
-		borderWidth: 1,
-		borderRadius: 16,
+		borderWidth: 0,
+		borderTopWidth: StyleSheet.hairlineWidth,
+		borderRadius: 0,
 		padding: 16,
-		marginBottom: 12,
-	},
-	resultCardLight: {
-		backgroundColor: '#ffffff',
-	},
-	resultCardDark: {
-		backgroundColor: '#111827',
+		marginBottom: 0,
 	},
 	resultName: {
 		fontSize: 17,
