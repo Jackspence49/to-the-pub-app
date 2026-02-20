@@ -1,10 +1,7 @@
-import { FontAwesome } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   ImageSourcePropType,
   Linking,
   ScrollView,
@@ -15,6 +12,7 @@ import {
 } from 'react-native';
 
 import heroFallback from '@/assets/images/light_logo.png';
+import EventDetails from '@/components/eventDetails';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -284,7 +282,7 @@ export default function EventDetailScreen() {
     if (!event) {
       return [];
     }
-    const buttons: { key: string; iconName: React.ComponentProps<typeof FontAwesome>['name']; onPress: () => void }[] = [];
+    const buttons: { key: string; iconName: string; onPress: () => void }[] = [];
     if (event.externalLink) {
       buttons.push({ key: 'external', iconName: 'external-link', onPress: () => openExternal(event.externalLink) });
     }
@@ -322,8 +320,6 @@ export default function EventDetailScreen() {
     });
   }, [event, router]);
 
-  const showActionSection = true;
-
   const content = () => {
     if (isLoading) {
       return (
@@ -357,79 +353,25 @@ export default function EventDetailScreen() {
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroWrapper}>
-          <Image source={heroSource} style={styles.heroImage} resizeMode="cover" />
-          <LinearGradient
-            pointerEvents="none"
-            colors={theme === 'light'
-              ? ['rgba(15,23,42,0)', 'rgba(15,23,42,0.35)', 'rgba(15,23,42,0.7)', palette.background]
-              : ['rgba(15,23,42,0)', 'rgba(2,6,23,0.6)', 'rgba(2,6,23,0.9)', palette.background]}
-            locations={[0, 0.45, 0.8, 1]}
-            style={styles.heroFade}
+        <View style={styles.bodyContent}>
+          <EventDetails
+            title={event.title}
+            description={event.description}
+            image={heroSource}
+            dateLabel={dateLabel}
+            timeLabel={timeRangeLabel}
+            locationLabel={event.barName ?? undefined}
+            tagLabel={event.tagName ?? undefined}
+            recurrencePattern={recurrenceLabel ?? undefined}
+            crossesMidnight={event.crossesMidnight}
+            onPressLocation={event.barId ? handleViewBarDetails : undefined}
+            barName={event.barName ?? undefined}
+            onPressBarDetails={event.barId ? handleViewBarDetails : undefined}
+            actionButtons={actionButtons}
+            onPressViewBarEvents={handleViewBarEvents}
+            showActionSection
+            barActionsEnabled={Boolean(event.barId)}
           />
-        </View>
-
-        <View style={[styles.bodyContent, { paddingTop: 32 }]}>
-          <View style={[styles.card, theme === 'light' ? styles.cardLight : styles.cardDark, styles.heroSectionOverlap]}>
-            <Text style={[styles.eventTitle, { color: palette.text }]}>{event.title}</Text>
-            {event.description ? (
-              <Text style={[styles.descriptionText, { color: theme === 'light' ? '#1f2937' : '#f1f5f9' }]}>{event.description}</Text>
-            ) : null}
-            <View style={styles.barLinkSection}>
-              {event.tagName ? (
-                <Text style={[styles.barTagLine, { color: palette.text }]}>{`${event.tagName} @`}</Text>
-              ) : null}
-              <TouchableOpacity
-                onPress={event.barId ? handleViewBarDetails : undefined}
-                activeOpacity={event.barId ? 0.85 : 1}
-                style={[styles.barLinkButton, { opacity: event.barId ? 1 : 0.6 }]}
-                disabled={!event.barId}
-                accessibilityRole={event.barId ? 'button' : undefined}
-                accessibilityLabel={event.barId ? `View ${event.barName ?? 'bar'} details` : undefined}
-              >
-                <FontAwesome name="map-marker" size={16} color={palette.tint} style={{ marginRight: 8 }} />
-                <Text style={[styles.barLinkText, { color: palette.text }]}>
-                  {event.barName ?? 'Bar coming soon'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.timeCard}>
-              <Text style={[styles.timeHeading, { color: palette.text }]}>{dateLabel}</Text>
-              <Text style={[styles.timeRange, { color: theme === 'light' ? '#334155' : '#e2e8f0' }]}>{timeRangeLabel}</Text>
-              {recurrenceLabel ? (
-                <Text style={[styles.recurrenceText, { color: theme === 'light' ? '#6366f1' : '#c7d2fe' }]}>Repeats {recurrenceLabel}</Text>
-              ) : null}
-              {event.crossesMidnight ? (
-                <Text style={[styles.recurrenceFootnote, { color: theme === 'light' ? '#9ca3af' : '#94a3b8' }]}>Ends after midnight</Text>
-              ) : null}
-            </View>
-            {showActionSection ? (
-              <View style={styles.actionList}>
-                <View style={[styles.iconButtonRow, { borderColor: 'rgba(15, 23, 42, 0.08)' }]}> 
-                  {actionButtons.map((button) => (
-                    <TouchableOpacity
-                      key={button.key}
-                      onPress={button.onPress}
-                      style={[styles.iconCircleButton, { borderColor: palette.tint }]}
-                      activeOpacity={0.85}
-                      accessibilityRole="button"
-                      accessibilityLabel={button.key}
-                    >
-                      <FontAwesome name={button.iconName} size={16} color={palette.tint} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <TouchableOpacity
-                  onPress={handleViewBarEvents}
-                  style={[styles.fullWidthButton, !event?.barId && styles.fullWidthButtonDisabled]}
-                  activeOpacity={0.9}
-                  disabled={!event?.barId}
-                >
-                  <Text style={styles.fullWidthButtonText}>See all upcoming events</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
         </View>
       </ScrollView>
     );
@@ -491,175 +433,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  heroWrapper: {
-    width: '100%',
-    height: 360,
-    overflow: 'hidden',
-    backgroundColor: '#0f172a',
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    marginTop: -30,
-  },
-  heroFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '80%',
-  },
-  tagOverlay: {
-    position: 'absolute',
-    left: 12,
-    bottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-  },
-  tagOverlayText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#f8fafc',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
   bodyContent: {
     width: '100%',
     paddingHorizontal: 20,
     gap: 20,
-  },
-  heroSectionOverlap: {
-    marginTop: -48,
-  },
-  card: {
-    borderRadius: 20,
-    padding: 20,
-    gap: 16,
-    borderWidth: 1,
-  },
-  cardLight: {
-    backgroundColor: '#ffffff',
-    borderColor: 'rgba(15, 23, 42, 0.08)',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  cardDark: {
-    backgroundColor: '#111827',
-    borderColor: 'rgba(148, 163, 184, 0.25)',
-    shadowColor: '#000000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  tagPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  tagText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  eventTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  eventMeta: {
-    fontSize: 15,
-  },
-  timeCard: {
-    borderRadius: 16,
-    padding: 16,
-    backgroundColor: 'rgba(99, 102, 241, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.4)',
-    gap: 6,
-  },
-  timeHeading: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  timeRange: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  recurrenceText: {
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  recurrenceFootnote: {
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  descriptionText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  barLinkSection: {
-    gap: 8,
-  },
-  barTagLine: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  barLinkButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    alignSelf: 'flex-start',
-  },
-  barLinkText: {
-    fontSize: 19,
-    fontWeight: '700',
-  },
-  actionList: {
-    gap: 12,
-  },
-  iconButtonRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    padding: 4,
-  },
-  iconCircleButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  iconCircleButtonPrimary: {
-    backgroundColor: '#fef3c7',
-    borderColor: 'rgba(15, 23, 42, 0)',
-  },
-  fullWidthButton: {
-    marginTop: 8,
-    borderRadius: 999,
-    paddingVertical: 14,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-  },
-  fullWidthButtonDisabled: {
-    opacity: 0.5,
-  },
-  fullWidthButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#f8fafc',
-  },
-  cardLabel: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
