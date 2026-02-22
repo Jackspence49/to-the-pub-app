@@ -63,7 +63,6 @@ export default function EventDetails({
   const styles = React.useMemo(() => createStyles(palette), [palette]);
 
   const heroTopPadding = Math.max(insets.top + 8, 20);
-  const navBackGutter = 52; // keeps the pill visually aligned with the back arrow
 
   const startTimeDisplay = startTimeLabel ?? (endTimeLabel ? 'Start time TBD' : 'Time coming soon');
   const endTimeDisplay = endTimeLabel ?? (startTimeLabel ? 'End time TBD' : 'Time coming soon');
@@ -75,7 +74,7 @@ export default function EventDetails({
       {/* Header */}
       <View style={styles.heroWrapper}>
     <View style={[styles.hero, { backgroundColor: palette.iconSelected, paddingTop: heroTopPadding }]}> 
-        <View style={[styles.heroTopRow, { paddingLeft: navBackGutter }]}>
+        <View style={[styles.heroTopRow, ]}>
           <View style={[styles.tagPill, { backgroundColor: palette.pillBackground, borderColor: palette.pillBorder }]}> 
             <Text style={[styles.tagPillText, { color: palette.pillText }]}>
               {tagLabel}
@@ -214,7 +213,7 @@ export default function EventDetails({
 			) : null}
 				
 			{/* More Information */}
-            <View style={styles.section}>      
+            <View style={styles.sectionEnd}>      
                 <TouchableOpacity
 					onPress={barActionsEnabled ? onPressViewBarEvents : undefined}
 					style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
@@ -230,10 +229,11 @@ export default function EventDetails({
 
 
 const createStyles = (palette: Palette) => StyleSheet.create({
+
+  // ── Header
   heroWrapper: {
     marginHorizontal: -20,
   },
-
   hero: {
     width: "100%",
     overflow: "hidden",
@@ -246,6 +246,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
     paddingRight: 20,
+    paddingLeft: 52,
   },
   tagPill: {
     alignSelf: "flex-start",
@@ -264,23 +265,14 @@ const createStyles = (palette: Palette) => StyleSheet.create({
     fontWeight: "900",
   },
 
-  // ── Body
-  body: {
-    paddingHorizontal: 24,
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
+  // ── Sections
   section: {
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: palette.border,
   },
-  sectionLast: {
-    paddingBottom: 20,
+  sectionEnd: {
+    paddingVertical: 16,
   },
   sectionLabel: {
     fontSize: 16,
@@ -292,6 +284,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
     fontWeight: "400",
   },
 
+  // ── Date 
   dateRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -300,24 +293,7 @@ const createStyles = (palette: Palette) => StyleSheet.create({
     flexDirection: 'column',
     gap: 6,
   },
-
-  venueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  venueTextBlock: {
-    flex: 1,
-  },
-
-  addressBlock: {
-    marginTop: 6,
-    gap: 8,
-  },
-
-  // ── Recurrence badge
-  recurrenceBadge: {
+    recurrenceBadge: {
     alignSelf: "flex-start",
     borderWidth: 1,
     borderRadius: 100,
@@ -330,6 +306,19 @@ const createStyles = (palette: Palette) => StyleSheet.create({
   },
 
   // ── Venue
+  venueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  venueTextBlock: {
+    flex: 1,
+  },
+  addressBlock: {
+    marginTop: 6,
+    gap: 8,
+  },
   barName: {
     fontSize: 20,
     fontWeight: "700",
@@ -340,47 +329,8 @@ const createStyles = (palette: Palette) => StyleSheet.create({
     fontSize: 16,
     marginBottom: 4,
   },
-  mapButton: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  mapButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 12,
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  btnGoldText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  btnOutline: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-  btnOutlineText: {
-    color: "#a09080",
-    fontSize: 13,
-    fontWeight: "500",
-  },
 
-  // ── Contact cards
+  // ── Contacts
   contactRow: {
     flexDirection: "row",
     gap: 10,
@@ -412,13 +362,11 @@ const createStyles = (palette: Palette) => StyleSheet.create({
     justifyContent: "center",
   },
   externalBtnText: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "700",
-    letterSpacing: 0.3,
   },
 
-  // ── Time row
+  // ── Hours
   timeRowSimple: {
 		marginTop: 8,
 		flexDirection: 'row',
