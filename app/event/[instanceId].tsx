@@ -1,9 +1,11 @@
+import type { FontAwesome } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ImageSourcePropType,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,6 +20,12 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type ThemeName = keyof typeof Colors;
 type LooseObject = Record<string, any>;
+type ActionButton = {
+  key: string;
+  label: string;
+  iconName: React.ComponentProps<typeof FontAwesome>['name'];
+  onPress: () => void;
+};
 
 type EventDetail = {
   id: string;
@@ -225,15 +233,6 @@ export default function EventDetailScreen() {
     }
     return heroFallback;
   }, [event?.heroImageUrl, tagImage]);
-  const timeRangeLabel = useMemo(() => {
-    if (startTimeLabel && endTimeLabel) {
-      return `${startTimeLabel} – ${endTimeLabel}`;
-    }
-    if (startTimeLabel || endTimeLabel) {
-      return startTimeLabel ?? endTimeLabel ?? 'Time coming soon';
-    }
-    return 'Time coming soon';
-  }, [startTimeLabel, endTimeLabel]);
   const recurrenceLabel = useMemo(() => {
     const raw = event?.recurrencePattern?.trim();
     if (!raw) {
@@ -245,6 +244,66 @@ export default function EventDetailScreen() {
     }
     return raw;
   }, [event?.recurrencePattern]);
+
+  const addressLabel = useMemo(() => {
+    if (!event) {
+      return null;
+    }
+    const parts: string[] = [];
+    const street = event.addressStreet?.trim();
+    const cityState = [event.addressCity, event.addressState].filter(Boolean).join(', ').trim();
+    const cityStateZip = [cityState, event.addressZip?.trim()].filter(Boolean).join(' ').trim();
+    if (street) {
+      parts.push(street);
+    }
+    if (cityStateZip) {
+      parts.push(cityStateZip);
+    }
+    if (parts.length === 0) {
+      return null;
+    }
+    return parts.join(', ');
+  }, [event]);
+
+  const addressQuery = useMemo(() => {
+    if (!event) {
+      return null;
+    }
+    const parts: string[] = [];
+    const street = event.addressStreet?.trim();
+    const city = event.addressCity?.trim();
+    const state = event.addressState?.trim();
+    const zip = event.addressZip?.trim();
+    if (street) {
+      parts.push(street);
+    }
+    const cityState = [city, state].filter(Boolean).join(', ');
+    const cityStateZip = [cityState, zip].filter(Boolean).join(' ');
+    if (cityStateZip) {
+      parts.push(cityStateZip);
+    }
+    const query = parts.join(', ').trim();
+    return query.length > 0 ? query : null;
+  }, [event]);
+
+  const handleOpenMaps = useCallback(async () => {
+    if (!addressQuery) {
+      return;
+    }
+    const encoded = encodeURIComponent(addressQuery);
+    const url = Platform.select({
+      ios: `http://maps.apple.com/?q=${encoded}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${encoded}`,
+    });
+    if (!url) {
+      return;
+    }
+    try {
+      await Linking.openURL(url);
+    } catch (err) {
+      console.warn('Unable to open maps', err);
+    }
+  }, [addressQuery]);
 
   const fetchEventDetail = useCallback(async () => {
     if (!instanceId) {
@@ -278,19 +337,29 @@ export default function EventDetailScreen() {
     fetchEventDetail();
   }, [fetchEventDetail]);
 
-  const actionButtons = useMemo(() => {
+  const actionButtons = useMemo<ActionButton[]>(() => {
     if (!event) {
       return [];
     }
-    const buttons: { key: string; iconName: string; onPress: () => void }[] = [];
+    const buttons: ActionButton[] = [];
     if (event.externalLink) {
-      buttons.push({ key: 'external', iconName: 'external-link', onPress: () => openExternal(event.externalLink) });
+      buttons.push({
+        key: 'external',
+        label: 'Event link',
+        iconName: 'external-link',
+        onPress: () => openExternal(event.externalLink),
+      });
     }
     if (event.website) {
-      buttons.push({ key: 'website', iconName: 'globe', onPress: () => openExternal(event.website) });
+      buttons.push({
+        key: 'website',
+        label: 'Website',
+        iconName: 'globe',
+        onPress: () => openExternal(event.website),
+      });
     }
     if (event.phone) {
-      buttons.push({ key: 'phone', iconName: 'phone', onPress: () => openPhone(event.phone) });
+      buttons.push({ key: 'phone', label: 'Call', iconName: 'phone', onPress: () => openPhone(event.phone) });
     }
     return buttons;
   }, [event]);
@@ -359,10 +428,13 @@ export default function EventDetailScreen() {
             description={event.description}
             image={heroSource}
             dateLabel={dateLabel}
-            timeLabel={timeRangeLabel}
+            startTimeLabel={startTimeLabel ?? undefined}
+            endTimeLabel={endTimeLabel ?? undefined}
             locationLabel={event.barName ?? undefined}
             tagLabel={event.tagName ?? undefined}
             recurrencePattern={recurrenceLabel ?? undefined}
+            addressLabel={addressLabel ?? undefined}
+            onPressOpenMap={handleOpenMaps}
             crossesMidnight={event.crossesMidnight}
             onPressLocation={event.barId ? handleViewBarDetails : undefined}
             barName={event.barName ?? undefined}
