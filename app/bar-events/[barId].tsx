@@ -9,66 +9,21 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from 'react-native';
 
+import EventCard from '@/components/eventCard';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import type { Event, EventTag } from '@/types/index';
 
-type ThemeName = keyof typeof Colors;
 type FetchMode = 'initial' | 'refresh' | 'paginate';
 type QueryValue = string | number | boolean | undefined;
 type LooseObject = Record<string, any>;
-
-type EventInstance = {
-  id: string;
-  instanceId: string;
-  eventId?: string;
-  title: string;
-  description?: string;
-  barName?: string;
-  startsAt?: string;
-  endsAt?: string;
-  venueName?: string;
-  cityState?: string;
-  heroImageUrl?: string;
-  tags?: string[];
-  eventTagName?: string;
-  eventDate?: string;
-  crossesMidnight?: boolean;
-};
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 const PAGE_SIZE = 6;
 
-const getEventThemeTokens = (theme: ThemeName) => {
-  const isLight = theme === 'light';
-  return {
-    pageBackground: isLight ? '#f5f5f5' : '#050608',
-    headerBackground: isLight ? '#ffffff' : '#161a20',
-    headerBorder: isLight ? '#e5e7eb' : '#2a2f36',
-    headingText: isLight ? '#111827' : '#f3f4f6',
-    subheadingText: isLight ? '#6b7280' : '#9ca3af',
-    cardBackground: isLight ? '#ffffff' : '#191f28',
-    cardBorder: isLight ? '#e5e7eb' : '#2b313c',
-    cardShadowColor: isLight ? '#111827' : '#000000',
-    cardShadowOpacity: isLight ? 0.05 : 0.35,
-    imageBackground: isLight ? '#f3f4f6' : '#101318',
-    imagePlaceholderText: isLight ? '#9ca3af' : '#6b7280',
-    eventBarLabel: isLight ? '#6b7280' : '#a0a8ba',
-    eventTitle: isLight ? '#111827' : '#f8fafc',
-    eventMeta: isLight ? '#4b5563' : '#cbd5f5',
-    timeBorder: isLight ? '#e5e7eb' : '#2f3642',
-    timeBackground: isLight ? '#f9fafb' : '#10131a',
-    timeLabel: isLight ? '#6b7280' : '#a3acc2',
-    timeValue: isLight ? '#111827' : '#f3f4f6',
-    footerText: isLight ? '#6b7280' : '#9ca3af',
-    indicator: isLight ? '#111827' : '#f8fafc',
-    accent: Colors[theme]?.tint ?? '#2563eb',
-  };
-};
-
-type EventThemeTokens = ReturnType<typeof getEventThemeTokens>;
 
 const normalizeDateOnly = (value?: string, offsetDays = 0): string | null => {
   if (!value) {
@@ -99,49 +54,6 @@ const combineDateAndTime = (
     return undefined;
   }
   return `${datePart}T${timeValue}`;
-};
-
-const isWithinCurrentWeek = (date: Date): boolean => {
-  const now = new Date();
-  const startOfWeek = new Date(now);
-  startOfWeek.setHours(0, 0, 0, 0);
-  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
-  endOfWeek.setHours(23, 59, 59, 999);
-  return date >= startOfWeek && date <= endOfWeek;
-};
-
-const formatEventDay = (value?: string): string => {
-  if (!value) {
-    return 'Date coming soon';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'Date coming soon';
-  }
-  if (isWithinCurrentWeek(date)) {
-    return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
-  }
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
-};
-
-const formatEventTime = (value?: string): string => {
-  if (!value) {
-    return 'Time TBD';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'Time TBD';
-  }
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
 };
 
 const startOfDay = (input: Date) => {
@@ -248,13 +160,13 @@ const shouldKeepPaginating = (payload: unknown, receivedCount: number): boolean 
   return receivedCount === PAGE_SIZE;
 };
 
-const mergeEvents = (current: EventInstance[], incoming: EventInstance[]): EventInstance[] => {
+const mergeEvents = (current: Event[], incoming: Event[]): Event[] => {
   if (current.length === 0) {
     return incoming;
   }
   const next = [...current];
   incoming.forEach((event) => {
-    const index = next.findIndex((item) => item.id === event.id);
+    const index = next.findIndex((item) => item.instance_id === event.instance_id);
     if (index === -1) {
       next.push(event);
     } else {
@@ -264,7 +176,7 @@ const mergeEvents = (current: EventInstance[], incoming: EventInstance[]): Event
   return next;
 };
 
-const mapToEventInstance = (raw: LooseObject): EventInstance => {
+const mapToEventInstance = (raw: LooseObject): Event => {
   const fallbackLabel = `${raw.name ?? raw.title ?? 'event'}-${raw.start_time ?? raw.starts_at ?? Date.now()}`;
   const primaryId =
     raw.instance_id ??
@@ -275,39 +187,12 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
     raw.eventId ??
     fallbackLabel;
   const eventIdSource = raw.event_id ?? raw.eventId ?? raw.parent_event_id ?? undefined;
-  const tags = Array.isArray(raw.tags)
-    ? (raw.tags
-        .map((tag: any) => {
-          if (typeof tag === 'string') {
-            return tag;
-          }
-          if (tag && typeof tag === 'object') {
-            return tag.name ?? tag.title ?? tag.slug;
-          }
-          return undefined;
-        })
-        .filter(Boolean) as string[])
-    : undefined;
   const derivedVenueName =
     raw.venue?.name ??
     raw.venue_name ??
     raw.location_name ??
     (typeof raw.venue === 'string' ? raw.venue : undefined);
-  const barName = raw.bar_name ?? raw.bar?.name ?? derivedVenueName;
-  const venueName = barName ?? derivedVenueName;
-  const city =
-    raw.address_city ??
-    raw.bar?.address_city ??
-    raw.venue?.city ??
-    raw.city ??
-    raw.location_city;
-  const state =
-    raw.address_state ??
-    raw.bar?.address_state ??
-    raw.venue?.state ??
-    raw.state ??
-    raw.location_state;
-  const cityState = city && state ? `${city}, ${state}` : city ?? state ?? undefined;
+  const barName = raw.bar?.name ?? raw.bar_name ?? derivedVenueName ?? 'Unknown bar';
   const crossesMidnight = Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false);
   const dateSource = raw.date ?? raw.event_date ?? raw.starts_at ?? raw.start ?? undefined;
   const eventDate = raw.date ?? raw.event_date ?? undefined;
@@ -362,104 +247,46 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
     }
   }
   return {
-    id: String(primaryId),
-    instanceId: String(primaryId),
-    eventId: eventIdSource ? String(eventIdSource) : undefined,
+    instance_id: String(primaryId),
+    event_id: eventIdSource ? String(eventIdSource) : undefined,
     title: raw.title ?? raw.name ?? 'Untitled event',
     description: raw.description ?? raw.summary ?? raw.subtitle ?? undefined,
-    barName,
-    startsAt: startDateTime ?? raw.begin_at ?? undefined,
-    endsAt: endDateTime ?? undefined,
-    venueName,
-    cityState,
-    heroImageUrl: raw.hero_image_url ?? raw.image_url ?? raw.banner_url ?? raw.cover_photo ?? undefined,
-    tags,
-    eventTagName,
-    eventDate: eventDate ?? startDateTime,
-    crossesMidnight,
+    bar_name: barName,
+    event_tag_name: eventTagName ?? raw.event_tag_name,
+    date: eventDate,
+    start_time: startDateTime ?? raw.begin_at ?? undefined,
+    end_time: endDateTime ?? undefined,
   };
-};
-
-type EventCardProps = {
-  event: EventInstance;
-  tokens: EventThemeTokens;
-  onPress?: () => void;
-};
-
-const EventCard = ({ event, tokens, onPress }: EventCardProps) => {
-  const primaryTagName = useMemo(() => {
-    const tagName = event.eventTagName?.trim();
-    const fallbackTag = event.tags?.find((tag) => typeof tag === 'string' && tag.trim().length > 0);
-    return tagName || (fallbackTag ? fallbackTag.trim() : undefined);
-  }, [event.eventTagName, event.tags]);
-  const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
-  const startTimeLabel = formatEventTime(event.startsAt);
-  const endTimeLabel = formatEventTime(event.endsAt);
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.92}
-      disabled={!onPress}
-      onPress={onPress}
-      style={[
-        styles.card,
-        {
-          backgroundColor: tokens.cardBackground,
-          borderColor: tokens.cardBorder,
-          shadowColor: tokens.cardShadowColor,
-          shadowOpacity: tokens.cardShadowOpacity,
-        },
-      ]}
-    >
-      <View style={styles.cardBody}>
-        {primaryTagName ? (
-          <Text style={[styles.primaryTagLabel, { color: '#2563eb' }]}>{primaryTagName}</Text>
-        ) : null}
-        <Text style={[styles.eventTitle, { color: tokens.eventTitle }]}>{event.title}</Text>
-        <Text style={[styles.eventBarName, { color: tokens.eventBarLabel }]}>{barName}</Text>
-
-        <View style={styles.scheduleBlock}>
-          <View
-            style={[
-              styles.timeRow,
-              { borderColor: tokens.timeBorder, backgroundColor: tokens.timeBackground },
-            ]}
-          >
-            <View style={styles.timeColumn}>
-              <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>Start Time</Text>
-              <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{startTimeLabel}</Text>
-            </View>
-            <View
-              style={[
-                styles.timeColumn,
-                styles.timeColumnRight,
-                { borderLeftColor: tokens.timeBorder },
-              ]}
-            >
-              <Text style={[styles.timeLabel, { color: tokens.timeLabel }]}>End Time</Text>
-              <Text style={[styles.timeValue, { color: tokens.timeValue }]}>{endTimeLabel}</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
 };
 
 export default function BarEventsScreen() {
   const { barId, barName } = useLocalSearchParams<{ barId?: string; barName?: string }>();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = (colorScheme ?? 'light') as ThemeName;
-  const tokens = useMemo(() => getEventThemeTokens(theme), [theme]);
+	const theme = useColorScheme() ?? 'dark';
+	const palette = Colors[theme];
 
-  const [events, setEvents] = useState<EventInstance[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isInitialLoading, setIsInitialLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPaginating, setIsPaginating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const availableTags = useMemo<EventTag[]>(() => {
+    const map = new Map<string, EventTag>();
+    events.forEach((event) => {
+      const entries = [...(event.event_tag_id ?? []), event.event_tag_name].filter(Boolean) as string[];
+      entries.forEach((entry) => {
+        const id = entry.trim();
+        if (!id || map.has(id)) {
+          return;
+        }
+        map.set(id, { id, name: id });
+      });
+    });
+    return Array.from(map.values());
+  }, [events]);
 
   const fetchEvents = useCallback(
     async (pageToLoad: number, mode: FetchMode) => {
@@ -545,25 +372,32 @@ export default function BarEventsScreen() {
   }, [events.length, fetchEvents]);
 
   const handleOpenEvent = useCallback(
-    (event: EventInstance) => {
-      router.push({ pathname: '/event/[instanceId]', params: { instanceId: event.instanceId } });
+    (event: Event) => {
+      router.push({ pathname: '/event/[instanceId]', params: { instanceId: event.instance_id } });
     },
     [router]
   );
 
-  const renderItem = useCallback<ListRenderItem<EventInstance>>(
-    ({ item }) => <EventCard event={item} tokens={tokens} onPress={() => handleOpenEvent(item)} />,
-    [handleOpenEvent, tokens]
+  const renderItem = useCallback<ListRenderItem<Event>>(
+    ({ item }) => (
+      <EventCard
+        event={item}
+        availableTags={availableTags}
+        distanceUnit="miles"
+        onPress={() => handleOpenEvent(item)}
+      />
+    ),
+    [availableTags, handleOpenEvent]
   );
 
   const sections = useMemo(() => {
     if (events.length === 0) {
-      return [] as { title: string; data: EventInstance[] }[];
+      return [] as { title: string; data: Event[] }[];
     }
 
     const sorted = [...events].sort((a, b) => {
-      const aDate = a.eventDate ?? a.startsAt ?? '';
-      const bDate = b.eventDate ?? b.startsAt ?? '';
+      const aDate = a.date ?? a.start_time ?? '';
+      const bDate = b.date ?? b.start_time ?? '';
       const aTime = new Date(aDate).getTime();
       const bTime = new Date(bDate).getTime();
       const aValue = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
@@ -571,10 +405,10 @@ export default function BarEventsScreen() {
       return aValue - bValue;
     });
 
-    const groups: Record<string, { title: string; data: EventInstance[]; order: number }> = {};
+    const groups: Record<string, { title: string; data: Event[]; order: number }> = {};
 
     sorted.forEach((event) => {
-      const dateValue = event.eventDate ?? event.startsAt;
+      const dateValue = event.date ?? event.start_time;
       const normalized = normalizeDateOnly(dateValue ?? undefined) ?? 'unknown-date';
       const label = dateValue ? formatRelativeEventDay(dateValue) : 'Date coming soon';
       const orderValue = (() => {
@@ -599,26 +433,26 @@ export default function BarEventsScreen() {
     const barLabel = barName ?? 'This bar';
     return (
       <View style={styles.navTitleContainer}>
-        <Text style={[styles.navTitleEyebrow, { color: tokens.subheadingText }]}>{introLabel}</Text>
-        <Text style={[styles.navTitleMain, { color: tokens.headingText }]}>{barLabel}</Text>
+        <Text style={[styles.navTitleEyebrow, { color: palette.cardSubtitle }]}>{introLabel}</Text>
+        <Text style={[styles.navTitleMain, { color: palette.cardTitle }]}>{barLabel}</Text>
       </View>
     );
-  }, [barName, tokens]);
+  }, [barName, palette]);
 
   const renderEmpty = useMemo(() => {
     if (isInitialLoading) {
       return (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={tokens.indicator} size="large" />
-          <Text style={[styles.emptyStateText, { color: tokens.subheadingText }]}>Loading events...</Text>
+          <ActivityIndicator color={palette.cardText} size="large" />
+          <Text style={[styles.emptyStateText, { color: palette.cardSubtitle }]}>Loading events...</Text>
         </View>
       );
     }
     if (error) {
       return (
         <View style={styles.emptyState}>
-          <Text style={[styles.emptyStateTitle, { color: tokens.headingText }]}>Unable to load events</Text>
-          <Text style={[styles.emptyStateText, { color: tokens.subheadingText }]}>{error}</Text>
+          <Text style={[styles.emptyStateTitle, { color: palette.cardTitle }]}>Unable to load events</Text>
+          <Text style={[styles.emptyStateText, { color: palette.cardSubtitle }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
             <Text style={styles.retryButtonText}>Try again</Text>
           </TouchableOpacity>
@@ -627,54 +461,54 @@ export default function BarEventsScreen() {
     }
     return (
       <View style={styles.emptyState}>
-        <Text style={[styles.emptyStateTitle, { color: tokens.headingText }]}>No upcoming events yet</Text>
-        <Text style={[styles.emptyStateText, { color: tokens.subheadingText }]}>Check back later.</Text>
+        <Text style={[styles.emptyStateTitle, { color: palette.cardTitle }]}>No upcoming events yet</Text>
+        <Text style={[styles.emptyStateText, { color: palette.cardSubtitle }]}>Check back later.</Text>
       </View>
     );
-  }, [error, handleRetry, isInitialLoading, tokens]);
+  }, [error, handleRetry, isInitialLoading, palette]);
 
   const renderFooter = useMemo(() => {
     if (isPaginating) {
       return (
         <View style={styles.listFooter}>
-          <ActivityIndicator color={tokens.indicator} />
+          <ActivityIndicator color={palette.cardText} />
         </View>
       );
     }
     if (!hasMore && events.length > 0) {
       return (
         <View style={styles.listFooter}>
-          <Text style={[styles.footerText, { color: tokens.footerText }]}>You have reached the end.</Text>
+          <Text style={[styles.container, { color: palette.cardSubtitle }]}>You have reached the end.</Text>
         </View>
       );
     }
     return null;
-  }, [events.length, hasMore, isPaginating, tokens]);
+  }, [events.length, hasMore, isPaginating, palette]);
 
   return (
-    <View style={[styles.container, { backgroundColor: tokens.pageBackground }]}>
+    <View style={[styles.container, { backgroundColor: palette.container }]}>
       <Stack.Screen
         options={{
-          headerTintColor: tokens.headingText,
+          headerTintColor: palette.cardTitle,
           headerTitleAlign: 'left',
-          headerStyle: { backgroundColor: tokens.headerBackground },
+          headerStyle: { backgroundColor: palette.container },
           headerShadowVisible: true,
           headerTitle: () => navTitle,
         }}
       />
       <SectionList
         sections={sections}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.instance_id}
         renderItem={renderItem}
         renderSectionHeader={({ section }) => (
-          <View style={[styles.sectionHeader, { backgroundColor: tokens.pageBackground }]}>
+          <View style={[styles.sectionHeader, { backgroundColor: palette.background }]}>
             <View
               style={[
                 styles.sectionHeaderPill,
-                { backgroundColor: tokens.headerBackground, borderColor: tokens.headerBorder },
+                { backgroundColor: palette.background, borderColor: palette.border },
               ]}
             >
-              <Text style={[styles.sectionHeaderText, { color: tokens.headingText }]}>
+              <Text style={[styles.sectionHeaderText, { color: palette.cardTitle }]}>
                 {section.title}
               </Text>
             </View>
@@ -692,9 +526,9 @@ export default function BarEventsScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={tokens.indicator}
-            colors={[tokens.indicator]}
-            progressBackgroundColor={tokens.headerBackground}
+            tintColor={palette.cardText}
+            colors={[palette.cardText]}
+            progressBackgroundColor={palette.container}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -863,11 +697,13 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     textTransform: 'uppercase',
   },
-  listFooter: {
-    paddingVertical: 24,
-    alignItems: 'center',
+  footerText : {
+    fontSize: 13,
+    fontWeight: '600',
   },
-  footerText: {
-    color: '#6b7280',
+  listFooter: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

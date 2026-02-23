@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { Stack, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -9,13 +10,10 @@ import {
 	Text,
 	TextInput,
 	TouchableOpacity,
+	useColorScheme,
 	View,
 } from 'react-native';
 
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-type ThemeName = keyof typeof Colors;
 
 type BarSearchResult = {
 	id: string;
@@ -32,8 +30,7 @@ const SAVED_BARS_KEY = 'ttp-saved-bars';
 const MAX_SAVED_BARS = 50;
 
 export default function SearchScreen() {
-	const colorScheme = useColorScheme();
-	const theme = (colorScheme ?? 'light') as ThemeName;
+	const theme = useColorScheme() ?? 'dark';
 	const palette = Colors[theme];
 	const borderColor = palette.border;
 	const router = useRouter();
@@ -230,7 +227,7 @@ export default function SearchScreen() {
 
 			{isLoading && results.length === 0 ? (
 				<View style={styles.statusWrapper}>
-					<ActivityIndicator color={palette.tint} />
+					<ActivityIndicator color={palette.actionButton} />
 				</View>
 			) : null}
 

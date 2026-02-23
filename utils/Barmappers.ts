@@ -1,5 +1,6 @@
 // Functions to map raw API data to Bar objects
-import type { Bar, BarTag, LooseObject } from '../types';
+import type { BarTag } from '@/types/index';
+import type { Bar, LooseObject } from '../types';
 import { DAY_NAME_INDEX, MILES_PER_KM } from './constants';
 import { normalizeTwitterUrl, toNumber } from './helpers';
 
@@ -202,6 +203,7 @@ export const mapToBar = (raw: LooseObject, index: number): Bar => {
     closesToday,
     crossesMidnightToday,
     tags: dedupedTags,
+    hours: [],
   };
 };
 

@@ -51,7 +51,12 @@ export const useTagFilters = (
           }
 
           // Require backend tag ids so API calls send ids instead of normalized names
-          const tagId = typeof tag?.id === 'string' ? tag.id.trim() : '';
+          const tagId =
+            typeof tag?.id === 'string'
+              ? tag.id.trim()
+              : typeof tag?.id === 'number'
+                ? String(tag.id)
+                : '';
           if (!tagId || tagMap.has(tagId)) {
             return;
           }

@@ -1,8 +1,7 @@
 // index.tsx
-// Main Bars Screen Component
 
+// Import react and necessary components/hooks
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,10 +14,14 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useColorScheme,
   type ListRenderItem,
 } from 'react-native';
 
-import type { Bar, ThemeName } from '../../types/index';
+// Types
+import type { Bar } from '../../types/index';
+
+// Utils
 import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
 
 // Custom hooks
@@ -36,13 +39,14 @@ import {
 } from '../../components/emptyStates';
 import { TagFilterSheet } from '../../components/tagFilterSheet';
 
+
+// Main screen component
 export default function BarsScreen() {
-  const colorScheme = useColorScheme();
-  const theme = (colorScheme ?? 'light') as ThemeName;
+  const theme = useColorScheme() ?? 'dark';
   const palette = Colors[theme];
   const router = useRouter();
 
-  // Location management
+  // Uses UseLocationCache to manage location state and permissions
   const {
     userCoords,
     locationDeniedPermanently,

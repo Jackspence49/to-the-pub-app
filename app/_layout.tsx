@@ -1,24 +1,24 @@
+import { Colors } from '@/constants/theme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useColorScheme } from 'react-native';
 import 'react-native-reanimated';
 
 import { AuthProvider } from '@/hooks/use-auth';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useThemeColor } from '@/hooks/use-theme-color';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const background = useThemeColor({}, 'background');
+  const theme = useColorScheme() ?? 'dark';
+  const palette = Colors[theme];
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ contentStyle: { backgroundColor: background } }}>
+      <ThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ contentStyle: { backgroundColor: palette.background } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="bar/[barId]" options={{ title: 'Bar Details' }} />
           <Stack.Screen name="event/[instanceId]" options={{ title: 'Event Details' }} />
@@ -27,7 +27,7 @@ export default function RootLayout() {
           <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
-        <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
+        <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
     </AuthProvider>
   );

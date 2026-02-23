@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons'; // Icon library
 import * as Location from 'expo-location'; // Location services
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'; // Navigation and routing
@@ -14,12 +15,13 @@ import {
 	StyleSheet,
 	Text,
 	TouchableOpacity,
+	useColorScheme,
 	View,
 } from 'react-native';
 
 // Custom constants and hooks
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import EventCard from '@/components/eventCard';
+import type { Event, EventTag, ThemeName } from '@/types/index';
 import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
 import { getCacheKey } from '../../utils/helpers';
 import { extractPaginationMeta, shouldContinuePagination } from '../../utils/pagination';
@@ -28,56 +30,18 @@ import { extractPaginationMeta, shouldContinuePagination } from '../../utils/pag
 // Type definitions
 type FetchMode = 'initial' | 'refresh' | 'paginate';
 type LooseObject = Record<string, any>;
-type ThemeName = keyof typeof Colors; 
 type Coordinates = { lat: number; lon: number };
-type EventThemeTokens = ReturnType<typeof getEventThemeTokens>;
 type QueryValue = string | number | boolean | undefined | (string | number | boolean)[];
-
-// Event card props type definition
-type EventCardProps = {
-	event: EventInstance;
-	availableTags: EventTag[];
-	tokens: EventThemeTokens;
-	onPress?: () => void;
-};
-
-// Event tag type definition
-type EventTag = {
-	id: string;
-	name: string;
-	description?: string;
-	slug?: string;
-};
-
-// Event instance type definition
-type EventInstance = {
-	id: string;
-	instanceId: string;
-	eventId?: string;
-	title: string;
-	description?: string;
-	barName?: string;
-	startsAt?: string;
-	endsAt?: string;
-	venueName?: string;
-	cityState?: string;
-	heroImageUrl?: string;
-	tags?: string[];
-	eventTagName?: string;
-	eventDate?: string;
-	crossesMidnight?: boolean;
-	distanceMiles?: number;
-};
 
 // Flat list rows (date separators and events)
 type EventListRow =
 	| { type: 'date'; key: string; label: string }
-	| { type: 'event'; key: string; event: EventInstance };
+	| { type: 'event'; key: string; event: Event };
 
 type EventsCache = {
 	key: string;
 	timestamp: number;
-	data: EventInstance[];
+	data: Event[];
 	currentPage: number;
 	hasMore: boolean;
 };
@@ -93,53 +57,6 @@ const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 const DEFAULT_COORDINATES = {
 	latitude: 42.3555,
 	longitude: -71.0565,
-};
-
-// Function to get theme tokens based on current theme
-const getEventThemeTokens = (theme: ThemeName) => {
-	const palette = Colors[theme];
-	return {
-		background: palette.background,
-		container: palette.container,
-		border: palette.border,
-		headerBorder: palette.border,
-		cardTitle: palette.cardTitle,
-		subcardTitle: palette.cardSubtitle,
-		icon: palette.icon,
-		iconSelected: palette.iconSelected,
-		activePill: palette.activePill,
-		filterContainer: palette.filterContainer,
-		filterText: palette.filterText,
-		filterTextActive: palette.filterTextActive,
-		filterActivePill: palette.filterActivePill,
-		cardSurface: palette.cardSurface,
-		cardSubtitle: palette.cardSubtitle,
-		cardText: palette.cardText,
-		pillBackground: palette.pillBackground,
-		pillText: palette.pillText,
-		pillBorder: palette.pillBorder,
-		warningBackground: palette.warningBackground,
-		warningBorder: palette.warningBorder,
-		warningText: palette.warningText,
-		actionButton: palette.actionButton,
-		dismissButton: palette.dismissButton,
-		networkErrorBackground: palette.networkErrorBackground,
-		networkErrorButton: palette.networkErrorButton,
-		networkErrorBorder: palette.networkErrorBorder,
-		networkErrorText: palette.networkErrorText,
-		errorBackground: palette.networkErrorBackground,
-		errorBorder: palette.networkErrorBorder,
-		errorTitle: palette.cardTitle,
-		errorDescription: palette.cardSubtitle,
-		retryBackground: palette.networkErrorBackground,
-		retryText: palette.networkErrorText,
-		indicator: palette.iconSelected,
-		emptyText: palette.cardSubtitle,
-		emptyTitle: palette.cardTitle,
-		footerText: palette.filterText,
-		cardBackground: palette.cardSurface,
-		cardBorder: palette.border,
-	};
 };
 
 
@@ -241,8 +158,8 @@ const extractTagItems = (payload: unknown): LooseObject[] => {
 	return [];
 };
 
-// Function to map raw event data to EventInstance type
-const mapToEventInstance = (raw: LooseObject): EventInstance => {
+// Function to map raw event data to Event type
+const mapToEventInstance = (raw: LooseObject): Event => {
 	const fallbackLabel = `${raw.name ?? raw.title ?? 'event'}-${raw.start_time ?? raw.starts_at ?? Date.now()}`;
 	const primaryId =
 		raw.instance_id ??
@@ -254,28 +171,13 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 		fallbackLabel;
 	const eventIdSource = raw.event_id ?? raw.eventId ?? raw.parent_event_id ?? undefined;
 
-	const tags = Array.isArray(raw.tags)
-		? (raw.tags
-				.map((tag: any) => {
-					if (typeof tag === 'string') {
-						return tag;
-					}
-					if (tag && typeof tag === 'object') {
-						return tag.name ?? tag.title ?? tag.slug;
-					}
-					return undefined;
-				})
-				.filter(Boolean) as string[])
-		: undefined;
-
 	const derivedVenueName =
 		raw.venue?.name ??
 		raw.venue_name ??
 		raw.location_name ??
 		(typeof raw.venue === 'string' ? raw.venue : undefined);
 
-	const barName = raw.bar_name ?? raw.bar?.name ?? derivedVenueName;
-	const venueName = barName ?? derivedVenueName;
+	const barName = raw.bar_name ?? raw.bar?.name ?? derivedVenueName ?? 'Unknown bar';
 
 	const city =
 		raw.address_city ??
@@ -289,7 +191,6 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 		raw.venue?.state ??
 		raw.state ??
 		raw.location_state;
-	const cityState = city && state ? `${city}, ${state}` : city ?? state ?? undefined;
 
 	const crossesMidnight = Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false);
 	const dateSource = raw.date ?? raw.event_date ?? raw.starts_at ?? raw.start ?? undefined;
@@ -311,13 +212,22 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 		}) ??
 		undefined;
 
+	const eventTagId =
+		raw.event_tag_id ??
+		raw.event_tag?.id ??
+		raw.event_tag?.slug ??
+		raw.tag_id ??
+		raw.tag?.id ??
+		raw.tag?.slug ??
+		undefined;
+
 	const eventTagName =
 		raw.event_tag?.name ??
 		raw.event_tag_name ??
 		raw.tag_name ??
 		raw.tag?.name ??
 		raw.event_tag ??
-		raw.event_tag_id ??
+		eventTagId ??
 		undefined;
 
 	const distanceMiles = (() => {
@@ -327,21 +237,19 @@ const mapToEventInstance = (raw: LooseObject): EventInstance => {
 	})();
 
 	return {
-		id: String(primaryId),
-		instanceId: String(primaryId),
-		eventId: eventIdSource ? String(eventIdSource) : undefined,
+		instance_id: String(primaryId),
+		event_id: eventIdSource ? String(eventIdSource) : undefined,
 		title: raw.title ?? raw.name ?? 'Untitled event',
 		description: raw.description ?? raw.summary ?? raw.subtitle ?? undefined,
-		barName,
-		startsAt: startDateTime ?? raw.begin_at ?? undefined,
-		endsAt: endDateTime ?? undefined,
-		venueName,
-		cityState,
-		heroImageUrl: raw.hero_image_url ?? raw.image_url ?? raw.banner_url ?? raw.cover_photo ?? undefined,
-		tags,
-		eventTagName,
-		eventDate: eventDate ?? startDateTime,
-		crossesMidnight,
+		bar_name: barName,
+		address_city: city ?? undefined,
+		address_state: state ?? undefined,
+		start_time: startDateTime ?? raw.begin_at ?? undefined,
+		end_time: endDateTime ?? undefined,
+		event_tag_name: eventTagName,
+		event_tag_id: eventTagId ? String(eventTagId) : undefined,
+		date: eventDate ?? startDateTime,
+		crosses_midnight: crossesMidnight,
 		distanceMiles,
 	};
 };
@@ -352,20 +260,17 @@ const mapToEventTag = (raw: LooseObject): EventTag => {
 		raw.id ??
 		raw.tag_id ??
 		raw.uuid ??
-		raw.slug ??
 		raw.name ??
 		`tag-${Date.now()}`;
 
 	return {
 		id: String(fallbackId),
 		name: raw.name ?? raw.title ?? raw.label ?? `Tag ${fallbackId}`,
-		description: raw.description ?? raw.summary ?? undefined,
-		slug: raw.slug ?? raw.handle ?? undefined,
 	};
 };
 
 // Function to merge current and incoming event lists, deduping by ID
-const mergeEvents = (current: EventInstance[], incoming: EventInstance[]): EventInstance[] => {
+const mergeEvents = (current: Event[], incoming: Event[]): Event[] => {
 	if (current.length === 0) {
 		return incoming;
 	}
@@ -373,7 +278,7 @@ const mergeEvents = (current: EventInstance[], incoming: EventInstance[]): Event
 	const next = [...current];
 
 	incoming.forEach((event) => {
-		const index = next.findIndex((item) => item.id === event.id);
+		const index = next.findIndex((item) => item.instance_id === event.instance_id);
 		if (index === -1) {
 			next.push(event);
 		} else {
@@ -429,23 +334,6 @@ const startOfDay = (input: Date) => {
 	return copy;
 };
 
-// Function to format event time strings
-const formatEventTime = (value?: string): string => {
-	if (!value) {
-		return 'Time TBD';
-	}
-
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) {
-		return 'Time TBD';
-	}
-
-	return new Intl.DateTimeFormat('en-US', {
-		hour: 'numeric',
-		minute: '2-digit',
-	}).format(date);
-};
-
 // Function to format event day strings relatively
 const formatRelativeEventDay = (value?: string): string => {
 	if (!value) {
@@ -478,108 +366,6 @@ const formatRelativeEventDay = (value?: string): string => {
 		month: 'short',	
 		day: 'numeric',
 	}).format(date);
-};
-
-
-// Function to format distance values
-const formatDistance = (value?: number): string | null => {
-	if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
-		return null;
-	}
-
-	if (value < 0.1) {
-		return `< 0.1 ${DISTANCE_UNIT} away`;
-	}
-
-	const formatter = new Intl.NumberFormat('en-US', {
-		maximumFractionDigits: value < 10 ? 1 : 0,
-	});
-
-	return `${formatter.format(value)} ${DISTANCE_UNIT} away`;
-};
-
-// Event card component
-const EventCard = ({ event, availableTags, tokens, onPress }: EventCardProps) => {
-	const barName = event.barName ?? event.venueName ?? 'Bar coming soon';
-	const startTimeLabel = formatEventTime(event.startsAt);
-	const endTimeLabel = formatEventTime(event.endsAt);
-	const distanceLabel = formatDistance(event.distanceMiles);
-	// Gather all tag IDs (eventTagName and tags[]), filter out falsy, dedupe, and slice
-	const tagIds = Array.from(
-		new Set([
-			event.eventTagName,
-			...(event.tags ?? [])
-		].filter(Boolean) as string[])
-	).slice(0, 3);
-	// Map tag IDs to tag names using availableTags
-	const tagsToRender = tagIds.map(
-		(tagId) => availableTags.find((t) => t.id === tagId)?.name || tagId
-	);
-	const eventTagName = tagsToRender[0];
-
-	return (
-		<TouchableOpacity
-			activeOpacity={0.92}
-			disabled={!onPress}
-			onPress={onPress}
-			style={[
-				styles.card,
-				{
-					backgroundColor: tokens.cardBackground,
-					borderColor: tokens.cardBorder,
-				},
-			]}
-		>
-			<View style={styles.cardBody}>
-				{eventTagName ? (
-					<View
-						style={[
-							styles.eventTagPill,
-							{
-								backgroundColor: tokens.filterActivePill,
-							},
-						]}
-					>
-						<Text style={[styles.eventTagLabel, { color: tokens.filterTextActive }]}>{eventTagName}</Text>
-					</View>
-				) : null}
-				<Text style={[styles.eventTitle, { color: tokens.cardTitle }]}>{event.title}</Text>
-				<View style={[styles.eventTitleDivider, { backgroundColor: tokens.cardBorder }]} />
-				<View style={styles.eventBarRow}>
-					<MaterialIcons name="location-on" size={18} color={tokens.iconSelected} style={styles.eventBarIcon} />
-					<Text style={[styles.eventBarName, { color: tokens.cardSubtitle }]}>{barName}</Text>
-				</View>
-				{distanceLabel ? (
-					<View style={styles.metaRow}>
-						<View
-							style={[
-								styles.distancePill,
-								{
-									backgroundColor: tokens.pillBackground,
-								},
-							]}
-						>
-							<Text style={[styles.metaDistanceText, { color: tokens.pillText }]}>{distanceLabel}</Text>
-						</View>
-					</View>
-				) : null}
-				<View style={styles.scheduleBlock}>
-					<View style={styles.timeRowSimple}>
-						<MaterialIcons name="schedule" size={18} color={tokens.iconSelected} style={styles.timeIcon} />
-						<View style={styles.timePair}>
-							<Text style={[styles.timeLabelInline, { color: tokens.cardSubtitle }]}>Start</Text>
-							<Text style={[styles.timeValueInline, { color: tokens.cardTitle }]}>{startTimeLabel}</Text>
-						</View>
-						<MaterialIcons name="arrow-forward" size={16} color={tokens.cardSubtitle} style={styles.timeArrowIcon} />
-						<View style={styles.timePair}>
-							<Text style={[styles.timeLabelInline, { color: tokens.cardSubtitle }]}>End</Text>
-							<Text style={[styles.timeValueInline, { color: tokens.cardTitle }]}>{endTimeLabel}</Text>
-						</View>
-					</View>
-				</View>
-			</View>
-		</TouchableOpacity>
-	);
 };
 
 type RadiusSelectorProps = {
@@ -650,7 +436,6 @@ type TagFilterSheetProps = {
 	isLoading: boolean;
 	error: string | null;
 	theme: ThemeName;
-	tokens: EventThemeTokens;
 };
 
 // Tag filter sheet Modal component
@@ -664,7 +449,6 @@ const TagFilterSheet = ({
 	isLoading,
 	error,
 	theme,
-	tokens,
 
 }: TagFilterSheetProps) => {
 	const palette = Colors[theme];
@@ -730,19 +514,19 @@ const TagFilterSheet = ({
 			<View
 				style={[
 					styles.sheetContainer,
-					{ backgroundColor: tokens.container, borderColor: tokens.headerBorder },
+					{ backgroundColor: palette.container, borderColor: palette.border },
 				]}
 			>
-				<Text style={[styles.sheetTitle, { color: tokens.cardTitle }]}>Filter Events</Text>
+				<Text style={[styles.sheetTitle, { color: palette.cardTitle }]}>Filter Events</Text>
 
 				{isLoading ? (
 					<View style={styles.filterStateRow}>
 						<ActivityIndicator color={highlightColor} />
-						<Text style={[styles.filterStateText, { color: tokens.cardTitle }]}>Loading tags...</Text>
+						<Text style={[styles.filterStateText, { color: palette.cardTitle }]}>Loading tags...</Text>
 					</View>
 				) : error ? (
 					<View style={styles.filterStateColumn}>
-						<Text style={[styles.filterStateErrorText, { color: tokens.cardTitle }]}>{error}</Text>
+						<Text style={[styles.filterStateErrorText, { color: palette.cardTitle }]}>{error}</Text>
 						<TouchableOpacity
 							onPress={onRetry}
 							style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
@@ -759,7 +543,7 @@ const TagFilterSheet = ({
 						contentContainerStyle={filteredTags.length === 0 ? styles.filterEmptyContent : undefined}
 						ListEmptyComponent={
 							<View style={styles.filterEmptyState}>
-								<Text style={[styles.filterStateText, { color: tokens.subcardTitle }]}>No tags available.</Text>
+								<Text style={[styles.filterStateText, { color: palette.cardSubtitle }]}>No tags available.</Text>
 							</View>
 						}
 						style={styles.filterList}
@@ -774,10 +558,9 @@ const TagFilterSheet = ({
 
 // Main Events Screen component
 const EventsScreen = () => {
+	const theme = useColorScheme() ?? 'dark';
+	const palette = Colors[theme];
 	const router = useRouter();
-	const colorScheme = useColorScheme();
-	const theme = (colorScheme ?? 'light') as ThemeName;
-	const tokens = useMemo(() => getEventThemeTokens(theme), [theme]);
 	const searchParams = useLocalSearchParams<{ eventTagId?: string | string[] }>();
 	const initialTagIdsFromParams = useMemo(
 		() => normalizeTagParamList(searchParams.eventTagId),
@@ -786,7 +569,7 @@ const EventsScreen = () => {
 	const initialSelectedTagIds = normalizeTagIds(initialTagIdsFromParams);
 	const hasAppliedInitialTagsRef = useRef(false);
 
-	const [events, setEvents] = useState<EventInstance[]>([]);
+	const [events, setEvents] = useState<Event[]>([]);
 	const [page, setPage] = useState(1);
 	const [hasMore, setHasMore] = useState(true);
 	const [isInitialLoading, setIsInitialLoading] = useState(false);
@@ -886,8 +669,8 @@ const EventsScreen = () => {
 
 	// Handler for opening event details
 	const handleOpenEvent = useCallback(
-		(event: EventInstance) => {
-			const instanceId = event.instanceId ?? event.id;
+		(event: Event) => {
+			const instanceId = event.instance_id;
 			if (!instanceId) {
 				return;
 			}
@@ -1113,10 +896,10 @@ const EventsScreen = () => {
 					<View
 						style={[
 							styles.dateSeparatorPill,
-							{ backgroundColor: tokens.container, borderColor: tokens.headerBorder },
+							{ backgroundColor: palette.container, borderColor: palette.border },
 						]}
 					>
-						<Text style={[styles.dateSeparatorText, { color: tokens.cardTitle }]}>{item.label}</Text>
+						<Text style={[styles.dateSeparatorText, { color: palette.cardTitle }]}>{item.label}</Text>
 					</View>
 				);
 			}
@@ -1125,22 +908,22 @@ const EventsScreen = () => {
 				<EventCard
 					event={item.event}
 					availableTags={availableTags}
-					tokens={tokens}
+					distanceUnit={DISTANCE_UNIT}
 					onPress={() => handleOpenEvent(item.event)}
 				/>
 			);
 		},
-		[availableTags, handleOpenEvent, tokens]
+		[availableTags, handleOpenEvent, palette]
 	);
 
 	const flatEvents = useMemo(() => {
 		if (events.length === 0) {
-			return [] as EventInstance[];
+			return [] as Event[];
 		}
 
 		return [...events].sort((a, b) => {
-			const aDate = a.eventDate ?? a.startsAt ?? '';
-			const bDate = b.eventDate ?? b.startsAt ?? '';
+			const aDate = a.date ?? a.start_time ?? '';
+			const bDate = b.date ?? b.start_time ?? '';
 			const aTime = new Date(aDate).getTime();
 			const bTime = new Date(bDate).getTime();
 			const aValue = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
@@ -1157,7 +940,7 @@ const EventsScreen = () => {
 		let lastLabel: string | null = null;
 
 		flatEvents.forEach((event) => {
-			const dateValue = event.eventDate ?? event.startsAt;
+			const dateValue = event.date ?? event.start_time;
 			const normalized = normalizeDateOnly(dateValue ?? undefined) ?? 'unknown-date';
 			const label = dateValue ? formatRelativeEventDay(dateValue) : 'Date coming soon';
 
@@ -1166,7 +949,7 @@ const EventsScreen = () => {
 				lastLabel = label;
 			}
 
-			rows.push({ type: 'event', key: `event-${event.id}`, event });
+			rows.push({ type: 'event', key: `event-${event.instance_id}`, event });
 		});
 
 		return rows;
@@ -1189,10 +972,10 @@ const EventsScreen = () => {
 			<View
 				style={[
 					styles.listHeader,
-					{ backgroundColor: tokens.background },
+					{ backgroundColor: palette.background },
 				]}
 			>
-				<Text style={[styles.screenTitle, { color: tokens.cardTitle }]}>Upcoming events</Text>
+				<Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Upcoming events</Text>
 
 				<View style={styles.headerControlsRow}>
 					<View style={styles.filterButtonRow}>
@@ -1201,17 +984,17 @@ const EventsScreen = () => {
 							style={[
 								styles.filterButton,
 								styles.filterButtonLarge,
-								{ backgroundColor: tokens.actionButton },
+								{ backgroundColor: palette.actionButton },
 							]}
 							activeOpacity={0.9}
 						>
 							<MaterialIcons
 								name="tune"
 								size={18}
-								color={tokens.filterTextActive}
+								color={palette.filterTextActive}
 								style={styles.filterButtonIcon}
 							/>
-							<Text style={[styles.filterButtonText, { color: tokens.filterTextActive }]}>
+							<Text style={[styles.filterButtonText, { color: palette.filterTextActive }]}>
 								Filters{selectedTagIds.length ? ` (${selectedTagIds.length})` : ''}
 							</Text>
 						</TouchableOpacity>
@@ -1231,7 +1014,7 @@ const EventsScreen = () => {
 				</View>
 
 				{selectedTagNames.length ? (
-					<Text style={[styles.selectedTagsText, { color: tokens.subcardTitle }]}>
+					<Text style={[styles.selectedTagsText, { color: palette.cardSubtitle }]}>
 						{preview}
 						{remaining ? ` +${remaining} more` : ''}
 					</Text>
@@ -1242,7 +1025,7 @@ const EventsScreen = () => {
 						onPress={fetchAvailableTags}
 						style={[styles.filterLoadRow, { borderColor: highlightColor }]}
 					>
-						<Text style={[styles.filterLoadText, { color: tokens.cardTitle }]}>
+						<Text style={[styles.filterLoadText, { color: palette.cardTitle }]}>
 							Could not load tags. Tap to retry.
 						</Text>
 					</TouchableOpacity>
@@ -1251,7 +1034,7 @@ const EventsScreen = () => {
 				{areTagsLoading ? (
 					<View style={styles.filterLoadRow}>
 						<ActivityIndicator size="small" color={highlightColor} />
-						<Text style={[styles.filterLoadText, { color: tokens.subcardTitle }]}>Loading tags...</Text>
+						<Text style={[styles.filterLoadText, { color: palette.cardSubtitle }]}>Loading tags...</Text>
 					</View>
 				) : null}
 
@@ -1259,16 +1042,16 @@ const EventsScreen = () => {
 					<View
 						style={[
 							styles.errorBanner,
-							{ backgroundColor: tokens.errorBackground, borderColor: tokens.errorBorder },
+							{ backgroundColor: palette.networkErrorBackground, borderColor: palette.networkErrorBorder },
 						]}
 					>
-						<Text style={[styles.errorTitle, { color: tokens.errorTitle }]}>Unable to load events</Text>
-						<Text style={[styles.errorDescription, { color: tokens.errorDescription }]}>{error}</Text>
+						<Text style={[styles.errorTitle, { color: palette.networkErrorText }]}>Unable to load events</Text>
+						<Text style={[styles.errorDescription, { color: palette.networkErrorText }]}>{error}</Text>
 						<TouchableOpacity
-							style={[styles.retryButton, { backgroundColor: tokens.retryBackground }]}
+							style={[styles.retryButton, { backgroundColor: palette.networkErrorBackground }]}
 							onPress={handleRetry}
 						>
-							<Text style={[styles.retryButtonText, { color: tokens.retryText }]}>Try again</Text>
+							<Text style={[styles.retryButtonText, { color: palette.networkErrorText }]}>Try again</Text>
 						</TouchableOpacity>
 					</View>
 				) : null}
@@ -1287,15 +1070,15 @@ const EventsScreen = () => {
 		selectedTagNames,
 		tagsError,
 		theme,
-		tokens,
+		palette,
 	]);
 
 	const renderEmpty = useMemo(() => {
 		if (isInitialLoading) {
 			return (
 				<View style={styles.emptyState}>
-					<ActivityIndicator color={tokens.indicator} size="large" />
-					<Text style={[styles.emptyStateText, { color: tokens.emptyText }]}>Loading events...</Text>
+					<ActivityIndicator color={palette.actionButton} size="large" />
+					<Text style={[styles.emptyStateText, { color: palette.filterTextActive }]}>Loading events...</Text>
 				</View>
 			);
 		}
@@ -1303,8 +1086,8 @@ const EventsScreen = () => {
 		if (error) {
 			return (
 				<View style={styles.emptyState}>
-					<Text style={[styles.emptyStateTitle, { color: tokens.emptyTitle }]}>No events to show</Text>
-					<Text style={[styles.emptyStateText, { color: tokens.emptyText }]}>
+					<Text style={[styles.emptyStateTitle, { color: palette.filterText }]}>No events to show</Text>
+					<Text style={[styles.emptyStateText, { color: palette.filterText }]}>
 						Adjust the filters above and try again.
 					</Text>
 				</View>
@@ -1313,19 +1096,19 @@ const EventsScreen = () => {
 
 		return (
 			<View style={styles.emptyState}>
-				<Text style={[styles.emptyStateTitle, { color: tokens.emptyTitle }]}>Nothing scheduled yet</Text>
-				<Text style={[styles.emptyStateText, { color: tokens.emptyText }]}>
+				<Text style={[styles.emptyStateTitle, { color: palette.filterText }]}>Nothing scheduled yet</Text>
+				<Text style={[styles.emptyStateText, { color: palette.filterText }]}>
 					We could not find upcoming events for the selected tags.
 				</Text>
 			</View>
 		);
-	}, [error, isInitialLoading, tokens]);
+	}, [error, isInitialLoading, palette]);
 
 	const renderFooter = useMemo(() => {
 		if (isPaginating) {
 			return (
 				<View style={styles.listFooter}>
-					<ActivityIndicator color={tokens.indicator} />
+					<ActivityIndicator color={palette.filterActivePill} />
 				</View>
 			);
 		}
@@ -1333,16 +1116,16 @@ const EventsScreen = () => {
 		if (!hasMore && events.length > 0) {
 			return (
 				<View style={styles.listFooter}>
-					<Text style={[styles.footerText, { color: tokens.footerText }]}>You have reached the end.</Text>
+					<Text style={[styles.footerText, { color: palette.filterActivePill }]}>You have reached the end.</Text>
 				</View>
 			);
 		}
 
 		return null;
-	}, [events.length, hasMore, isPaginating, tokens]);
+	}, [events.length, hasMore, isPaginating, palette]);
 
 	return (
-		<View style={[styles.container, { backgroundColor: tokens.background }]}>
+		<View style={[styles.container, { backgroundColor: palette.background }]}>
 			<FlatList
 				data={listRows}
 				keyExtractor={(item) => item.key}
@@ -1360,9 +1143,9 @@ const EventsScreen = () => {
 					<RefreshControl
 						refreshing={isRefreshing}
 						onRefresh={handleRefresh}
-						tintColor={tokens.indicator}
-						colors={[tokens.indicator]}
-						progressBackgroundColor={tokens.container}
+						tintColor={palette.filterActivePill}
+						colors={[palette.filterActivePill]}
+						progressBackgroundColor={palette.container}
 					/>
 				}
 				initialNumToRender={INFINITE_SCROLL_CONFIG.initialPageSize}
@@ -1382,7 +1165,6 @@ const EventsScreen = () => {
 				isLoading={areTagsLoading}
 				error={tagsError}
 				theme={theme}
-				tokens={tokens}
 			/>
 		</View>
 	);

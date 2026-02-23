@@ -3,31 +3,31 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-    BarsCache,
-    Coordinates,
-    LoadBarsPageOptions,
-    LoadMode,
-    PaginationState,
-    QueryParams
+  BarsCache,
+  Coordinates,
+  LoadBarsPageOptions,
+  LoadMode,
+  PaginationState,
+  QueryParams
 } from '../types';
 import {
-    mapBarsInBatches,
-    mergeBars,
+  mapBarsInBatches,
+  mergeBars,
 } from '../utils/Barmappers';
 import {
-    BARS_ENDPOINT,
-    BASE_QUERY_PARAMS,
-    DEFAULT_COORDS,
-    INFINITE_SCROLL_CONFIG,
+  BARS_ENDPOINT,
+  BASE_QUERY_PARAMS,
+  DEFAULT_COORDS,
+  INFINITE_SCROLL_CONFIG,
 } from '../utils/constants';
 import {
-    buildQueryString,
-    extractBarItems,
-    getCacheKey,
+  buildQueryString,
+  extractBarItems,
+  getCacheKey,
 } from '../utils/helpers';
 import {
-    extractTotalCount,
-    shouldContinuePagination,
+  extractTotalCount,
+  shouldContinuePagination,
 } from '../utils/pagination';
 
 export const useBars = (
@@ -151,7 +151,6 @@ export const useBars = (
           lon: coordsToUse.lon,
           page,
           limit: pageSize,
-          page_size: pageSize,
           tags: selectedTags.length ? selectedTags.join(',') : undefined,
         };
 

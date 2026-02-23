@@ -3,7 +3,6 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  ImageSourcePropType,
   Linking,
   Platform,
   ScrollView,
@@ -11,12 +10,12 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useColorScheme
 } from 'react-native';
 
-import heroFallback from '@/assets/images/light_logo.png';
+
 import EventDetails from '@/components/eventDetails';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type ThemeName = keyof typeof Colors;
 type LooseObject = Record<string, any>;
@@ -115,27 +114,6 @@ const formatEventTime = (value?: string): string | null => {
 
 const ensureProtocol = (value: string) => (value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
 
-const tagImageMap: Record<string, any> = {
-  bingo: require('../../assets/images/bingo.png'),
-  comedy: require('../../assets/images/comedy.png'),
-  dj: require('../../assets/images/DJ.png'),
-  drinkspecial: require('../../assets/images/Drink Special.png'),
-  foodspecial: require('../../assets/images/Food Special.png'),
-  happyhour: require('../../assets/images/Happy Hour.png'),
-  karaoke: require('../../assets/images/Karaoke.png'),
-  livemusic: require('../../assets/images/live music.png'),
-  sportsviewing: require('../../assets/images/Sports Viewing.png'),
-  triva: require('../../assets/images/Triva.png'),
-  trivia: require('../../assets/images/Triva.png'),
-};
-
-const getTagImage = (tagName?: string) => {
-  if (!tagName) {
-    return null;
-  }
-  const key = tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return tagImageMap[key] ?? null;
-};
 
 const mapToEventDetail = (raw: LooseObject): EventDetail => {
   const crossesMidnight = Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false);
@@ -223,16 +201,6 @@ export default function EventDetailScreen() {
   const dateLabel = useMemo(() => formatEventDay(event?.eventDate ?? event?.startsAt), [event?.eventDate, event?.startsAt]);
   const startTimeLabel = useMemo(() => formatEventTime(event?.startsAt), [event?.startsAt]);
   const endTimeLabel = useMemo(() => formatEventTime(event?.endsAt), [event?.endsAt]);
-  const tagImage = useMemo(() => getTagImage(event?.tagName), [event?.tagName]);
-  const heroSource = useMemo<ImageSourcePropType>(() => {
-    if (event?.heroImageUrl) {
-      return { uri: event.heroImageUrl };
-    }
-    if (tagImage) {
-      return tagImage;
-    }
-    return heroFallback;
-  }, [event?.heroImageUrl, tagImage]);
   const recurrenceLabel = useMemo(() => {
     const raw = event?.recurrencePattern?.trim();
     if (!raw) {
@@ -393,7 +361,7 @@ export default function EventDetailScreen() {
     if (isLoading) {
       return (
         <View style={styles.centerContent}>
-          <ActivityIndicator color={palette.tint} size="large" />
+          <ActivityIndicator color={palette.activePill} size="large" />
           <Text style={[styles.statusText, { color: palette.text }]}>Loading event...</Text>
         </View>
       );
@@ -404,8 +372,8 @@ export default function EventDetailScreen() {
         <View style={styles.centerContent}>
           <Text style={[styles.errorTitle, { color: palette.text }]}>Unable to load event</Text>
           <Text style={[styles.errorDescription, { color: theme === 'light' ? '#4b5563' : '#94a3b8' }]}>{error}</Text>
-          <TouchableOpacity style={[styles.retryButton, { borderColor: palette.tint }]} onPress={fetchEventDetail}>
-            <Text style={[styles.retryButtonText, { color: palette.tint }]}>Try again</Text>
+          <TouchableOpacity style={[styles.retryButton, { borderColor: palette.activePill }]} onPress={fetchEventDetail}>
+            <Text style={[styles.retryButtonText, { color: palette.activePill }]}>Try again</Text>
           </TouchableOpacity>
         </View>
       );
@@ -426,7 +394,6 @@ export default function EventDetailScreen() {
           <EventDetails
             title={event.title}
             description={event.description}
-            image={heroSource}
             dateLabel={dateLabel}
             startTimeLabel={startTimeLabel ?? undefined}
             endTimeLabel={endTimeLabel ?? undefined}

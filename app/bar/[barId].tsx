@@ -1,10 +1,9 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { View, useColorScheme } from 'react-native';
 
 import BarDetails, { BarDetail, BarHour, BarTag, ThemeName } from '@/components/barDetails';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type LooseObject = Record<string, any>;
 

@@ -1,22 +1,16 @@
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, useColorScheme, View } from 'react-native';
 
-import darkLogo from '@/assets/images/dark_logo.png';
-import lightLogo from '@/assets/images/light_logo.png';
+
 
 export function LogoHeader() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const theme = useColorScheme() ?? 'dark';
+  const palette = Colors[theme];
   return (
-    <View style={styles.container}>
-      <Image
-        source={isDark ? lightLogo : darkLogo}
-        style={styles.logo}
-        resizeMode="contain"
-        accessibilityLabel="To The Pub logo"
-      />
+    <View style={[styles.container, { backgroundColor: palette.container }]}>
+      <Text style={{ color: palette.cardTitle }}>To The Pub</Text>
     </View>
   );
 }

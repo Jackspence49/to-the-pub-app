@@ -2,20 +2,20 @@ import { FontAwesome } from '@expo/vector-icons';
 import { Redirect, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme
 } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type ThemeName = keyof typeof Colors;
 type FormField = 'email' | 'password';
@@ -116,7 +116,7 @@ export default function LoginScreen() {
   if (status === 'checking') {
     return (
       <View style={[styles.loaderContainer, { backgroundColor: palette.background }]}>
-        <ActivityIndicator size="large" color={palette.tint} />
+        <ActivityIndicator size="large" color={palette.activePill} />
       </View>
     );
   }

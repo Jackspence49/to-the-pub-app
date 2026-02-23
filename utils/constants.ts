@@ -1,5 +1,4 @@
 // Configuration constants
-
 import type { Coordinates, InfiniteScrollConfig, QueryParams } from '../types';
 
 // API Configuration
@@ -20,17 +19,15 @@ export const DEFAULT_COORDS: Coordinates = {
   lon: -71.0565,
 };
 
-// Base Query Parameters
+// Base Query Parameters (align with backend expectations)
 export const BASE_QUERY_PARAMS: QueryParams = {
   unit: 'miles',
-  open_now: true,
-  include: 'tags,hours',
 };
 
 // Infinite Scroll Configuration
 export const INFINITE_SCROLL_CONFIG: InfiniteScrollConfig = {
-  initialPageSize: 20,
-  subsequentPageSize: 20,
+  initialPageSize: 10,
+  subsequentPageSize: 10,
   loadMoreThreshold: 0.8,
   maxConcurrentRequests: 2,
   prefetchPages: 1,

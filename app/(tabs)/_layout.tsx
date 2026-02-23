@@ -1,6 +1,7 @@
+import { Colors } from '@/constants/theme';
 import { Redirect, Tabs } from 'expo-router'; // Tab layout with authentication check
 import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, useColorScheme } from 'react-native';
 
 
 // Custom components
@@ -10,22 +11,18 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 
 // Custom hooks for theming and authentication
 import { useAuth } from '@/hooks/use-auth';
-import { useThemeColor } from '@/hooks/use-theme-color';
 
 //Get Auth status and theme colors
 export default function TabLayout() {
   const { status } = useAuth();  
-  const container = useThemeColor({}, 'container');
-  const border = useThemeColor({}, 'border');
-  const icon = useThemeColor({}, 'icon');
-  const iconSelected = useThemeColor({}, 'iconSelected');
-  const activePill = useThemeColor({}, 'activePill');
+  const theme = useColorScheme() ?? 'dark';
+  const palette = Colors[theme];
 
   // Show loader while checking auth status
   if (status === 'checking') { 
     return (
-      <View style={[styles.loaderContainer, { backgroundColor: container }]}>
-        <ActivityIndicator size="large" color={iconSelected} />
+      <View style={[styles.loaderContainer, { backgroundColor: palette.container }]}>
+        <ActivityIndicator size="large" color={palette.iconSelected} />
       </View>
     );
   }
@@ -39,12 +36,12 @@ export default function TabLayout() {
   return (
     <Tabs 
       screenOptions={{
-        tabBarActiveTintColor: iconSelected,
-        tabBarInactiveTintColor: icon,
-        tabBarActiveBackgroundColor: activePill,
+        tabBarActiveTintColor: palette.iconSelected,
+        tabBarInactiveTintColor: palette.icon,
+        tabBarActiveBackgroundColor: palette.activePill,
         tabBarStyle: {
-          backgroundColor: container,
-          borderTopColor: border,
+          backgroundColor: palette.container,
+          borderTopColor: palette.border,
           borderTopWidth: StyleSheet.hairlineWidth,
         },
         headerShown: true,
@@ -56,9 +53,9 @@ export default function TabLayout() {
           marginLeft: 0,
         },
         headerStyle: {
-          backgroundColor: container,
+          backgroundColor: palette.container,
           height: 120,
-          borderBottomColor: border,
+          borderBottomColor: palette.border,
           borderBottomWidth: StyleSheet.hairlineWidth,
         },
         headerShadowVisible: false,

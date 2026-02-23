@@ -1,11 +1,10 @@
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, type ImageSourcePropType } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, useColorScheme, View, type ImageSourcePropType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { ThemeName } from '@/types';
 
 type Palette = (typeof Colors)[ThemeName];

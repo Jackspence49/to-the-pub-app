@@ -12,7 +12,7 @@ type AuthenticatedUser = {
   id: string;
   name?: string;
   email?: string;
-  [key: string]: unknown;
+  [Token: string]: unknown;
 };
 
 type AuthActionResult = {
