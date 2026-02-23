@@ -108,3 +108,12 @@ export type LoadBarsPageOptions = {
   ignoreCache?: boolean;
   coordsOverride?: Coordinates;
 };
+
+export type Hours = {
+  id: string;
+  day_of_week: number; 
+  open_time: string | null;
+  close_time: string | null;
+  is_closed: boolean;
+  crosses_midnight: boolean;
+}

@@ -170,7 +170,6 @@ export default function EventDetails({
               ) : null}
             </View>
           ) : null}
-          
       </View>
 
       {/* Description */}
@@ -213,16 +212,16 @@ export default function EventDetails({
 			) : null}
 				
 			{/* More Information */}
-            <View style={styles.sectionEnd}>      
+       <View style={styles.sectionEnd}>      
                 <TouchableOpacity
 					onPress={barActionsEnabled ? onPressViewBarEvents : undefined}
-					style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
+					style={[styles.externalBtn, { backgroundColor: palette.actionButton}]}
 					activeOpacity={0.9}
 					disabled={!barActionsEnabled}
 				>
 					<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>See all upcoming events</Text>
 				</TouchableOpacity>
-            </View>
+      </View>
 		</View>
 	);
 }
