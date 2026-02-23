@@ -89,7 +89,7 @@ const EventCard = ({ event, availableTags, distanceUnit = 'miles', onPress }: Ev
 				},
 			]}
 		>
-			<View style={styles.cardBody}>
+			<View style={[styles.cardBody, { backgroundColor: palette.cardSurface }]}>
 				{eventTagName ? (
 					<View
 						style={[

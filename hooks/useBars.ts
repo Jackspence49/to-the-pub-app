@@ -26,10 +26,13 @@ import {
   getCacheKey,
 } from '../utils/helpers';
 import {
+  PayloadWithPagination,
   extractTotalCount,
   shouldContinuePagination,
 } from '../utils/pagination';
 
+
+// Custom hook for managing bars data with pagination, caching, and error handling
 export const useBars = (
   userCoords: Coordinates | null,
   selectedTags: string[]
@@ -163,7 +166,7 @@ export const useBars = (
           throw new Error(`Request failed with status ${response.status}`);
         }
 
-        const payload = await response.json();
+        const payload: PayloadWithPagination = await response.json();
         const rawItems = extractBarItems(payload);
         const startIndex = (page - 1) * pageSize;
         const items = await mapBarsInBatches(rawItems, startIndex);
