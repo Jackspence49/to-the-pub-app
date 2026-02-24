@@ -1,7 +1,6 @@
 // Functions to map raw API data to Bar objects
-import type { BarTag } from '@/types/index';
-import type { Bar, LooseObject } from '../types';
-import { DAY_NAME_INDEX, MILES_PER_KM } from './constants';
+import type { Bar, BarTag } from '@/types/index';
+import { DAY_NAME_INDEX } from './constants';
 import { normalizeTwitterUrl, toNumber } from './helpers';
 
 //Map raw tag data to BarTag type
@@ -144,66 +143,34 @@ const extractTodayClosingMeta = (
 
 // Map raw bar data to Bar type
 export const mapToBar = (raw: LooseObject, index: number): Bar => {
-  const idSource =
-    raw.id ?? raw.bar_id ?? raw.uuid ?? raw.slug ?? raw.external_id ?? `bar-${index}`;
-
-  const location = (raw.address ?? raw.location ?? {}) as LooseObject;
-  const city = raw.address_city ?? raw.city ?? location.city;
-  const state = raw.address_state ?? raw.state ?? location.state;
-  const cityState = [city, state].filter(Boolean).join(', ');
-  const addressLabel = cityState || city || state || undefined;
-  
-  const distanceKm = toNumber(raw.distance_km ?? raw.distanceKm ?? raw.distance);
-  const distanceMilesExplicit = toNumber(
-    raw.distance_miles ?? raw.distanceMiles ?? raw.distance_mi ?? raw.distanceMi ?? raw.distanceMilesAway
-  );
-  const distanceMiles =
-    typeof distanceMilesExplicit === 'number'
-      ? distanceMilesExplicit
-      : typeof distanceKm === 'number'
-        ? distanceKm * MILES_PER_KM
-        : undefined;
-
-  const rawTags = Array.isArray(raw.tags)
-    ? raw.tags
-    : Array.isArray(raw.tag_list)
-      ? raw.tag_list
-      : [];
-
-  const dedupedTags: BarTag[] = [];
-  rawTags
-    .map((tag, tagIndex) => mapToBarTag(tag, tagIndex))
-    .filter((tag): tag is BarTag => Boolean(tag))
-    .forEach((tag) => {
-      if (!dedupedTags.some((existing) => existing.id === tag.id)) {
-        dedupedTags.push(tag);
-      }
-    });
+  // Assume payload is consistent and all fields exist
+  const idSource = raw.id;
+  const city = raw.address_city;
+  const state = raw.address_state;
+  const addressLabel = `${city}, ${state}`;
+  const distanceMiles = toNumber(raw.distance_miles);
+  const rawTags = raw.tags || [];
+  const dedupedTags: BarTag[] = rawTags.map((tag, tagIndex) => mapToBarTag(tag, tagIndex)).filter((tag): tag is BarTag => Boolean(tag));
 
   const closingMeta = extractTodayClosingMeta(raw);
   const closesToday = closingMeta.closesAt;
-  const crossesMidnightToday = Boolean(
-    raw.crosses_midnight_today ??
-      raw.crossesMidnightToday ??
-      closingMeta.crossesMidnight ??
-      false
-  );
+  const crossesMidnightToday = closingMeta.crossesMidnight;
 
   return {
     id: String(idSource),
-    name: raw.name ?? raw.title ?? 'Unnamed bar',
-    city: city ? String(city) : undefined,
-    state: state ? String(state) : undefined,
+    name: raw.name,
+    city: String(city),
+    state: String(state),
     addressLabel,
-    instagram: raw.instagram ?? undefined,
-    facebook: raw.facebook ?? undefined,
+    instagram: raw.instagram,
+    facebook: raw.facebook,
     twitter: normalizeTwitterUrl(raw.twitter),
-    distanceKm,
+    distanceKm: undefined,
     distanceMiles,
     closesToday,
     crossesMidnightToday,
     tags: dedupedTags,
-    hours: [],
+    hours: raw.hours || [],
   };
 };
 

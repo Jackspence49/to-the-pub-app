@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { FontAwesome } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import {
@@ -8,47 +9,14 @@ import {
 	StyleSheet,
 	Text,
 	TouchableOpacity,
+	useColorScheme,
 	View,
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
+import { HERO_MAP_DELTA } from '..//utils/constants';
+import { Bar, BarHours } from '../types/index';
 
-import { Colors } from '@/constants/theme';
 
-export type ThemeName = keyof typeof Colors;
-type Palette = (typeof Colors)[ThemeName];
-
-export type BarTag = {
-	id: string;
-	name: string;
-	category?: string;
-};
-
-export type BarHour = {
-	dayOfWeek: number;
-	openTime?: string | null;
-	closeTime?: string | null;
-	isClosed: boolean;
-	crossesMidnight: boolean;
-};
-
-export type BarDetail = {
-	id: string;
-	name: string;
-	description?: string;
-	addressStreet?: string;
-	addressCity?: string;
-	addressState?: string;
-	addressZip?: string;
-	latitude?: string;
-	longitude?: string;
-	phone?: string;
-	website?: string;
-	instagram?: string;
-	facebook?: string;
-	twitter?: string;
-	tags: BarTag[];
-	hours: BarHour[];
-};
 
 export type ContactAction = {
 	key: string;
@@ -58,21 +26,16 @@ export type ContactAction = {
 	accessibilityLabel: string;
 };
 
-type BarDetailsProps = {
-	bar: BarDetail | null;
+type BarsProps = {
+	bar: Bar | null;
 	isLoading: boolean;
 	error: string | null;
-	theme: ThemeName;
-	palette: (typeof Colors)[ThemeName];
 	onRetry: () => void;
 	onViewUpcomingEvents: () => void;
 	onPressOpenMap?: () => void;
 };
 
-const HERO_MAP_DELTA = {
-	latitudeDelta: 0.005,
-	longitudeDelta: 0.005,
-};
+
 
 const HERO_MAP_STYLE = [
 	{ featureType: 'road.highway', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
@@ -99,17 +62,17 @@ const formatHourToken = (value?: string | null) => {
 	}).format(date);
 };
 
-const buildAddressLabel = (bar?: BarDetail | null) => {
+const buildAddressLabel = (bar?: Bar | null) => {
 	if (!bar) {
 		return null;
 	}
-	const segments = [bar.addressStreet, [bar.addressCity, bar.addressState].filter(Boolean).join(', '), bar.addressZip]
+	const segments = [bar.address_street, [bar.address_city, bar.address_state].filter(Boolean).join(', '), bar.address_zip]
 		.map((segment) => segment?.trim())
 		.filter((segment) => segment && segment.length > 0);
 	return segments.length > 0 ? segments.join(' ') : null;
 };
 
-const computeCoordinates = (bar?: BarDetail | null) => {
+const computeCoordinates = (bar?: Bar | null) => {
 	if (!bar?.latitude || !bar?.longitude) {
 		return null;
 	}
@@ -174,7 +137,7 @@ const openMapsForAddress = async (address?: string) => {
 	}
 };
 
-const buildContactActions = (bar?: BarDetail | null): ContactAction[] => {
+const buildContactActions = (bar?: Bar | null): ContactAction[] => {
 	if (!bar) {
 		return [];
 	}
@@ -200,7 +163,7 @@ const buildContactActions = (bar?: BarDetail | null): ContactAction[] => {
 	return actions;
 };
 
-const buildSocialActions = (bar?: BarDetail | null): ContactAction[] => {
+const buildSocialActions = (bar?: Bar | null): ContactAction[] => {
 	if (!bar) {
 		return [];
 	}
@@ -238,14 +201,14 @@ type GroupedHoursRow = {
 	days: number[];
 };
 
-const createHourValueLabel = (hour: BarHour) => {
-	if (hour.isClosed) {
+const createHourValueLabel = (hour: BarHours) => {
+	if (hour.is_closed) {
 		return 'Closed';
 	}
-	const openLabel = formatHourToken(hour.openTime);
-	const closeLabel = formatHourToken(hour.closeTime);
+	const openLabel = formatHourToken(hour.opens_at);
+	const closeLabel = formatHourToken(hour.closes_at);
 	if (openLabel && closeLabel) {
-		return `${openLabel} - ${closeLabel}${hour.crossesMidnight ? ' *' : ''}`;
+		return `${openLabel} - ${closeLabel}${hour.crosses_midnight ? ' *' : ''}`;
 	}
 	return 'Hours coming soon';
 };
@@ -286,7 +249,7 @@ const buildDayLabel = (days: number[]) => {
 	return ranges.map(formatRange).join(', ');
 };
 
-const groupHoursBySchedule = (hours?: BarHour[]): GroupedHoursRow[] => {
+const groupHoursBySchedule = (hours?: BarHours[]): GroupedHoursRow[] => {
 	if (!hours || hours.length === 0) {
 		return [];
 	}
@@ -294,7 +257,7 @@ const groupHoursBySchedule = (hours?: BarHour[]): GroupedHoursRow[] => {
 	hours.forEach((hour) => {
 		const valueLabel = createHourValueLabel(hour);
 		const existing = map.get(valueLabel) ?? [];
-		map.set(valueLabel, [...existing, hour.dayOfWeek]);
+		map.set(valueLabel, [...existing, hour.day_of_week]);
 	});
 	return Array.from(map.entries())
 		.map(([valueLabel, days]) => ({
@@ -309,12 +272,13 @@ export default function BarDetails({
 	bar,
 	isLoading,
 	error,
-	palette,
-	theme,
 	onRetry,
 	onViewUpcomingEvents,
 	onPressOpenMap,
-}: BarDetailsProps) {
+}: BarsProps) {
+	const theme = useColorScheme() ?? 'dark';
+	const palette = Colors[theme];
+
 	const styles = useMemo(() => createStyles(palette), [palette]);
 	const addressLabel = useMemo(() => buildAddressLabel(bar), [bar]);
 	const coordinates = useMemo(() => computeCoordinates(bar), [bar]);
@@ -344,7 +308,7 @@ export default function BarDetails({
 	if (isLoading) {
 		return (
 			<View style={styles.centerContent}>
-				<ActivityIndicator color={palette.tint} size="large" />
+				<ActivityIndicator color={palette.activePill} size="large" />
 				<Text style={[styles.statusText, { color: palette.text }]}>Loading bar details...</Text>
 			</View>
 		);
@@ -355,8 +319,8 @@ export default function BarDetails({
 			<View style={styles.centerContent}>
 				<Text style={[styles.errorTitle, { color: palette.text }]}>Unable to load bar</Text>
 				<Text style={[styles.errorDescription, { color: theme === 'light' ? '#4b5563' : '#94a3b8' }]}>{error}</Text>
-				<TouchableOpacity style={[styles.retryButton, { borderColor: palette.tint }]} onPress={onRetry}>
-					<Text style={[styles.retryButtonText, { color: palette.tint }]}>Try again</Text>
+				<TouchableOpacity style={[styles.retryButton, { borderColor: palette.activePill }]} onPress={onRetry}>
+					<Text style={[styles.retryButtonText, { color: palette.activePill }]}>Try again</Text>
 				</TouchableOpacity>
 			</View>
 		);
@@ -535,7 +499,8 @@ export default function BarDetails({
 		);
 	}
 
-const createStyles = (palette: Palette) => StyleSheet.create({
+const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet.create({
+	
 	// ── Map
 	heroMapWrapper: {
 		width: '100%',

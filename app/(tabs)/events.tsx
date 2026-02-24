@@ -24,8 +24,7 @@ import EventCard from '@/components/eventCard';
 import type { Event, EventTag, ThemeName } from '@/types/index';
 import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
 import { getCacheKey } from '../../utils/helpers';
-import { extractPaginationMeta, shouldContinuePagination } from '../../utils/pagination';
-
+import { PayloadWithPagination, shouldContinuePagination } from '../../utils/pagination';
 
 // Type definitions
 type FetchMode = 'initial' | 'refresh' | 'paginate';
@@ -788,16 +787,14 @@ const EventsScreen = () => {
 					throw new Error(`Request failed with status ${response.status}`);
 				}
 
-				const payload = await response.json();
+				const payload: PayloadWithPagination = await response.json();
 				const incoming = extractEventItems(payload).map(mapToEventInstance);
-				const pagination = extractPaginationMeta(payload);
+				const pageMeta = payload.meta?.pagination;
 				const hasMoreNext = shouldContinuePagination(payload, incoming.length, PAGE_SIZE);
 				const resolvedPage =
-					typeof pagination?.current_page === 'number'
-						? pagination.current_page
-						: typeof pagination?.page === 'number'
-							? pagination.page
-							: pageToLoad;
+					typeof pageMeta?.current_page === 'number'
+						? pageMeta.current_page
+						: pageToLoad;
 
 				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
 					return;
@@ -1151,7 +1148,8 @@ const EventsScreen = () => {
 				initialNumToRender={INFINITE_SCROLL_CONFIG.initialPageSize}
 				maxToRenderPerBatch={INFINITE_SCROLL_CONFIG.subsequentPageSize}
 				windowSize={5}
-				removeClippedSubviews
+				// Keep clipping off to avoid flicker with sticky headers on Android
+				removeClippedSubviews={false}
 				showsVerticalScrollIndicator={false}
 			/>
 

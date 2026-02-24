@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Bar, SelectedTagEntry, TagFilterOption } from '../types';
 import { TAGS_ENDPOINT } from '../utils/constants';
-import { normalizeTagName } from '../utils/helpers';
+// ...existing code...
 
 export const useTagFilters = (
   bars: Bar[],
@@ -38,19 +38,12 @@ export const useTagFilters = (
             : [];
 
         const tagMap = new Map<string, TagFilterOption>();
-
         rawItems.forEach((tag: any) => {
           const name = typeof tag?.name === 'string' ? tag.name.trim() : '';
           if (!name) {
             return;
           }
-
-          const normalizedName = normalizeTagName(name);
-          if (!normalizedName) {
-            return;
-          }
-
-          // Require backend tag ids so API calls send ids instead of normalized names
+          // Require backend tag ids so API calls send ids
           const tagId =
             typeof tag?.id === 'string'
               ? tag.id.trim()
@@ -60,11 +53,10 @@ export const useTagFilters = (
           if (!tagId || tagMap.has(tagId)) {
             return;
           }
-
           tagMap.set(tagId, {
             id: tagId,
             name,
-            normalizedName,
+            normalizedName: tagId, // Use tagId as normalizedName since normalization is removed
           });
         });
 
@@ -103,26 +95,17 @@ export const useTagFilters = (
         return false;
       }
       
-      // Prefer backend tag ids for matching; fall back to normalized names only if ids are missing
+      // Only use backend tag ids for matching
       const tagIds = bar.tags
         .map((tag) => (typeof tag.id === 'string' ? tag.id.trim() : ''))
         .filter((value) => value.length > 0);
-
-      const fallbackNames = tagIds.length
-        ? []
-        : bar.tags
-            .map((tag) => normalizeTagName(tag.name))
-            .filter((value) => value && value.length > 0);
-
-      const barTagSet = new Set([...tagIds, ...fallbackNames]);
-      
+      const barTagSet = new Set(tagIds);
       // Bar must have ALL selected tags (AND logic)
       for (const tag of selectedSet.values()) {
         if (!barTagSet.has(tag)) {
           return false;
         }
       }
-      
       return true;
     });
   }, [bars, selectedTags]);
@@ -134,9 +117,7 @@ export const useTagFilters = (
     if (selectedTags.length === 0) {
       return [];
     }
-    
     const lookup = new Map(availableTags.map((tag) => [tag.id, tag.name]));
-    
     return selectedTags.map((id) => ({
       normalized: id,
       label: lookup.get(id) ?? id,

@@ -22,6 +22,8 @@ export const DEFAULT_COORDS: Coordinates = {
 // Base Query Parameters (align with backend expectations)
 export const BASE_QUERY_PARAMS: QueryParams = {
   unit: 'miles',
+  include: 'tags',
+  open_now: 'true',
 };
 
 // Infinite Scroll Configuration

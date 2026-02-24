@@ -1,5 +1,4 @@
 // General utility functions
-
 import type { Coordinates, LooseObject, QueryParams } from '../types';
 
  // Build a URL query string from parameters
@@ -55,9 +54,6 @@ export const toNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
-// Normalize tag names for filtering
-export const normalizeTagName = (value: string): string => value.trim().toLowerCase();
-
 // Format distance labels for display
 export const formatDistanceLabel = (distanceMiles?: number): string | null => {
   if (typeof distanceMiles !== 'number' || Number.isNaN(distanceMiles) || distanceMiles < 0) {
@@ -68,11 +64,19 @@ export const formatDistanceLabel = (distanceMiles?: number): string | null => {
     return 'Right here';
   }
 
+    if (distanceMiles < 0.1) {
+    return `${(distanceMiles * 5280).toFixed(0)} ft away`;
+  }
+
   if (distanceMiles < 10) {
     return `${distanceMiles.toFixed(2)} mi away`;
   }
 
-  return `${distanceMiles.toFixed(1)} mi away`;
+    if (distanceMiles < 100) {
+    return `${distanceMiles.toFixed(1)} mi away`;
+  }
+
+  return `${distanceMiles.toFixed(0)} mi away`;
 };
 
 // Ensure a URL has a protocol
