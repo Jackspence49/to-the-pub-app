@@ -6,9 +6,7 @@ export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 export const NORMALIZED_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
 export const BARS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/bars` : '/get/bars';
 export const TAGS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/tags` : '/get/tags';
-
-// Distance Conversion
-export const MILES_PER_KM = 0.621371;
+export const EVENTS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/events` : '/get/events';
 
 // Cache TTLs
 export const LOCATION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -19,12 +17,21 @@ export const DEFAULT_COORDS: Coordinates = {
   lon: -71.0565,
 };
 
-// Base Query Parameters (align with backend expectations)
-export const BASE_QUERY_PARAMS: QueryParams = {
+// Base index.tsx Parameters (align with backend expectations)
+export const INDEX_BASE_QUERY_PARAMS: QueryParams = {
   unit: 'miles',
   include: 'tags',
   open_now: 'true',
 };
+
+//Event.tsx Parameters
+export const EVENTS_BASE_QUERY_PARAMS: QueryParams = {
+  radius: 10,
+  unit: 'miles',
+  upcoming: 'true',
+}
+
+export const RADIUS_OPTIONS = [1, 3, 5, 10];
 
 // Infinite Scroll Configuration
 export const INFINITE_SCROLL_CONFIG: InfiniteScrollConfig = {
@@ -45,4 +52,10 @@ export const DAY_NAME_INDEX: Record<string, number> = {
   thursday: 4,
   friday: 5,
   saturday: 6,
+};
+
+// barDetails.tsx Hero map delta configuration for consistent zoom level
+export const HERO_MAP_DELTA = {
+	latitudeDelta: 0.005,
+	longitudeDelta: 0.005,
 };

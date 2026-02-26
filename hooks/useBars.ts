@@ -16,8 +16,8 @@ import {
 } from '../utils/Barmappers';
 import {
   BARS_ENDPOINT,
-  BASE_QUERY_PARAMS,
   DEFAULT_COORDS,
+  INDEX_BASE_QUERY_PARAMS,
   INFINITE_SCROLL_CONFIG,
 } from '../utils/constants';
 import {
@@ -149,7 +149,7 @@ export const useBars = (
 
       try {
         const queryParams: QueryParams = {
-          ...BASE_QUERY_PARAMS,
+          ...INDEX_BASE_QUERY_PARAMS,
           lat: coordsToUse.lat,
           lon: coordsToUse.lon,
           page,

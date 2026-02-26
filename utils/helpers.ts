@@ -1,4 +1,5 @@
 // General utility functions
+import { Linking } from 'react-native';
 import type { Coordinates, LooseObject, QueryParams } from '../types';
 
  // Build a URL query string from parameters
@@ -119,7 +120,6 @@ export const openExternalLink = async (url?: string): Promise<void> => {
   if (!url) {
     return;
   }
-  const { Linking } = await import('react-native');
   try {
     const canOpen = await Linking.canOpenURL(url);
     if (canOpen) {

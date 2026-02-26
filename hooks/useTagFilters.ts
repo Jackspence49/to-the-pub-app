@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Bar, SelectedTagEntry, TagFilterOption } from '../types';
 import { TAGS_ENDPOINT } from '../utils/constants';
-// ...existing code...
+
 
 export const useTagFilters = (
   bars: Bar[],

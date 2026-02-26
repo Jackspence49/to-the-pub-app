@@ -1,10 +1,9 @@
 import { Colors } from '@/constants/theme';
-import { MaterialIcons } from '@expo/vector-icons'; // Icon library
-import * as Location from 'expo-location'; // Location services
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'; // Navigation and routing
+import { MaterialIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
-
 // React Native components
 import {
 	ActivityIndicator,
@@ -19,12 +18,31 @@ import {
 	View,
 } from 'react-native';
 
-// Custom constants and hooks
+//types
+import type { Event, EventTag, QueryParams, ThemeName } from '@/types/index';
+
+
+
+// Components
 import EventCard from '@/components/eventCard';
-import type { Event, EventTag, ThemeName } from '@/types/index';
-import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
-import { getCacheKey } from '../../utils/helpers';
+
+// Utility functions for event data normalization and mapping
+import { DEFAULT_COORDS, INFINITE_SCROLL_CONFIG } from '../../utils/constants';
+import { extractEventItems } from '../../utils/Event';
+import { normalizeTagIds, normalizeTagParamList } from '../../utils/eventTag';
+import { buildQueryString, getCacheKey } from '../../utils/helpers';
 import { PayloadWithPagination, shouldContinuePagination } from '../../utils/pagination';
+
+
+
+
+// Default Parameters
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
+const PAGE_SIZE = INFINITE_SCROLL_CONFIG.initialPageSize;
+const DEFAULT_RADIUS_MILES = 10;
+const DISTANCE_UNIT = 'miles';
+const RADIUS_OPTIONS = [1, 3, 5, 10];
+const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
 // Type definitions
 type FetchMode = 'initial' | 'refresh' | 'paginate';
@@ -45,87 +63,6 @@ type EventsCache = {
 	hasMore: boolean;
 };
 
-// Default Parameters
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
-const PAGE_SIZE = INFINITE_SCROLL_CONFIG.initialPageSize;
-const DEFAULT_RADIUS_MILES = 10;
-const DISTANCE_UNIT = 'miles';
-const RADIUS_OPTIONS = [1, 3, 5, 10];
-const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-
-const DEFAULT_COORDINATES = {
-	latitude: 42.3555,
-	longitude: -71.0565,
-};
-
-
-// Utility function to normalize tag parameter list
-const normalizeTagParamList = (value?: string | string[]): string[] => {
-	if (!value) {
-		return [];
-	}
-
-	const rawList = Array.isArray(value) ? value : value.split(',');
-	return rawList
-		.map((entry) => entry.trim())
-		.filter((entry) => entry.length > 0);
-};
-
-// Normalize a tag id array to trimmed, unique values
-const normalizeTagIds = (ids: string[]): string[] =>
-	Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
-
-// Utility function to build query strings
-
-// Utility function to build query strings
-const buildQueryString = (params: Record<string, QueryValue>) =>
-	Object.entries(params)
-		.flatMap(([key, value]) => {
-			if (value === undefined || value === '') {
-				return [];
-			}
-
-			if (Array.isArray(value)) {
-				return value
-					.filter((entry) => entry !== undefined && entry !== '')
-					.map((entry) =>
-						`${encodeURIComponent(key)}=${encodeURIComponent(String(entry))}`
-					);
-			}
-
-			return `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`;
-		})
-		.join('&');
-
-// Function to extract event items from various API response structures
-const extractEventItems = (payload: unknown): LooseObject[] => {
-	if (!payload) {
-		return [];
-	}
-
-	if (Array.isArray(payload)) {
-		return payload as LooseObject[];
-	}
-
-	const record = payload as LooseObject;
-	const candidates = [
-		record.data?.items,
-		record.data?.data,
-		record.data,
-		record.items,
-		record.results,
-		record.event_instances,
-		record.events,
-	];
-
-	for (const candidate of candidates) {
-		if (Array.isArray(candidate)) {
-			return candidate as LooseObject[];
-		}
-	}
-
-	return [];
-};
 
 // Function to extract tag items from various API response structures
 const extractTagItems = (payload: unknown): LooseObject[] => {
@@ -741,8 +678,8 @@ const EventsScreen = () => {
 			try {
 				setError(null);
 				const coordsToUse = userCoords ?? {
-					lat: DEFAULT_COORDINATES.latitude,
-					lon: DEFAULT_COORDINATES.longitude,
+					lat: DEFAULT_COORDS.lat,
+					lon: DEFAULT_COORDS.lon,
 				};
 				const cacheKey = getCacheKey(coordsToUse, selectedTagIds);
 
@@ -764,7 +701,7 @@ const EventsScreen = () => {
 					}
 				}
 				// Build the API query to match the backend contract (no extra pagination params)
-				const queryParams: Record<string, QueryValue> = {
+				const queryParams: QueryParams = {
 					upcoming: true,
 					limit: PAGE_SIZE,
 					page: pageToLoad,
@@ -1148,8 +1085,7 @@ const EventsScreen = () => {
 				initialNumToRender={INFINITE_SCROLL_CONFIG.initialPageSize}
 				maxToRenderPerBatch={INFINITE_SCROLL_CONFIG.subsequentPageSize}
 				windowSize={5}
-				// Keep clipping off to avoid flicker with sticky headers on Android
-				removeClippedSubviews={false}
+				removeClippedSubviews
 				showsVerticalScrollIndicator={false}
 			/>
 

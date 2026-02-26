@@ -22,7 +22,7 @@ export const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
 
   const distanceLabel = formatDistanceLabel(bar.distanceMiles);
   const addressLabel = bar.addressLabel ?? 'Location coming soon';
-  const closingLabel = formatClosingTimeLabel(bar.closesToday);
+  const closingLabel = formatClosingTimeLabel(bar.closes_at);
 
   const detailParts: string[] = [];
   if (distanceLabel) {

@@ -1,6 +1,5 @@
 // types/index.ts
 // All TypeScript type definitions for the bars module
-
 import type { Colors } from '@/constants/theme';
 
 // Re-exporting types from individual files for easier imports
@@ -9,12 +8,14 @@ export type LooseObject = Record<string, any>;
 export type QueryValue = string | number | boolean | undefined;
 export type QueryParams = Record<string, QueryValue>;
 
+//Coordinates type definition
 export type Coordinates = { 
   lat: number; 
   lon: number 
 };
 
 
+//bar types
 export type Bar = {
   id: string;
   name: string;
@@ -44,6 +45,7 @@ export type meta = {
     location?: location;
 };
 
+// Pagination metadata structure
 export type pagination = {
     current_page: number;
     per_page: number;
@@ -55,6 +57,7 @@ export type pagination = {
     previous_page: number | null;
 }
 
+//Bar Filters
 export type filters = {
   open_now?: boolean;
   radius?: number;
@@ -64,6 +67,7 @@ export type filters = {
 	event_tag_id?: string;
 }
 
+// Bar location Meta Data
 export type location = {
     lat?: number;
     lon?: number;
@@ -71,6 +75,7 @@ export type location = {
     unit?: string;
 }
 
+//Bar Search Result Type
 export type searchBar = {
     id: string;
     name: string;
@@ -80,12 +85,14 @@ export type searchBar = {
     address_zip?: string;
 }
 
+//Bar Tag Results Type
 export type BarTag = {
   id: string;
   name: string;
   category?: string;
 };
 
+//Bar Hour Results Typles
 export type BarHours = {
     id: string;
     day_of_week: number;

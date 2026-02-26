@@ -1,5 +1,3 @@
-// index.tsx
-
 // Import react and necessary components/hooks
 import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';

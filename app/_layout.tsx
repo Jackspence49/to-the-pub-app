@@ -25,7 +25,6 @@ export default function RootLayout() {
           <Stack.Screen name="bar-events/[barId]" options={{ title: 'Bar Events' }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style={theme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>
