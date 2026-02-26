@@ -1,24 +1,17 @@
-// Individual bar display component
-
+// Import necessary modules and types
 import { Colors } from '@/constants/theme';
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import type { BarCardProps } from '../types';
 import { formatDistanceLabel, openExternalLink } from '../utils/helpers';
 import { formatClosingTimeLabel } from '../utils/Timeformatters';
 
-export const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
+
+
+export const BarCard = ({ bar, onPress }: BarCardProps) => {
+  const theme  = useColorScheme() ?? 'dark';
   const palette = Colors[theme];
-  const cardTitle = palette.cardTitle;
-  const cardSubtitle = palette.cardSubtitle;
-  const cardText = palette.cardText;
-  const cardSurface = palette.cardSurface;
-  const cardBorder = palette.border;
-  const pillBackground = palette.pillBackground;
-  const pillBorder = palette.border;
-  const pillText = palette.pillText;
-  const iconSelected = palette.iconSelected;
 
   const distanceLabel = formatDistanceLabel(bar.distanceMiles);
   const addressLabel = bar.addressLabel ?? 'Location coming soon';
@@ -35,19 +28,19 @@ export const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: cardSurface, borderColor: cardBorder }]}
+      style={[styles.card, { backgroundColor: palette.cardSurface, borderColor: palette.border }]}
       activeOpacity={0.9}
       onPress={onPress}
       disabled={!onPress}
     >
       <View style={styles.cardHeader}>
-        <Text style={[styles.barName, { color: cardTitle }]} numberOfLines={1}>
+        <Text style={[styles.barName, { color: palette.cardTitle }]} numberOfLines={1}>
           {bar.name}
         </Text>
       </View>
 
       <View>
-        <Text style={[styles.addressText, { color: cardSubtitle }]} numberOfLines={2}>
+        <Text style={[styles.addressText, { color: palette.cardSubtitle }]} numberOfLines={2}>
           {addressLabel}
         </Text>
       </View>
@@ -57,10 +50,10 @@ export const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
           <MaterialIcons
             name="location-on"
             size={16}
-            color={iconSelected}
+            color={palette.iconSelected}
             style={{ marginRight: 4 }}
           />
-          <Text style={[styles.distanceDetail, { color: cardText }]}>{detailLine}</Text>
+          <Text style={[styles.distanceDetail, { color: palette.cardText }]}>{detailLine}</Text>
         </View>
       ) : null}
 
@@ -69,9 +62,9 @@ export const BarCard = ({ bar, theme, onPress }: BarCardProps) => {
           {bar.tags.slice(0, 4).map((tag) => (
             <View
               key={tag.id}
-              style={[styles.tagPill, { backgroundColor: pillBackground, borderColor: pillBorder }]}
+              style={[styles.tagPill, { backgroundColor: palette.pillBackground, borderColor: palette.pillBorder }]}
             >
-              <Text style={[styles.tagText, { color: pillText }]} numberOfLines={1}>
+              <Text style={[styles.tagText, { color: palette.pillText }]} numberOfLines={1}>
                 {tag.name}
               </Text>
             </View>
