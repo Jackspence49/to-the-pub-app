@@ -92,12 +92,12 @@ export type BarTag = {
   category?: string;
 };
 
-//Bar Hour Results Typles
+//Bar Hour Results Types
 export type BarHours = {
     id: string;
     day_of_week: number;
-    opens_at: string;
-    closes_at: string;
+    open_time: string;
+    close_time: string;
     is_closed: boolean;
     crosses_midnight: boolean;
 }
@@ -179,8 +179,7 @@ export type SelectedTagEntry = {
 
 // Component props types
 export type BarCardProps = {
-  bar: Bar;
-  theme: ThemeName;
+  Bar: Bar;
   onPress?: () => void;
 };
 

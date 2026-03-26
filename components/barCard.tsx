@@ -4,22 +4,23 @@ import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import type { BarCardProps } from '../types';
-import { formatDistanceLabel, openExternalLink } from '../utils/helpers';
-import { formatClosingTimeLabel } from '../utils/Timeformatters';
+import { formatCityAddress, formatDistanceLabel, openExternalLink } from '../utils/helpers';
+import { getTodaysHours } from '../utils/Timeformatters';
 
 
 
-export const BarCard = ({ bar, onPress }: BarCardProps) => {
+export const BarCard = ({ Bar, onPress }: BarCardProps) => {
   const theme  = useColorScheme() ?? 'dark';
   const palette = Colors[theme];
 
-  const distanceLabel = formatDistanceLabel(bar.distanceMiles);
-  const addressLabel = bar.addressLabel ?? 'Location coming soon';
-  const closingLabel = formatClosingTimeLabel(bar.closes_at);
+  const distanceLabel = formatDistanceLabel(Bar.distance_miles);
+  const addressLabel = formatCityAddress(Bar.address_city, Bar.address_state);
+  const todaysHours = getTodaysHours(Bar.hours);
+  const closingLabel = todaysHours.close
 
   const detailParts: string[] = [];
   if (distanceLabel) {
-    detailParts.push(distanceLabel);
+    detailParts.push(`${distanceLabel} mi away`);
   }
   if (closingLabel) {
     detailParts.push(`Closes ${closingLabel}`);
@@ -34,8 +35,8 @@ export const BarCard = ({ bar, onPress }: BarCardProps) => {
       disabled={!onPress}
     >
       <View style={styles.cardHeader}>
-        <Text style={[styles.barName, { color: palette.cardTitle }]} numberOfLines={1}>
-          {bar.name}
+        <Text style={[styles.BarName, { color: palette.cardTitle }]} numberOfLines={1}>
+          {Bar.name}
         </Text>
       </View>
 
@@ -53,13 +54,13 @@ export const BarCard = ({ bar, onPress }: BarCardProps) => {
             color={palette.iconSelected}
             style={{ marginRight: 4 }}
           />
-          <Text style={[styles.distanceDetail, { color: palette.cardText }]}>{detailLine}</Text>
+          <Text style={[styles.distanceDetail, { color: palette.cardText }]}>{distanceLabel}</Text>
         </View>
       ) : null}
 
-      {bar.tags.length > 0 ? (
+      {Bar.tags.length > 0 ? (
         <View style={styles.tagList}>
-          {bar.tags.slice(0, 4).map((tag) => (
+          {Bar.tags.slice(0, 4).map((tag) => (
             <View
               key={tag.id}
               style={[styles.tagPill, { backgroundColor: palette.pillBackground, borderColor: palette.pillBorder }]}
@@ -72,29 +73,29 @@ export const BarCard = ({ bar, onPress }: BarCardProps) => {
         </View>
       ) : null}
 
-      {(bar.instagram || bar.twitter || bar.facebook) && (
+      {(Bar.instagram || Bar.twitter || Bar.facebook) && (
         <View style={styles.socialRow}>
-          {bar.instagram ? (
+          {Bar.instagram ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(bar.instagram)}
+              onPress={() => openExternalLink(Bar.instagram)}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
               <FontAwesome name="instagram" size={16} color={palette.pillText} />
             </TouchableOpacity>
           ) : null}
-          {bar.twitter ? (
+          {Bar.twitter ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(bar.twitter)}
+              onPress={() => openExternalLink(Bar.twitter)}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
               <FontAwesome name="twitter" size={16} color={palette.pillText} />
             </TouchableOpacity>
           ) : null}
-          {bar.facebook ? (
+          {Bar.facebook ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(bar.facebook)}
+              onPress={() => openExternalLink(Bar.facebook)}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  barName: {
+  BarName: {
     fontSize: 20,
     fontWeight: '700',
     flex: 1,

@@ -29,7 +29,7 @@ export const shouldContinuePagination = (
   }
 
   if (typeof pageMeta.has_next_page === 'boolean') {
-    return pageMeta.has_next_page || countSuggestsMore;
+    return pageMeta.has_next_page;
   }
 
   if (typeof pageMeta.total_pages === 'number') {

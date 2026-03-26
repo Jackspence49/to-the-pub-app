@@ -28,8 +28,6 @@ import EventCard from '@/components/eventCard';
 
 // Utility functions for event data normalization and mapping
 import { DEFAULT_COORDS, INFINITE_SCROLL_CONFIG } from '../../utils/constants';
-import { extractEventItems } from '../../utils/Event';
-import { normalizeTagIds, normalizeTagParamList } from '../../utils/eventTag';
 import { buildQueryString, getCacheKey } from '../../utils/helpers';
 import { PayloadWithPagination, shouldContinuePagination } from '../../utils/pagination';
 
@@ -61,6 +59,51 @@ type EventsCache = {
 	data: Event[];
 	currentPage: number;
 	hasMore: boolean;
+};
+
+// Normalize a tag id array to trimmed, unique values
+const normalizeTagIds = (ids: string[]): string[] =>
+	Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+
+const normalizeTagParamList = (value?: string | string[]): string[] => {
+	if (!value) {
+		return [];
+	}
+
+	const rawList = Array.isArray(value) ? value : value.split(',');
+	return rawList
+		.map((entry) => entry.trim())
+		.filter((entry) => entry.length > 0);
+};
+
+// Function to extract event items from various API response structures
+const extractEventItems = (payload: unknown): LooseObject[] => {
+	if (!payload) {
+		return [];
+	}
+
+	if (Array.isArray(payload)) {
+		return payload as LooseObject[];
+	}
+
+	const record = payload as LooseObject;
+	const candidates = [
+		record.data?.items,
+		record.data?.data,
+		record.data,
+		record.items,
+		record.results,
+		record.event_instances,
+		record.events,
+	];
+
+	for (const candidate of candidates) {
+		if (Array.isArray(candidate)) {
+			return candidate as LooseObject[];
+		}
+	}
+
+	return [];
 };
 
 
@@ -328,6 +371,8 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 		},
 		[onChange]
 	);
+
+	
 
 	const unitLabel = DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT;
 	const currentLabel = `Location: ${value} ${unitLabel}`;

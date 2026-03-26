@@ -135,3 +135,11 @@ export const getCacheKey = (coords: Coordinates, normalizedTags: string[]): stri
   const tagsKey = normalizedTags.slice().sort().join(',');
   return `${coords.lat}|${coords.lon}|${tagsKey}`;
 };
+
+export const formatCityAddress = (address_city?: string, address_state?: string): string | null => {
+  const parts = [address_city, address_state].filter(Boolean);
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join(', ');
+};

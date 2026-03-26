@@ -205,8 +205,8 @@ const createHourValueLabel = (hour: BarHours) => {
 	if (hour.is_closed) {
 		return 'Closed';
 	}
-	const openLabel = formatHourToken(hour.opens_at);
-	const closeLabel = formatHourToken(hour.closes_at);
+	const openLabel = formatHourToken(hour.open_time);
+	const closeLabel = formatHourToken(hour.close_time);
 	if (openLabel && closeLabel) {
 		return `${openLabel} - ${closeLabel}${hour.crosses_midnight ? ' *' : ''}`;
 	}

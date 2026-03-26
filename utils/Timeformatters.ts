@@ -1,3 +1,5 @@
+import { BarHours } from '../types';
+
 // Time parsing and formatting utilities
 
 //Parse various time formats into Date objects
@@ -62,4 +64,37 @@ export const formatClosingTimeLabel = (closesAt?: string): string | null => {
 
   const minutesPart = minutes > 0 ? `:${minutes.toString().padStart(2, '0')}` : '';
   return `${hours}${minutesPart} ${period}`;
+};
+
+//
+// utils/barUtils.ts
+
+
+export const getTodaysHours = (hours: BarHours[]) => {
+  const todayIndex = new Date().getDay(); 
+  const todaysSchedule = hours.find(h => h.day_of_week === todayIndex);
+
+  // If not found or marked closed, return a "closed" state object
+  if (!todaysSchedule || todaysSchedule.is_closed) {
+    return {
+      open: null,
+      close: null,
+      isClosed: true
+    };
+  }
+
+  return {
+    open: formatTime(todaysSchedule.open_time),
+    close: formatTime(todaysSchedule.close_time),
+    isClosed: false
+  };
+};
+
+// Helper to turn "13:00:00" into "1:00 PM"
+const formatTime = (timeString: string): string => {
+  const [hours, minutes] = timeString.split(':');
+  const h = parseInt(hours, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const formattedHours = h % 12 || 12;
+  return `${formattedHours}:${minutes} ${ampm}`;
 };

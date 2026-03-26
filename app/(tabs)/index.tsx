@@ -2,7 +2,7 @@
 import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -50,7 +50,6 @@ export default function BarsScreen() {
     locationDeniedPermanently,
     refreshUserLocation,
     getCurrentCoordinates,
-    lastCoordsRef,
   } = useLocationCache();
 
     // Tag filter state (shared between UI and backend fetches)
@@ -71,7 +70,19 @@ export default function BarsScreen() {
     } = useBars(userCoords, selectedTags);
 
     // Tag filters derived from loaded bars
-    const tagFilterContext = useTagFilters(
+    // selectedTags and isFilterSheetVisible are passed in and returned unchanged — use local state directly
+    const {
+      availableTags,
+      tagsError,
+      retryFetchTags,
+      filteredBars,
+      selectedTagEntries,
+      handleApplyFilters,
+      openFilterSheet,
+      closeFilterSheet,
+      handleClearFilters,
+      handleRemoveTag,
+    } = useTagFilters(
       bars,
       selectedTags,
       setSelectedTags,
@@ -129,17 +140,6 @@ export default function BarsScreen() {
     let cancelled = false;
 
     const kickoff = async () => {
-      // Check for cached location
-      const freshCached =
-        lastCoordsRef.current && Date.now() - lastCoordsRef.current.fetchedAt < 5 * 60 * 1000
-          ? lastCoordsRef.current.coords
-          : null;
-
-      if (freshCached) {
-        // Use cached location immediately
-      }
-
-      // Try to get current location
       const coords = await getCurrentCoordinates();
       
       if (!cancelled) {
@@ -152,31 +152,27 @@ export default function BarsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [getCurrentCoordinates, loadBarsPage, lastCoordsRef]);
+  }, [getCurrentCoordinates, loadBarsPage]);
 
-  // Focus effect for location refresh
+  // Warm the location cache each time this tab comes into focus.
+  // The result is intentionally discarded — this is a background side-effect so that
+  // the next pull-to-refresh has a fresh coord ready immediately instead of waiting on GPS.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       (async () => {
         if (cancelled) return;
-        await refreshUserLocation();
+        await getCurrentCoordinates();
       })();
       return () => {
         cancelled = true;
       };
-    }, [refreshUserLocation])
+    }, [getCurrentCoordinates])
   );
 
   // Handlers
   const handleOpenSettings = useCallback(() => {
-    if (typeof Linking.openSettings === 'function') {
-      Linking.openSettings().catch((err) => {
-        console.warn('Unable to open app settings.', err);
-      });
-      return;
-    }
-    Linking.openURL('app-settings:').catch((err) => {
+    Linking.openSettings().catch((err) => {
       console.warn('Unable to open app settings.', err);
     });
   }, []);
@@ -196,8 +192,8 @@ export default function BarsScreen() {
   );
 
   const renderItem = useCallback<ListRenderItem<Bar>>(
-    ({ item }) => <BarCard bar={item} theme={theme} onPress={() => openBarDetail(item.id)} />,
-    [openBarDetail, theme]
+    ({ item }) => <BarCard Bar={item} onPress={() => openBarDetail(item.id)} />,
+    [openBarDetail]
   );
 
   const keyExtractor = useCallback((item: Bar) => item.id, []);
@@ -205,10 +201,11 @@ export default function BarsScreen() {
   const errorMessage = error?.message ?? null;
 
   // Header component
-  const headerComponent =
+  const headerComponent = useMemo(() => (
     locationDeniedPermanently ||
-    tagFilterContext.availableTags.length > 0 ||
-    tagFilterContext.selectedTags.length > 0 ||
+    availableTags.length > 0 ||
+    selectedTags.length > 0 ||
+    !!tagsError ||
     (bars.length > 0 && errorMessage) ? (
       <View style={styles.listHeader}>
         <Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Open Bars</Text>
@@ -221,11 +218,19 @@ export default function BarsScreen() {
           />
         ) : null}
 
-        {tagFilterContext.availableTags.length > 0 || tagFilterContext.selectedTags.length > 0 ? (
+        {tagsError ? (
+          <TouchableOpacity onPress={retryFetchTags} activeOpacity={0.7}>
+            <Text style={[styles.tagsErrorText, { color: palette.warningText }]}>
+              Unable to load filters — tap to retry
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {availableTags.length > 0 || selectedTags.length > 0 ? (
           <View style={[styles.filterCard, { backgroundColor: palette.background }]}>
             <View style={styles.filterButtonRow}>
               <TouchableOpacity
-                onPress={tagFilterContext.openFilterSheet}
+                onPress={openFilterSheet}
                 style={[
                   styles.filterButton,
                   styles.filterButtonLarge,
@@ -241,14 +246,14 @@ export default function BarsScreen() {
                 />
                 <Text style={[styles.filterButtonText, { color: palette.filterTextActive }]}>
                   Filters
-                  {tagFilterContext.selectedTags.length
-                    ? ` (${tagFilterContext.selectedTags.length})`
+                  {selectedTags.length
+                    ? ` (${selectedTags.length})`
                     : ''}
                 </Text>
               </TouchableOpacity>
-              {tagFilterContext.selectedTags.length ? (
+              {selectedTags.length ? (
                 <TouchableOpacity
-                  onPress={tagFilterContext.handleClearFilters}
+                  onPress={handleClearFilters}
                   style={[styles.inlineClearButton, { borderColor: palette.filterActivePill }]}
                   activeOpacity={0.85}
                 >
@@ -259,9 +264,9 @@ export default function BarsScreen() {
               ) : null}
             </View>
 
-            {tagFilterContext.selectedTagEntries.length ? (
+            {selectedTagEntries.length ? (
               <View style={styles.selectedTagChipRow}>
-                {tagFilterContext.selectedTagEntries.map((entry) => (
+                {selectedTagEntries.map((entry) => (
                   <View
                     key={entry.normalized}
                     style={[
@@ -276,7 +281,7 @@ export default function BarsScreen() {
                       {entry.label}
                     </Text>
                     <TouchableOpacity
-                      onPress={() => tagFilterContext.handleRemoveTag(entry.normalized)}
+                      onPress={() => handleRemoveTag(entry.normalized)}
                       style={[
                         styles.selectedTagChipClose,
                         { backgroundColor: palette.filterContainer },
@@ -296,11 +301,28 @@ export default function BarsScreen() {
           <ErrorBanner message={errorMessage} theme={theme} />
         ) : null}
       </View>
-    ) : null;
+    ) : null
+  ), [
+    locationDeniedPermanently,
+    availableTags.length,
+    selectedTags,
+    selectedTagEntries,
+    tagsError,
+    openFilterSheet,
+    retryFetchTags,
+    handleClearFilters,
+    handleRemoveTag,
+    bars.length,
+    errorMessage,
+    palette,
+    theme,
+    handleOpenSettings,
+    refreshUserLocation,
+  ]);
 
   // Footer component
-  const footerComponent =
-    tagFilterContext.filteredBars.length > 0 ? (
+  const footerComponent = useMemo(() => (
+    filteredBars.length > 0 ? (
       isLoadingMore ? (
         <View style={styles.footerLoading}>
           <ActivityIndicator size="small" color={palette.text} />
@@ -309,19 +331,34 @@ export default function BarsScreen() {
           </Text>
         </View>
       ) : null
-    ) : null;
+    ) : null
+  ), [filteredBars, isLoadingMore, palette.text]);
 
   // Empty component
-  const listEmptyComponent =
-    bars.length === 0 && !isLoading && !isRefreshing ? (
-      <BarsEmptyState error={errorMessage} onRetry={handleRetry} theme={theme} />
-    ) : tagFilterContext.filteredBars.length === 0 && tagFilterContext.selectedTags.length > 0 ? (
-      <FilteredEmptyState
-        selectedTagEntries={tagFilterContext.selectedTagEntries}
-        onClear={tagFilterContext.handleClearFilters}
-        theme={theme}
-      />
-    ) : null;
+  const listEmptyComponent = useMemo(() => (
+    !isLoading && !isRefreshing ? (
+      filteredBars.length === 0 && selectedTags.length > 0 ? (
+        <FilteredEmptyState
+          selectedTagEntries={selectedTagEntries}
+          onClear={handleClearFilters}
+          theme={theme}
+        />
+      ) : bars.length === 0 ? (
+        <BarsEmptyState error={errorMessage} onRetry={handleRetry} theme={theme} />
+      ) : null
+    ) : null
+  ), [
+    isLoading,
+    isRefreshing,
+    filteredBars.length,
+    selectedTags.length,
+    selectedTagEntries,
+    handleClearFilters,
+    bars.length,
+    errorMessage,
+    handleRetry,
+    theme,
+  ]);
 
   // Loading state
   if (isLoading && bars.length === 0) {
@@ -341,7 +378,7 @@ export default function BarsScreen() {
     <View style={[styles.container, { backgroundColor: palette.background }]}>
       <FlatList
         ref={listRef}
-        data={tagFilterContext.filteredBars}
+        data={filteredBars}
         style={[styles.list, { backgroundColor: palette.background }]}
         contentContainerStyle={styles.listContent}
         keyExtractor={keyExtractor}
@@ -363,11 +400,11 @@ export default function BarsScreen() {
         showsVerticalScrollIndicator={false}
       />
       <TagFilterSheet
-        visible={tagFilterContext.isFilterSheetVisible}
-        tags={tagFilterContext.availableTags}
-        selectedTags={tagFilterContext.selectedTags}
-        onApply={tagFilterContext.handleApplyFilters}
-        onClose={tagFilterContext.closeFilterSheet}
+        visible={isFilterSheetVisible}
+        tags={availableTags}
+        selectedTags={selectedTags}
+        onApply={handleApplyFilters}
+        onClose={closeFilterSheet}
         theme={theme}
       />
     </View>
@@ -486,5 +523,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+  },
+  tagsErrorText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

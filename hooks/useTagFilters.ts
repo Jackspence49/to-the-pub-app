@@ -2,7 +2,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Bar, SelectedTagEntry, TagFilterOption } from '../types';
-import { TAGS_ENDPOINT } from '../utils/constants';
+import { BAR_TAGS_ENDPOINT } from '../utils/constants';
 
 
 export const useTagFilters = (
@@ -16,8 +16,13 @@ export const useTagFilters = (
   const [availableTags, setAvailableTags] = useState<TagFilterOption[]>([]);
   const [areTagsLoading, setAreTagsLoading] = useState(false);
   const [tagsError, setTagsError] = useState<string | null>(null);
+  const [tagsRetryCount, setTagsRetryCount] = useState(0);
 
-  // Load tags from the backend 
+  const retryFetchTags = useCallback(() => {
+    setTagsRetryCount((c) => c + 1);
+  }, []);
+
+  // Load tags from the backend
   useEffect(() => {
     let cancelled = false;
 
@@ -25,7 +30,7 @@ export const useTagFilters = (
       setAreTagsLoading(true);
       try {
         setTagsError(null);
-        const response = await fetch(TAGS_ENDPOINT);
+        const response = await fetch(BAR_TAGS_ENDPOINT);
         if (!response.ok) {
           throw new Error(`Failed to fetch tags (status ${response.status})`);
         }
@@ -80,9 +85,10 @@ export const useTagFilters = (
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tagsRetryCount]);
 
-  // Filter bars by selected tags (client-side) Note: This should ideally be done server-side
+  // Filter bars by selected tags (client-side).
+  // AND logic: bar must have ALL selected tags — matches server-side behaviour.
   const filteredBars = useMemo(() => {
     if (selectedTags.length === 0) {
       return bars;
@@ -167,6 +173,7 @@ export const useTagFilters = (
     availableTags,
     areTagsLoading,
     tagsError,
+    retryFetchTags,
     filteredBars,
     selectedTagEntries,
     isFilterSheetVisible,

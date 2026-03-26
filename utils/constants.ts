@@ -5,7 +5,7 @@ import type { Coordinates, InfiniteScrollConfig, QueryParams } from '../types';
 export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 export const NORMALIZED_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
 export const BARS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/bars` : '/get/bars';
-export const TAGS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/tags` : '/get/tags';
+export const BAR_TAGS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/BarTags` : '/get/tags';
 export const EVENTS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/events` : '/get/events';
 
 // Cache TTLs
