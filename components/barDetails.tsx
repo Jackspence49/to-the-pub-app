@@ -16,8 +16,6 @@ import MapView, { Marker, Region } from 'react-native-maps';
 import { HERO_MAP_DELTA } from '..//utils/constants';
 import { Bar, BarHours } from '../types/index';
 
-
-
 export type ContactAction = {
 	key: string;
 	iconName: React.ComponentProps<typeof FontAwesome>['name'];
@@ -66,10 +64,14 @@ const buildAddressLabel = (bar?: Bar | null) => {
 	if (!bar) {
 		return null;
 	}
-	const segments = [bar.address_street, [bar.address_city, bar.address_state].filter(Boolean).join(', '), bar.address_zip]
+	const cityStateZip = [[bar.address_city, bar.address_state].filter(Boolean).join(', '), bar.address_zip]
+		.map((s) => s?.trim())
+		.filter((s) => s && s.length > 0)
+		.join(' ');
+	const segments = [bar.address_street, cityStateZip]
 		.map((segment) => segment?.trim())
 		.filter((segment) => segment && segment.length > 0);
-	return segments.length > 0 ? segments.join(' ') : null;
+	return segments.length > 0 ? segments.join(', ') : null;
 };
 
 const computeCoordinates = (bar?: Bar | null) => {
@@ -192,7 +194,7 @@ const buildSocialActions = (bar?: Bar | null): ContactAction[] => {
 			accessibilityLabel: `Open ${bar.name} Twitter`,
 		});
 	}
-	return actions;
+return actions;
 };
 
 type GroupedHoursRow = {
