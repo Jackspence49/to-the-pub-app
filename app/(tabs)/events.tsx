@@ -747,17 +747,17 @@ const EventsScreen = () => {
 				}
 				// Build the API query to match the backend contract (no extra pagination params)
 				const queryParams: QueryParams = {
-					upcoming: true,
+					upcoming: 'true',
 					limit: PAGE_SIZE,
 					page: pageToLoad,
-					lon: coordsToUse.lon,
 					lat: coordsToUse.lat,
+					lon: coordsToUse.lon,
 					radius: searchRadius,
 					unit: DISTANCE_UNIT,
 				};
 
 				if (selectedTagIds.length > 0) {
-					queryParams.event_tag_id = selectedTagIds.join(',');
+					queryParams.event_tag_id = selectedTagIds[0];
 				}
 
 				const query = buildQueryString(queryParams);
@@ -886,13 +886,12 @@ const EventsScreen = () => {
 			return (
 				<EventCard
 					event={item.event}
-					availableTags={availableTags}
 					distanceUnit={DISTANCE_UNIT}
 					onPress={() => handleOpenEvent(item.event)}
 				/>
 			);
 		},
-		[availableTags, handleOpenEvent, palette]
+		[handleOpenEvent, palette]
 	);
 
 	const flatEvents = useMemo(() => {

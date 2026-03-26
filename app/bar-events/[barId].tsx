@@ -14,7 +14,7 @@ import {
 
 import EventCard from '@/components/eventCard';
 import { Colors } from '@/constants/theme';
-import type { Event, EventTag } from '@/types/index';
+import type { Event } from '@/types/index';
 
 type FetchMode = 'initial' | 'refresh' | 'paginate';
 type QueryValue = string | number | boolean | undefined;
@@ -273,20 +273,6 @@ export default function BarEventsScreen() {
   const [isPaginating, setIsPaginating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const availableTags = useMemo<EventTag[]>(() => {
-    const map = new Map<string, EventTag>();
-    events.forEach((event) => {
-      const entries = [...(event.event_tag_id ?? []), event.event_tag_name].filter(Boolean) as string[];
-      entries.forEach((entry) => {
-        const id = entry.trim();
-        if (!id || map.has(id)) {
-          return;
-        }
-        map.set(id, { id, name: id });
-      });
-    });
-    return Array.from(map.values());
-  }, [events]);
 
   const fetchEvents = useCallback(
     async (pageToLoad: number, mode: FetchMode) => {
@@ -382,12 +368,11 @@ export default function BarEventsScreen() {
     ({ item }) => (
       <EventCard
         event={item}
-        availableTags={availableTags}
         distanceUnit="miles"
         onPress={() => handleOpenEvent(item)}
       />
     ),
-    [availableTags, handleOpenEvent]
+    [handleOpenEvent]
   );
 
   const sections = useMemo(() => {

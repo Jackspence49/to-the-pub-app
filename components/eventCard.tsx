@@ -1,10 +1,10 @@
 import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 
 
-import type { Event, EventTag } from '@/types/index';
+import type { Event } from '@/types/index';
 
 export type EventCardTokens = {
 	cardBackground: string;
@@ -20,7 +20,6 @@ export type EventCardTokens = {
 
 export type EventCardProps = {
 	event: Event;
-	availableTags: EventTag[];
 	distanceUnit?: string;
 	onPress?: () => void;
 };
@@ -57,24 +56,15 @@ const formatDistance = (value: number | undefined, unit: string): string | null 
 	return `${formatter.format(value)} ${unit} away`;
 };
 
-const resolveTagNames = (event: Event, availableTags: EventTag[]) => {
-	const tagIds = Array.from(
-		new Set([event.event_tag_id].filter(Boolean) as string[]),
-	).slice(0, 3);
 
-	return tagIds.map((tagId) => availableTags.find((tag) => tag.id === tagId)?.name || tagId);
-};
-
-const EventCard = ({ event, availableTags, distanceUnit = 'miles', onPress }: EventCardProps) => {
+const EventCard = ({ event, distanceUnit = 'miles', onPress }: EventCardProps) => {
 	const theme = useColorScheme() ?? 'dark';
 	const palette = Colors[theme];
 	const barName = event.bar_name;
 	const startTimeLabel = formatEventTime(event.start_time);
 	const endTimeLabel = formatEventTime(event.end_time);
 	const distanceLabel = formatDistance(event.distanceMiles, distanceUnit);
-    
-	const tagsToRender = useMemo(() => resolveTagNames(event, availableTags), [availableTags, event]);
-	const eventTagName = tagsToRender[0];
+	const eventTagName = event.event_tag_name;
 
 	return (
 		<TouchableOpacity
