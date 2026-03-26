@@ -143,32 +143,30 @@ const extractTodayClosingMeta = (
 
 // Map raw bar data to Bar type
 export const mapToBar = (raw: LooseObject, index: number): Bar => {
-  // Assume payload is consistent and all fields exist
-  const idSource = raw.id;
-  const city = raw.address_city;
-  const state = raw.address_state;
-  const addressLabel = `${city}, ${state}`;
-  const distanceMiles = toNumber(raw.distance_miles);
   const rawTags = raw.tags || [];
-  const dedupedTags: BarTag[] = rawTags.map((tag, tagIndex) => mapToBarTag(tag, tagIndex)).filter((tag): tag is BarTag => Boolean(tag));
-
-  const closingMeta = extractTodayClosingMeta(raw);
-  const closesToday = closingMeta.closesAt;
-  const crossesMidnightToday = closingMeta.crossesMidnight;
+  const dedupedTags: BarTag[] = rawTags
+    .map((tag: any, tagIndex: number) => mapToBarTag(tag, tagIndex))
+    .filter((tag: BarTag | null): tag is BarTag => Boolean(tag));
 
   return {
-    id: String(idSource),
+    id: String(raw.id),
     name: raw.name,
-    city: String(city),
-    state: String(state),
-    addressLabel,
-    instagram: raw.instagram,
-    facebook: raw.facebook,
+    description: raw.description ?? undefined,
+    address_street: raw.address_street ?? undefined,
+    address_city: raw.address_city ?? undefined,
+    address_state: raw.address_state ?? undefined,
+    address_zip: raw.address_zip ?? undefined,
+    latitude: toNumber(raw.latitude) ?? undefined,
+    longitude: toNumber(raw.longitude) ?? undefined,
+    phone: raw.phone ?? undefined,
+    website: raw.website ?? undefined,
+    instagram: raw.instagram ?? undefined,
+    facebook: raw.facebook ?? undefined,
     twitter: normalizeTwitterUrl(raw.twitter),
-    distanceKm: undefined,
-    distanceMiles,
-    closesToday,
-    crossesMidnightToday,
+    posh: raw.posh ?? undefined,
+    eventbrite: raw.eventbrite ?? undefined,
+    distance_miles: toNumber(raw.distance_miles) ?? undefined,
+    distance_km: toNumber(raw.distance_km) ?? undefined,
     tags: dedupedTags,
     hours: raw.hours || [],
   };
