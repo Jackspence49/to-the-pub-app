@@ -35,7 +35,7 @@ import {
   FilteredEmptyState,
   LocationPermissionBanner,
 } from '../../components/emptyStates';
-import { TagFilterSheet } from '../../components/tagFilterSheet';
+import { TagFilterSheet } from '../../components/barTagFilterSheet';
 
 
 // Main screen component

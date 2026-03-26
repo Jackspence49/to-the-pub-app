@@ -194,6 +194,19 @@ export type TagFilterSheetProps = {
   theme: ThemeName;
 };
 
+// Props for the event tag filter sheet component
+export type EventTagFilterSheetProps = {
+  visible: boolean;
+  tags: EventTag[];
+  selectedTagIds: string[];
+  onApply: (tagIds: string[]) => void;
+  onClose: () => void;
+  onRetry: () => void;
+  isLoading: boolean;
+  error: string | null;
+  theme: ThemeName;
+};
+
 // Props for the filter pill component
 export type LocationCache = {
   coords: Coordinates;

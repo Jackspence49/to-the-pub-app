@@ -1,17 +1,16 @@
-// components/TagFilterSheet.tsx
-// Bottom sheet modal for tag filtering
+// components/barTagFilterSheet.tsx
 
 import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import type { TagFilterSheetProps } from '../types';
 

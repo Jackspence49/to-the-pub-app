@@ -8,8 +8,6 @@ import type { ListRenderItem } from 'react-native';
 import {
 	ActivityIndicator,
 	FlatList,
-	Modal,
-	Pressable,
 	RefreshControl,
 	StyleSheet,
 	Text,
@@ -25,9 +23,10 @@ import type { Event, EventTag, QueryParams, ThemeName } from '@/types/index';
 
 // Components
 import EventCard from '@/components/eventCard';
+import EventTagFilterSheet from '@/components/eventTagFilterSheet';
 
 // Utility functions for event data normalization and mapping
-import { DEFAULT_COORDS, INFINITE_SCROLL_CONFIG } from '../../utils/constants';
+import { DEFAULT_COORDS, EVENT_TAGS_ENDPOINT, INFINITE_SCROLL_CONFIG } from '../../utils/constants';
 import { buildQueryString, getCacheKey } from '../../utils/helpers';
 import { PayloadWithPagination, shouldContinuePagination } from '../../utils/pagination';
 
@@ -406,136 +405,6 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 	);
 };
 
-// Props type definition for TagFilterSheet
-type TagFilterSheetProps = {
-	visible: boolean;
-	tags: EventTag[];
-	selectedTagIds: string[];
-	onApply: (tagIds: string[]) => void;
-	onClose: () => void;
-	onRetry: () => void;
-	isLoading: boolean;
-	error: string | null;
-	theme: ThemeName;
-};
-
-// Tag filter sheet Modal component
-const TagFilterSheet = ({
-	visible,
-	tags,
-	selectedTagIds,
-	onApply,
-	onClose,
-	onRetry,
-	isLoading,
-	error,
-	theme,
-
-}: TagFilterSheetProps) => {
-	const palette = Colors[theme];
-	const highlightColor = palette.filterActivePill;
-	const [draftSelection, setDraftSelection] = useState<string[]>(selectedTagIds);
-
-	useEffect(() => {
-		if (visible) {
-			setDraftSelection(selectedTagIds);
-		}
-	}, [selectedTagIds, visible]);
-
-	const filteredTags = useMemo(() => {
-		return tags;
-	}, [tags]);
-
-	const toggleTag = useCallback((tagId: string) => {
-		setDraftSelection((previous) => {
-			const next = previous.includes(tagId) ? [] : [tagId];
-			onApply(next);
-			onClose();
-			return next;
-		});
-	}, [onApply, onClose]);
-
-	// Render function for each tag row
-	const renderTagRow = useCallback(
-		({ item }: { item: EventTag }) => {
-			const isChecked = draftSelection.includes(item.id);
-			return (
-				<TouchableOpacity
-					style={styles.filterRow}
-					onPress={() => toggleTag(item.id)}
-					activeOpacity={0.8}
-					accessibilityRole="radio"
-					accessibilityState={{ selected: isChecked }}
-				>
-					<MaterialIcons
-						name={isChecked ? 'radio-button-checked' : 'radio-button-unchecked'}
-						size={22}
-						color={isChecked ? highlightColor : palette.cardTitle}
-						style={styles.filterRowCheckbox}
-					/>
-					<Text style={[styles.filterRowLabel, { color: palette.cardTitle }]} numberOfLines={1}>
-						{item.name}
-					</Text>
-				</TouchableOpacity>
-			);
-		},
-		[draftSelection, highlightColor, palette.cardTitle, toggleTag]
-	);
-
-	// Render the modal sheet
-	return (
-		<Modal
-			visible={visible}
-			animationType="fade"
-			transparent
-			presentationStyle="overFullScreen"
-			onRequestClose={onClose}
-		>
-			<Pressable style={styles.sheetScrim} onPress={onClose} />
-			<View
-				style={[
-					styles.sheetContainer,
-					{ backgroundColor: palette.container, borderColor: palette.border },
-				]}
-			>
-				<Text style={[styles.sheetTitle, { color: palette.cardTitle }]}>Filter Events</Text>
-
-				{isLoading ? (
-					<View style={styles.filterStateRow}>
-						<ActivityIndicator color={highlightColor} />
-						<Text style={[styles.filterStateText, { color: palette.cardTitle }]}>Loading tags...</Text>
-					</View>
-				) : error ? (
-					<View style={styles.filterStateColumn}>
-						<Text style={[styles.filterStateErrorText, { color: palette.cardTitle }]}>{error}</Text>
-						<TouchableOpacity
-							onPress={onRetry}
-							style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
-							activeOpacity={0.85}
-						>
-							<Text style={[styles.filterStateRetryText, { color: highlightColor }]}>Retry</Text>
-						</TouchableOpacity>
-					</View>
-				) : (
-					<FlatList
-						data={filteredTags}
-						keyExtractor={(item) => item.id}
-						renderItem={renderTagRow}
-						contentContainerStyle={filteredTags.length === 0 ? styles.filterEmptyContent : undefined}
-						ListEmptyComponent={
-							<View style={styles.filterEmptyState}>
-								<Text style={[styles.filterStateText, { color: palette.cardSubtitle }]}>No tags available.</Text>
-							</View>
-						}
-						style={styles.filterList}
-						showsVerticalScrollIndicator={false}
-						keyboardShouldPersistTaps="handled"
-					/>
-				)}
-			</View>
-		</Modal>
-	);
-};
 
 // Main Events Screen component
 const EventsScreen = () => {
@@ -589,7 +458,7 @@ const EventsScreen = () => {
 		setAreTagsLoading(true);
 		try {
 			setTagsError(null);
-			const response = await fetch(`${normalizedBaseUrl}/event-tags`);
+			const response = await fetch(EVENT_TAGS_ENDPOINT);
 			if (!response.ok) {
 				throw new Error(`Failed to fetch tags (status ${response.status})`);
 			}
@@ -1133,7 +1002,7 @@ const EventsScreen = () => {
 				showsVerticalScrollIndicator={false}
 			/>
 
-			<TagFilterSheet
+			<EventTagFilterSheet
 				visible={isFilterSheetVisible}
 				tags={availableTags}
 				selectedTagIds={selectedTagIds}
