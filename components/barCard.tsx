@@ -4,19 +4,19 @@ import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import type { BarCardProps } from '../types';
-import { formatCityAddress, formatDistanceLabel, openExternalLink } from '../utils/helpers';
+import { formatCityAddress, formatDistanceLabel, openExternalLink, toSocialUrl } from '../utils/helpers';
 
 
 
-export const BarCard = ({ Bar, onPress }: BarCardProps) => {
+export const BarCard = ({ bar, onPress }: BarCardProps) => {
   const theme  = useColorScheme() ?? 'dark';
   const palette = Colors[theme];
 
-  const distanceLabel = formatDistanceLabel(Bar.distance_miles);
-  const addressLabel = formatCityAddress(Bar.address_city, Bar.address_state);
+  const distanceLabel = formatDistanceLabel(bar.distance_miles);
+  const addressLabel = formatCityAddress(bar.address_city, bar.address_state);
   const closingLabel = (() => {
-    if (!Bar.closes_at) return null;
-    const [h, m] = Bar.closes_at.split(':').map(Number);
+    if (!bar.closes_at) return null;
+    const [h, m] = bar.closes_at.split(':').map(Number);
     if (isNaN(h) || isNaN(m)) return null;
     const d = new Date();
     d.setHours(h, m, 0, 0);
@@ -32,7 +32,7 @@ export const BarCard = ({ Bar, onPress }: BarCardProps) => {
     >
       <View style={styles.cardHeader}>
         <Text style={[styles.BarName, { color: palette.cardTitle }]} numberOfLines={1}>
-          {Bar.name}
+          {bar.name}
         </Text>
       </View>
 
@@ -56,9 +56,9 @@ export const BarCard = ({ Bar, onPress }: BarCardProps) => {
         </View>
       ) : null}
 
-      {Bar.tags.length > 0 ? (
+      {bar.tags.length > 0 ? (
         <View style={styles.tagList}>
-          {Bar.tags.slice(0, 4).map((tag) => (
+          {bar.tags.slice(0, 4).map((tag) => (
             <View
               key={tag.id}
               style={[styles.tagPill, { backgroundColor: palette.pillBackground, borderColor: palette.pillBorder }]}
@@ -71,29 +71,29 @@ export const BarCard = ({ Bar, onPress }: BarCardProps) => {
         </View>
       ) : null}
 
-      {(Bar.instagram || Bar.twitter || Bar.facebook) && (
+      {(bar.instagram || bar.twitter || bar.facebook) && (
         <View style={styles.socialRow}>
-          {Bar.instagram ? (
+          {bar.instagram ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(Bar.instagram)}
+              onPress={() => openExternalLink(toSocialUrl(bar.instagram!, 'instagram'))}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
               <FontAwesome name="instagram" size={16} color={palette.pillText} />
             </TouchableOpacity>
           ) : null}
-          {Bar.twitter ? (
+          {bar.twitter ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(Bar.twitter)}
+              onPress={() => openExternalLink(toSocialUrl(bar.twitter!, 'twitter'))}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
               <FontAwesome name="twitter" size={16} color={palette.pillText} />
             </TouchableOpacity>
           ) : null}
-          {Bar.facebook ? (
+          {bar.facebook ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(Bar.facebook)}
+              onPress={() => openExternalLink(toSocialUrl(bar.facebook!, 'facebook'))}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >

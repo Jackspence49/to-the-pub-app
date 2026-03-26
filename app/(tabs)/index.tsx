@@ -192,7 +192,7 @@ export default function BarsScreen() {
   );
 
   const renderItem = useCallback<ListRenderItem<Bar>>(
-    ({ item }) => <BarCard Bar={item} onPress={() => openBarDetail(item.id)} />,
+    ({ item }) => <BarCard bar={item} onPress={() => openBarDetail(item.id)} />,
     [openBarDetail]
   );
 

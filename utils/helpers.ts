@@ -115,6 +115,21 @@ export const normalizeTwitterUrl = (value: unknown): string | undefined => {
   return `https://x.com/${handle}`;
 };
 
+const SOCIAL_BASE_URLS: Record<string, string> = {
+  instagram: 'https://instagram.com/',
+  facebook: 'https://facebook.com/',
+  twitter: 'https://x.com/',
+};
+
+export const toSocialUrl = (value: string, platform: string): string => {
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value;
+  }
+  const username = value.startsWith('@') ? value.slice(1) : value;
+  const base = SOCIAL_BASE_URLS[platform];
+  return base ? `${base}${username}` : `https://${username}`;
+};
+
 //Open an external link with error handling
 export const openExternalLink = async (url?: string): Promise<void> => {
   if (!url) {

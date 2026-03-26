@@ -15,6 +15,7 @@ import {
 import MapView, { Marker, Region } from 'react-native-maps';
 import { Bar, BarHours } from '../types/index';
 import { HERO_MAP_DELTA } from '../utils/constants';
+import { toSocialUrl } from '../utils/helpers';
 
 export type ContactAction = {
 	key: string;
@@ -165,20 +166,6 @@ const buildContactActions = (bar?: Bar | null): ContactAction[] => {
 	return actions;
 };
 
-const SOCIAL_BASE_URLS: Record<string, string> = {
-	instagram: 'https://instagram.com/',
-	facebook: 'https://facebook.com/',
-	twitter: 'https://twitter.com/',
-};
-
-const toSocialUrl = (value: string, platform: string): string => {
-	if (value.startsWith('http://') || value.startsWith('https://')) {
-		return value;
-	}
-	const username = value.startsWith('@') ? value.slice(1) : value;
-	const base = SOCIAL_BASE_URLS[platform];
-	return base ? `${base}${username}` : `https://${username}`;
-};
 
 const buildSocialActions = (bar?: Bar | null): ContactAction[] => {
 	if (!bar) {
@@ -456,7 +443,7 @@ export default function BarDetails({
 				{/* Contact */}
 				{contactActions.length > 0 ? (
 					<View style={[styles.section]}>
-						<Text style={[styles.sectionLabel, { color: palette.pillText, marginTop: socialActions.length > 0 ? 12 : 0 }]}>Contact</Text>
+						<Text style={[styles.sectionLabel, { color: palette.pillText }]}>Contact</Text>
 						<View style={styles.contactList}>
 						{contactActions.map((action) => (
 							<TouchableOpacity
@@ -515,7 +502,7 @@ export default function BarDetails({
 	}
 
 const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet.create({
-	
+
 	// ── Map
 	heroMapWrapper: {
 		width: '100%',
@@ -525,32 +512,30 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 	heroMap: {
 		width: '100%',
 		height: '100%',
-    	overflow: "hidden",
+		overflow: 'hidden',
 	},
 
+	// ── Sections
+	section: {
+		paddingVertical: 16,
+		borderBottomWidth: 1,
+		borderBottomColor: palette.border,
+	},
+	sectionEnd: {
+		paddingVertical: 16,
+	},
+	sectionLabel: {
+		fontSize: 16,
+		fontWeight: '700',
+		marginBottom: 6,
+		color: palette.pillText,
+	},
+	sectionValue: {
+		fontSize: 16,
+		fontWeight: '400',
+	},
 
-  // ── Sections
-  section: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border,
-  },
-  sectionEnd: {
-    paddingVertical: 16,
-  },
-    sectionLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 6,
-	color: palette.pillText,
-  },
-  sectionValue: {
-    fontSize: 16,
-    fontWeight: "400",
-  },
-
-
-//Bar Info
+	// Bar Info
 	typeValue: {
 		fontSize: 16,
 		fontWeight: '600',
@@ -559,20 +544,20 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		marginBottom: 4,
 	},
 	eventTitle: {
-		 fontSize: 30,
-		 fontWeight: "900",
-		 marginBottom: 4,
+		fontSize: 30,
+		fontWeight: '900',
+		marginBottom: 4,
 	},
-		 
-// Address
+
+	// Address
 	addressBlock: {
- marginTop: 6,
-    gap: 8,
-  },
-  addressText: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
+		marginTop: 6,
+		gap: 8,
+	},
+	addressText: {
+		fontSize: 16,
+		marginBottom: 4,
+	},
 	pageContent: {
 		paddingHorizontal: 20,
 	},
@@ -620,7 +605,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		justifyContent: 'space-between',
 		gap: 12,
 	},
-
 	tagsBlock: {
 		marginTop: 12,
 		gap: 8,
@@ -695,13 +679,13 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		fontWeight: '600',
 	},
 	externalBtn: {
-    	borderRadius: 12,
-    	paddingVertical: 14,
-    	alignItems: "center",
-    	justifyContent: "center",
- 	 },
-  externalBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
+		borderRadius: 12,
+		paddingVertical: 14,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	externalBtnText: {
+		fontSize: 14,
+		fontWeight: '700',
+	},
 });

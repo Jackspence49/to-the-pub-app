@@ -180,7 +180,7 @@ export type SelectedTagEntry = {
 
 // Component props types
 export type BarCardProps = {
-  Bar: Bar;
+  bar: Bar;
   onPress?: () => void;
 };
 
