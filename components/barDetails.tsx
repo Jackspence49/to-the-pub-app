@@ -13,8 +13,8 @@ import {
 	View,
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
-import { HERO_MAP_DELTA } from '..//utils/constants';
 import { Bar, BarHours } from '../types/index';
+import { HERO_MAP_DELTA } from '../utils/constants';
 
 export type ContactAction = {
 	key: string;
@@ -165,6 +165,21 @@ const buildContactActions = (bar?: Bar | null): ContactAction[] => {
 	return actions;
 };
 
+const SOCIAL_BASE_URLS: Record<string, string> = {
+	instagram: 'https://instagram.com/',
+	facebook: 'https://facebook.com/',
+	twitter: 'https://twitter.com/',
+};
+
+const toSocialUrl = (value: string, platform: string): string => {
+	if (value.startsWith('http://') || value.startsWith('https://')) {
+		return value;
+	}
+	const username = value.startsWith('@') ? value.slice(1) : value;
+	const base = SOCIAL_BASE_URLS[platform];
+	return base ? `${base}${username}` : `https://${username}`;
+};
+
 const buildSocialActions = (bar?: Bar | null): ContactAction[] => {
 	if (!bar) {
 		return [];
@@ -174,7 +189,7 @@ const buildSocialActions = (bar?: Bar | null): ContactAction[] => {
 		actions.push({
 			key: 'instagram',
 			iconName: 'instagram',
-			onPress: () => openExternal(bar.instagram),
+			onPress: () => openExternal(toSocialUrl(bar.instagram!, 'instagram')),
 			accessibilityLabel: `Open ${bar.name} Instagram`,
 		});
 	}
@@ -182,7 +197,7 @@ const buildSocialActions = (bar?: Bar | null): ContactAction[] => {
 		actions.push({
 			key: 'facebook',
 			iconName: 'facebook',
-			onPress: () => openExternal(bar.facebook),
+			onPress: () => openExternal(toSocialUrl(bar.facebook!, 'facebook')),
 			accessibilityLabel: `Open ${bar.name} Facebook`,
 		});
 	}
@@ -190,11 +205,11 @@ const buildSocialActions = (bar?: Bar | null): ContactAction[] => {
 		actions.push({
 			key: 'twitter',
 			iconName: 'twitter',
-			onPress: () => openExternal(bar.twitter),
+			onPress: () => openExternal(toSocialUrl(bar.twitter!, 'twitter')),
 			accessibilityLabel: `Open ${bar.name} Twitter`,
 		});
 	}
-return actions;
+	return actions;
 };
 
 type GroupedHoursRow = {
@@ -210,7 +225,7 @@ const createHourValueLabel = (hour: BarHours) => {
 	const openLabel = formatHourToken(hour.open_time);
 	const closeLabel = formatHourToken(hour.close_time);
 	if (openLabel && closeLabel) {
-		return `${openLabel} - ${closeLabel}${hour.crosses_midnight ? ' *' : ''}`;
+		return `${openLabel} - ${closeLabel}`;
 	}
 	return 'Hours coming soon';
 };
@@ -320,7 +335,7 @@ export default function BarDetails({
 		return (
 			<View style={styles.centerContent}>
 				<Text style={[styles.errorTitle, { color: palette.text }]}>Unable to load bar</Text>
-				<Text style={[styles.errorDescription, { color: theme === 'light' ? '#4b5563' : '#94a3b8' }]}>{error}</Text>
+				<Text style={[styles.errorDescription, { color: palette.cardSubtitle }]}>{error}</Text>
 				<TouchableOpacity style={[styles.retryButton, { borderColor: palette.activePill }]} onPress={onRetry}>
 					<Text style={[styles.retryButtonText, { color: palette.activePill }]}>Try again</Text>
 				</TouchableOpacity>
@@ -345,7 +360,7 @@ export default function BarDetails({
 						<MapView
 							style={styles.heroMap}
 							initialRegion={heroRegion}
-							customMapStyle={HERO_MAP_STYLE}
+							customMapStyle={Platform.OS === 'android' ? HERO_MAP_STYLE : undefined}
 							pointerEvents="none"
 							scrollEnabled={false}
 							zoomEnabled={false}
@@ -397,34 +412,32 @@ export default function BarDetails({
 				</View>
 
 				{/* Address */}
-				<View style={styles.section}>
-					<Text style={[styles.sectionLabel, { color: palette.pillText }]}> 
-						Location
-					</Text>
-					{addressLabel ? (
+				{addressLabel ? (
+					<View style={styles.section}>
+						<Text style={[styles.sectionLabel, { color: palette.pillText }]}>Location</Text>
 						<View style={styles.addressBlock}>
 							<Text style={[styles.addressText, { color: palette.cardSubtitle }]}>
 								{addressLabel}
 							</Text>
-						{handleOpenMap ? (
-							<TouchableOpacity
-								onPress={handleOpenMap}
-								style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
-								activeOpacity={0.9}
-								accessibilityRole="button"
-								accessibilityLabel="Get Directions"
-							>
-								<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>Get Directions</Text>
-							</TouchableOpacity>
-						) : null}
-							</View>
-					) : null}
-				</View>
+							{handleOpenMap ? (
+								<TouchableOpacity
+									onPress={handleOpenMap}
+									style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
+									activeOpacity={0.9}
+									accessibilityRole="button"
+									accessibilityLabel="Get Directions"
+								>
+									<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>Get Directions</Text>
+								</TouchableOpacity>
+							) : null}
+						</View>
+					</View>
+				) : null}
 					
 				{/* Hours */}
 				{groupedHours.length > 0 ? (
 					<View style={[styles.section]}>
-						<Text style={[styles.sectionLabel]}>Hours</Text>
+						<Text style={[styles.sectionLabel, { color: palette.pillText }]}>Hours</Text>
 						{groupedHours.map((hour) => {
 							const isTodayRange = hour.days.includes(todayIndex);
 							return (
@@ -442,9 +455,9 @@ export default function BarDetails({
 
 				{/* Contact */}
 				{contactActions.length > 0 ? (
-					<>
-					<Text style={[styles.sectionLabel, { color: palette.pillText, marginTop: socialActions.length > 0 ? 12 : 0 }]}>Contact</Text>
-					<View style={styles.contactList}>
+					<View style={[styles.section]}>
+						<Text style={[styles.sectionLabel, { color: palette.pillText, marginTop: socialActions.length > 0 ? 12 : 0 }]}>Contact</Text>
+						<View style={styles.contactList}>
 						{contactActions.map((action) => (
 							<TouchableOpacity
 								key={action.key}
@@ -458,8 +471,8 @@ export default function BarDetails({
 								<Text style={[styles.contactActionText, { color: palette.filterText }]}>{action.label ?? action.key}</Text>
 							</TouchableOpacity>
 							))}
+						</View>
 					</View>
-					</>
 				) : null}
 
 				{/* Socials */}
@@ -570,33 +583,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 	scrollContent: {
 		paddingBottom: 40,
 	},
-	bodyContent: {
-		width: '100%',
-		paddingHorizontal: 20,
-		gap: 20,
-	},
-
-	heroContent: {
-		position: 'absolute',
-		left: 0,
-		right: 0,
-		bottom: 0,
-		paddingHorizontal: 20,
-		paddingBottom: 60,
-		paddingTop: 80,
-		gap: 12,
-	},
-	heroTitle: {
-		fontSize: 34,
-		fontWeight: '800',
-		color: '#ffffff',
-	},
-	heroSection: {
-		gap: 12,
-	},
-	heroSectionOverlap: {
-		marginTop: -48,
-	},
 	contactRow: {
 		flexDirection: 'row',
 		flexWrap: 'wrap',
@@ -606,32 +592,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		flexDirection: 'row',
 		flexWrap: 'wrap',
 		gap: 10,
-	},
-	heroAddressLabel: {
-		fontSize: 12,
-		fontWeight: '700',
-		letterSpacing: 0.8,
-		textTransform: 'uppercase',
-		marginTop: 4,
-	},
-	heroAddressText: {
-		fontSize: 15,
-		lineHeight: 22,
-		marginTop: 2,
-	},
-	eventsButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'center',
-		borderRadius: 999,
-		borderWidth: 1,
-		paddingHorizontal: 18,
-		paddingVertical: 12,
-		marginTop: 8,
-	},
-	eventsButtonText: {
-		fontSize: 15,
-		fontWeight: '600',
 	},
 	contactIconButton: {
 		width: 48,
@@ -654,54 +614,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		fontSize: 15,
 		fontWeight: '700',
 	},
-	contactIconButtonLight: {
-		borderColor: 'rgba(15, 23, 42, 0.08)',
-		backgroundColor: '#ffffff',
-	},
-	contactIconButtonDark: {
-		borderColor: 'rgba(255, 255, 255, 0.16)',
-		backgroundColor: '#0f172a',
-	},
-	barName: {
-		fontSize: 28,
-		fontWeight: '700',
-	},
-	barDescription: {
-		fontSize: 16,
-		lineHeight: 24,
-	},
-	card: {
-		borderRadius: 16,
-		padding: 16,
-		gap: 12,
-		borderWidth: 1,
-	},
-	cardLight: {
-		backgroundColor: '#ffffff',
-		borderColor: 'rgba(15, 23, 42, 0.08)',
-		shadowColor: '#0f172a',
-		shadowOpacity: 0.05,
-		shadowRadius: 12,
-		shadowOffset: { width: 0, height: 4 },
-		elevation: 2,
-	},
-	cardDark: {
-		backgroundColor: '#1b1f23',
-		borderColor: 'rgba(255, 255, 255, 0.12)',
-		shadowColor: '#000',
-		shadowOpacity: 0.2,
-		shadowRadius: 10,
-		shadowOffset: { width: 0, height: 4 },
-		elevation: 2,
-	},
-	cardLabel: {
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	cardValue: {
-		fontSize: 16,
-		marginTop: 4,
-	},
 	typeRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -709,11 +621,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		gap: 12,
 	},
 
-	sectionHeading: {
-		fontSize: 18,
-		fontWeight: '600',
-		marginBottom: 8,
-	},
 	tagsBlock: {
 		marginTop: 12,
 		gap: 8,
@@ -740,20 +647,13 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		justifyContent: 'space-between',
 		paddingVertical: 6,
 		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: 'rgba(148, 163, 184, 0.3)',
+		borderBottomColor: palette.border,
 		paddingHorizontal: 10,
 		marginVertical: 2,
 	},
 	hourRowToday: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		paddingVertical: 6,
-		borderBottomWidth: StyleSheet.hairlineWidth,
-		borderBottomColor: 'rgba(148, 163, 184, 0.3)',
-		backgroundColor: 'rgba(148, 163, 184, 0.12)',
+		backgroundColor: palette.pillBackground,
 		borderRadius: 10,
-		paddingHorizontal: 10,
-		marginVertical: 2,
 	},
 	hourDay: {
 		fontSize: 15,
@@ -764,11 +664,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 	},
 	hourTodayText: {
 		fontWeight: '800',
-	},
-	hourFootnote: {
-		marginTop: 8,
-		fontSize: 13,
-		fontStyle: 'italic',
 	},
 	centerContent: {
 		flex: 1,
