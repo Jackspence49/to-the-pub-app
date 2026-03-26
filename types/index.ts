@@ -35,6 +35,7 @@ export type Bar = {
   eventbrite?: string;
   distance_miles?: number;
   distance_km?: number;
+  closes_at?: string;
   tags: BarTag[];
   hours: BarHours[];
 };

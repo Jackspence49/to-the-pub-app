@@ -1,5 +1,5 @@
 // Functions to map raw API data to Bar objects
-import type { Bar, BarTag } from '@/types/index';
+import type { Bar, BarTag, LooseObject } from '@/types/index';
 import { DAY_NAME_INDEX } from './constants';
 import { normalizeTwitterUrl, toNumber } from './helpers';
 
@@ -167,6 +167,7 @@ export const mapToBar = (raw: LooseObject, index: number): Bar => {
     eventbrite: raw.eventbrite ?? undefined,
     distance_miles: toNumber(raw.distance_miles) ?? undefined,
     distance_km: toNumber(raw.distance_km) ?? undefined,
+    closes_at: typeof raw.closes_at === 'string' && raw.closes_at.trim().length > 0 ? raw.closes_at.trim() : undefined,
     tags: dedupedTags,
     hours: raw.hours || [],
   };

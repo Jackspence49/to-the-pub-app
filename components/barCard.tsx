@@ -5,7 +5,6 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import type { BarCardProps } from '../types';
 import { formatCityAddress, formatDistanceLabel, openExternalLink } from '../utils/helpers';
-import { getTodaysHours } from '../utils/Timeformatters';
 
 
 
@@ -15,17 +14,14 @@ export const BarCard = ({ Bar, onPress }: BarCardProps) => {
 
   const distanceLabel = formatDistanceLabel(Bar.distance_miles);
   const addressLabel = formatCityAddress(Bar.address_city, Bar.address_state);
-  const todaysHours = getTodaysHours(Bar.hours);
-  const closingLabel = todaysHours.close
-
-  const detailParts: string[] = [];
-  if (distanceLabel) {
-    detailParts.push(`${distanceLabel} mi away`);
-  }
-  if (closingLabel) {
-    detailParts.push(`Closes ${closingLabel}`);
-  }
-  const detailLine = detailParts.join(' • ');
+  const closingLabel = (() => {
+    if (!Bar.closes_at) return null;
+    const [h, m] = Bar.closes_at.split(':').map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  })();
 
   return (
     <TouchableOpacity
@@ -46,7 +42,7 @@ export const BarCard = ({ Bar, onPress }: BarCardProps) => {
         </Text>
       </View>
 
-      {detailLine ? (
+      {(distanceLabel || closingLabel) ? (
         <View style={styles.distanceDetailRow}>
           <MaterialIcons
             name="location-on"
@@ -54,7 +50,9 @@ export const BarCard = ({ Bar, onPress }: BarCardProps) => {
             color={palette.iconSelected}
             style={{ marginRight: 4 }}
           />
-          <Text style={[styles.distanceDetail, { color: palette.cardText }]}>{distanceLabel}</Text>
+          <Text style={[styles.distanceDetail, { color: palette.cardText }]}>
+            {[distanceLabel, closingLabel ? `Closes ${closingLabel}` : null].filter(Boolean).join(' · ')}
+          </Text>
         </View>
       ) : null}
 
