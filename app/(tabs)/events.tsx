@@ -19,6 +19,7 @@ import {
 import { useLocationCache } from '../../hooks/UseLocationCache';
 import { useEventTagFilters } from '../../hooks/useEventTagFilters';
 import { useEvents } from '../../hooks/useEvents';
+import { useScrollRestoration } from '../../hooks/useScrollRestoration';
 import type { Event, ThemeName } from '../../types/index';
 
 // Components
@@ -303,6 +304,7 @@ const EventsScreen = () => {
 		handleEndReached,
 		handleRetry,
 	} = useEvents(userCoords, selectedTagIds, searchRadius);
+	const { listRef, handleScroll } = useScrollRestoration<EventListRow>(events.length);
 
 	// Handler for opening event details
 	const handleOpenEvent = useCallback(
@@ -477,6 +479,7 @@ const EventsScreen = () => {
 	return (
 		<View style={[styles.container, { backgroundColor: palette.background }]}>
 			<FlatList
+				ref={listRef}
 				data={listRows}
 				keyExtractor={(item) => item.key}
 				renderItem={renderItem}
@@ -501,6 +504,8 @@ const EventsScreen = () => {
 				maxToRenderPerBatch={INFINITE_SCROLL_CONFIG.subsequentPageSize}
 				windowSize={5}
 				removeClippedSubviews
+				onScroll={handleScroll}
+				scrollEventThrottle={16}
 				showsVerticalScrollIndicator={false}
 			/>
 
