@@ -1,6 +1,8 @@
 import { Colors } from '@/constants/theme';
+import type { searchBar } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { MaterialIcons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	ActivityIndicator,
@@ -14,20 +16,12 @@ import {
 	View,
 } from 'react-native';
 
-
-type BarSearchResult = {
-	id: string;
-	name: string;
-	address_city?: string;
-	address_state?: string;
-	city?: string;
-	state?: string;
-};
-
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 const SAVED_BARS_KEY = 'ttp-saved-bars';
 const MAX_SAVED_BARS = 50;
+const SEARCH_DEBOUNCE_MS = 300;
+const MAX_QUERY_LENGTH = 100;
 
 export default function SearchScreen() {
 	const theme = useColorScheme() ?? 'dark';
@@ -36,24 +30,24 @@ export default function SearchScreen() {
 	const router = useRouter();
 
 	const [query, setQuery] = useState('');
-	const [results, setResults] = useState<BarSearchResult[]>([]);
+	const [results, setResults] = useState<searchBar[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [savedBars, setSavedBars] = useState<BarSearchResult[]>([]);
+	const [savedBars, setSavedBars] = useState<searchBar[]>([]);
 
 	const trimmedQuery = query.trim();
 	const canSearch = useMemo(() => trimmedQuery.length >= 2, [trimmedQuery]);
 
-	const persistSavedBars = useCallback(async (bars: BarSearchResult[]) => {
+	const persistSavedBars = useCallback(async (bars: searchBar[]) => {
 		try {
-			await SecureStore.setItemAsync(SAVED_BARS_KEY, JSON.stringify(bars.slice(0, MAX_SAVED_BARS)));
+			await AsyncStorage.setItem(SAVED_BARS_KEY, JSON.stringify(bars.slice(0, MAX_SAVED_BARS)));
 		} catch {
 			// Best effort; ignore persistence errors
 		}
 	}, []);
 
 	const saveBar = useCallback(
-		(bar: BarSearchResult) => {
+		(bar: searchBar) => {
 			setSavedBars((previous) => {
 				const next = [bar, ...previous.filter((entry) => entry.id !== bar.id)].slice(0, MAX_SAVED_BARS);
 				persistSavedBars(next);
@@ -68,7 +62,7 @@ export default function SearchScreen() {
 
 		(async () => {
 			try {
-				const storedBars = await SecureStore.getItemAsync(SAVED_BARS_KEY);
+				const storedBars = await AsyncStorage.getItem(SAVED_BARS_KEY);
 				if (!mounted) return;
 				if (storedBars) {
 					const parsedBars = JSON.parse(storedBars);
@@ -103,7 +97,7 @@ export default function SearchScreen() {
 					throw new Error('Unable to search right now.');
 				}
 				const payload = await response.json();
-				const data: BarSearchResult[] = Array.isArray(payload?.data) ? payload.data : payload;
+				const data = Array.isArray(payload?.data) ? payload.data : payload;
 				setResults(
 					Array.isArray(data)
 						? data.map((item) => ({
@@ -135,12 +129,17 @@ export default function SearchScreen() {
 			return;
 		}
 		const controller = new AbortController();
-		performSearch(term, controller.signal);
-		return () => controller.abort();
+		const timer = setTimeout(() => {
+			performSearch(term, controller.signal);
+		}, SEARCH_DEBOUNCE_MS);
+		return () => {
+			clearTimeout(timer);
+			controller.abort();
+		};
 	}, [performSearch, trimmedQuery]);
 
 	const handlePressResult = useCallback(
-		(bar: BarSearchResult) => {
+		(bar: searchBar) => {
 			saveBar(bar);
 			router.push({
 				pathname: '/bar/[barId]',
@@ -150,8 +149,8 @@ export default function SearchScreen() {
 		[router, saveBar]
 	);
 
-	const renderResult = ({ item }: { item: BarSearchResult }) => {
-		return (
+	const renderResult = useCallback(
+		({ item }: { item: searchBar }) => (
 			<TouchableOpacity
 				style={[styles.resultCard, { backgroundColor: palette.cardSurface, borderColor }]}
 				activeOpacity={0.85}
@@ -164,8 +163,18 @@ export default function SearchScreen() {
 					{[item.address_city, item.address_state].filter(Boolean).join(', ') || 'Location coming soon'}
 				</Text>
 			</TouchableOpacity>
-		);
-	};
+		),
+		[handlePressResult, palette, borderColor]
+	);
+
+	const clearSavedBars = useCallback(async () => {
+		setSavedBars([]);
+		try {
+			await AsyncStorage.removeItem(SAVED_BARS_KEY);
+		} catch {
+			// Best effort
+		}
+	}, []);
 
 	const showRecentBars = !canSearch && savedBars.length > 0;
 	const listData = showRecentBars ? savedBars : results;
@@ -178,7 +187,7 @@ export default function SearchScreen() {
 			return 'Start typing to find a bar (min 2 characters).';
 		}
 		if (isLoading) {
-			return 'Searching…';
+			return null;
 		}
 		if (error) {
 			return error;
@@ -206,6 +215,7 @@ export default function SearchScreen() {
 					autoCorrect={false}
 					returnKeyType="search"
 					onSubmitEditing={Keyboard.dismiss}
+					maxLength={MAX_QUERY_LENGTH}
 				/>
 				{query ? (
 					<TouchableOpacity
@@ -214,7 +224,7 @@ export default function SearchScreen() {
 						accessibilityRole="button"
 						accessibilityLabel="Clear search"
 					>
-						<Text style={{ color: palette.cardTitle, fontWeight: '600' }}>×</Text>
+						<MaterialIcons name="close" size={16} color={palette.cardTitle} />
 					</TouchableOpacity>
 				) : null}
 			</View>
@@ -222,6 +232,13 @@ export default function SearchScreen() {
 			{showRecentBars ? (
 				<View style={styles.sectionHeaderRow}>
 					<Text style={[styles.sectionTitle, { color: palette.cardTitle }]}>Recent</Text>
+					<TouchableOpacity
+						onPress={clearSavedBars}
+						accessibilityRole="button"
+						accessibilityLabel="Clear recent bars"
+					>
+						<Text style={[styles.clearRecentText, { color: palette.cardSubtitle }]}>Clear</Text>
+					</TouchableOpacity>
 				</View>
 			) : null}
 
@@ -284,9 +301,7 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 	},
 	resultsList: {
-		paddingHorizontal: 0,
 		paddingVertical: 24,
-		gap: 0,
 	},
 	sectionHeaderRow: {
 		flexDirection: 'row',
@@ -299,8 +314,10 @@ const styles = StyleSheet.create({
 		fontSize: 16,
 		fontWeight: '700',
 	},
+	clearRecentText: {
+		fontSize: 14,
+	},
 	resultCard: {
-		borderWidth: 0,
 		borderTopWidth: StyleSheet.hairlineWidth,
 		borderRadius: 0,
 		padding: 16,
