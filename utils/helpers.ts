@@ -145,10 +145,11 @@ export const openExternalLink = async (url?: string): Promise<void> => {
   }
 };
 
-//Build a cache key based on coordinates and selected tags
-export const getCacheKey = (coords: Coordinates, normalizedTags: string[]): string => {
+//Build a cache key based on coordinates, selected tags, and optional radius
+export const getCacheKey = (coords: Coordinates, normalizedTags: string[], radius?: number): string => {
   const tagsKey = normalizedTags.slice().sort().join(',');
-  return `${coords.lat}|${coords.lon}|${tagsKey}`;
+  const radiusKey = radius !== undefined ? `|r${radius}` : '';
+  return `${coords.lat}|${coords.lon}|${tagsKey}${radiusKey}`;
 };
 
 export const formatCityAddress = (address_city?: string, address_state?: string): string | null => {

@@ -5,7 +5,7 @@ import type { Colors } from '@/constants/theme';
 // Re-exporting types from individual files for easier imports
 export type ThemeName = keyof typeof Colors;
 export type LooseObject = Record<string, any>;
-export type QueryValue = string | number | boolean | undefined;
+export type QueryValue = string | number | boolean | undefined | (string | number | boolean)[];
 export type QueryParams = Record<string, QueryValue>;
 
 //Coordinates type definition
@@ -211,6 +211,15 @@ export type EventTagFilterSheetProps = {
 export type LocationCache = {
   coords: Coordinates;
   fetchedAt: number;
+};
+
+// Cache structure for events data
+export type EventsCache = {
+  key: string;
+  timestamp: number;
+  data: Event[];
+  currentPage: number;
+  hasMore: boolean;
 };
 
 // Cache structure for bars data
