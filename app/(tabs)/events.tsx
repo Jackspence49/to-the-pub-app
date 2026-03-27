@@ -1,8 +1,8 @@
-import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
+import { Colors } from '../../constants/theme';
 // React Native components
 import {
 	ActivityIndicator,
@@ -16,28 +16,22 @@ import {
 } from 'react-native';
 
 //types
-import type { Event, EventsCache, EventTag, QueryParams, ThemeName } from '@/types/index';
-import { useLocationCache } from '@/hooks/UseLocationCache';
+import { useLocationCache } from '../../hooks/UseLocationCache';
+import { useEvents } from '../../hooks/useEvents';
+import type { Event, EventTag, ThemeName } from '../../types/index';
 
 // Components
-import EventCard from '@/components/eventCard';
-import { EventTagFilterSheet } from '@/components/eventTagFilterSheet';
+import EventCard from '../../components/eventCard';
+import { EventTagFilterSheet } from '../../components/eventTagFilterSheet';
 
-import { DEFAULT_COORDS, EVENT_TAGS_ENDPOINT, INFINITE_SCROLL_CONFIG } from '../../utils/constants';
-import { buildQueryString, getCacheKey } from '../../utils/helpers';
-import { extractEventItems, extractTagItems, mapToEvent, mapToEventTag, mergeEvents, normalizeDateOnly } from '../../utils/Eventmappers';
-import { PayloadWithPagination, shouldContinuePagination } from '../../utils/pagination';
+import { EVENT_TAGS_ENDPOINT, INFINITE_SCROLL_CONFIG } from '../../utils/constants';
+import { extractTagItems, mapToEventTag, normalizeDateOnly } from '../../utils/Eventmappers';
 
 // Default Parameters
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
-const PAGE_SIZE = INFINITE_SCROLL_CONFIG.initialPageSize;
 const DEFAULT_RADIUS_MILES = 10;
 const DISTANCE_UNIT = 'miles';
 const RADIUS_OPTIONS = [1, 3, 5, 10];
-const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-
-// Type definitions
-type FetchMode = 'initial' | 'refresh' | 'paginate';
 
 // Flat list rows (date separators and events)
 type EventListRow =
@@ -284,13 +278,6 @@ const EventsScreen = () => {
 	);
 	const hasAppliedInitialTagsRef = useRef(false);
 
-	const [events, setEvents] = useState<Event[]>([]);
-	const [page, setPage] = useState(1);
-	const [hasMore, setHasMore] = useState(true);
-	const [isInitialLoading, setIsInitialLoading] = useState(false);
-	const [isRefreshing, setIsRefreshing] = useState(false);
-	const [isPaginating, setIsPaginating] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialSelectedTagIds);
 	const [availableTags, setAvailableTags] = useState<EventTag[]>([]);
 	const [areTagsLoading, setAreTagsLoading] = useState(false);
@@ -298,10 +285,17 @@ const EventsScreen = () => {
 	const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
 	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_RADIUS_MILES);
 	const { userCoords, refreshUserLocation } = useLocationCache();
-	const eventsRequestAbortRef = useRef<AbortController | null>(null);
-	const eventsRequestSeqRef = useRef(0);
-	const isMountedRef = useRef(true);
-	const eventsCacheRef = useRef<EventsCache | null>(null);
+	const {
+		events,
+		isInitialLoading,
+		isRefreshing,
+		isPaginating,
+		hasMore,
+		error,
+		handleRefresh,
+		handleEndReached,
+		handleRetry,
+	} = useEvents(userCoords, selectedTagIds, searchRadius);
 
 	useEffect(() => {
 		if (hasAppliedInitialTagsRef.current) {
@@ -347,28 +341,13 @@ const EventsScreen = () => {
 		[availableTags, selectedTagIds]
 	);
 
-	// Handler for applying tag filters; abort in-flight, clear stale results, and reset paging
+	// Tag filter changes automatically trigger a re-fetch via useEvents deps
 	const handleApplyFilters = useCallback((nextTagIds: string[]) => {
-		eventsRequestAbortRef.current?.abort();
-		setIsInitialLoading(true);
-		setEvents([]);
-		setError(null);
-		eventsCacheRef.current = null;
 		setSelectedTagIds(normalizeTagIds(nextTagIds));
-		setPage(1);
-		setHasMore(true);
 	}, []);
 
-	// Handler for clearing tag filters
 	const handleClearTags = useCallback(() => {
-		eventsRequestAbortRef.current?.abort();
-		setIsInitialLoading(true);
-		setEvents([]);
-		setError(null);
-		eventsCacheRef.current = null;
 		setSelectedTagIds([]);
-		setPage(1);
-		setHasMore(true);
 	}, []);
 
 	// Handlers for opening and closing the filter sheet
@@ -397,136 +376,6 @@ const EventsScreen = () => {
 		setSearchRadius(Math.max(1, nextRadius));
 	}, []);
 
-	// Fetch events function
-	const fetchEvents = useCallback(
-		async (pageToLoad: number, mode: FetchMode) => {
-			// Cancel any in-flight request so stale responses cannot clobber fresh data
-			const requestId = eventsRequestSeqRef.current + 1;
-			eventsRequestSeqRef.current = requestId;
-			eventsRequestAbortRef.current?.abort();
-			const controller = new AbortController();
-			eventsRequestAbortRef.current = controller;
-
-			setIsPaginating(mode === 'paginate');
-			setIsRefreshing(mode === 'refresh');
-			setIsInitialLoading(mode === 'initial');
-
-			if (!API_BASE_URL) {
-				setError('Set EXPO_PUBLIC_API_URL in your .env file to load events.');
-				setIsPaginating(false);
-				setIsRefreshing(false);
-				setIsInitialLoading(false);
-				return;
-			}
-
-			try {
-				setError(null);
-				const coordsToUse = userCoords ?? {
-					lat: DEFAULT_COORDS.lat,
-					lon: DEFAULT_COORDS.lon,
-				};
-				const cacheKey = getCacheKey(coordsToUse, selectedTagIds, searchRadius);
-
-				// Serve cached data on initial/refresh when valid
-				if (mode !== 'paginate' && eventsCacheRef.current) {
-					const cached = eventsCacheRef.current;
-					const isCacheValid =
-						cached.key === cacheKey &&
-						Date.now() - cached.timestamp < INFINITE_SCROLL_CONFIG.cacheTimeout;
-
-					if (isCacheValid) {
-						setEvents(cached.data);
-						setPage(cached.currentPage);
-						setHasMore(cached.hasMore);
-						setIsInitialLoading(false);
-						setIsRefreshing(false);
-						setIsPaginating(false);
-						return;
-					}
-				}
-				// Build the API query to match the backend contract
-				const queryParams: QueryParams = {
-					upcoming: 'true',
-					limit: PAGE_SIZE,
-					page: pageToLoad,
-					lat: coordsToUse.lat,
-					lon: coordsToUse.lon,
-					radius: searchRadius,
-					unit: DISTANCE_UNIT,
-				};
-
-				// Single-select: the filter sheet enforces at most one tag at a time
-				if (selectedTagIds.length > 0) {
-					queryParams.event_tag_id = selectedTagIds[0];
-				}
-
-				const query = buildQueryString(queryParams);
-				const response = await fetch(`${normalizedBaseUrl}/events/instances?${query}`, {
-					signal: controller.signal,
-				});
-
-				if (!response.ok) {
-					throw new Error(`Request failed with status ${response.status}`);
-				}
-
-				const payload: PayloadWithPagination = await response.json();
-				const incoming = extractEventItems(payload).map(mapToEvent);
-				const pageMeta = payload.meta?.pagination;
-				const hasMoreNext = shouldContinuePagination(payload, incoming.length, PAGE_SIZE);
-				const resolvedPage =
-					typeof pageMeta?.current_page === 'number'
-						? pageMeta.current_page
-						: pageToLoad;
-
-				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
-					return;
-				}
-
-				setEvents((prev) => (mode === 'paginate' ? mergeEvents(prev, incoming) : incoming));
-				setPage(resolvedPage);
-				setHasMore(hasMoreNext);
-
-				// Cache successful result
-				eventsCacheRef.current = {
-					key: cacheKey,
-					timestamp: Date.now(),
-					data: mode === 'paginate'
-						? mergeEvents(eventsCacheRef.current?.data ?? [], incoming)
-						: incoming,
-					currentPage: resolvedPage,
-					hasMore: hasMoreNext,
-				};
-			} catch (err) {
-				if ((err as Error).name === 'AbortError') {
-					return;
-				}
-				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
-					return;
-				}
-				setError(err instanceof Error ? err.message : 'Unable to load events right now.');
-			} finally {
-				// Only clear loading flags if this is the latest in-flight request and we are still mounted
-				if (!isMountedRef.current || eventsRequestSeqRef.current !== requestId) {
-					return;
-				}
-				eventsRequestAbortRef.current = null;
-				setIsPaginating(false);
-				setIsRefreshing(false);
-				setIsInitialLoading(false);
-			}
-		},
-		[searchRadius, selectedTagIds, userCoords]
-	);
-
-	useEffect(() => {
-		return () => {
-			isMountedRef.current = false;
-			eventsRequestSeqRef.current += 1;
-			eventsRequestAbortRef.current?.abort();
-			eventsRequestAbortRef.current = null;
-		};
-	}, []);
-
 	useFocusEffect(
 		useCallback(() => {
 			let cancelled = false;
@@ -539,30 +388,6 @@ const EventsScreen = () => {
 			};
 		}, [refreshUserLocation])
 	);
-
-	useEffect(() => {
-		setHasMore(true);
-		setPage(1);
-		fetchEvents(1, 'initial');
-	}, [fetchEvents]);
-
-	const handleRefresh = useCallback(() => {
-		if (isInitialLoading || isRefreshing) {
-			return;
-		}
-		fetchEvents(1, 'refresh');
-	}, [fetchEvents, isInitialLoading, isRefreshing]);
-
-	const handleEndReached = useCallback(() => {
-		if (isInitialLoading || isPaginating || !hasMore) {
-			return;
-		}
-		fetchEvents(page + 1, 'paginate');
-	}, [fetchEvents, hasMore, isInitialLoading, isPaginating, page]);
-
-	const handleRetry = useCallback(() => {
-		fetchEvents(1, events.length ? 'refresh' : 'initial');
-	}, [events.length, fetchEvents]);
 
 	const renderItem = useCallback<ListRenderItem<EventListRow>>(
 		({ item }) => {
