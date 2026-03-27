@@ -1,6 +1,5 @@
 import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
@@ -17,7 +16,8 @@ import {
 } from 'react-native';
 
 //types
-import type { Coordinates, Event, EventsCache, EventTag, QueryParams, ThemeName } from '@/types/index';
+import type { Event, EventsCache, EventTag, QueryParams, ThemeName } from '@/types/index';
+import { useLocationCache } from '@/hooks/UseLocationCache';
 
 // Components
 import EventCard from '@/components/eventCard';
@@ -297,7 +297,7 @@ const EventsScreen = () => {
 	const [tagsError, setTagsError] = useState<string | null>(null);
 	const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
 	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_RADIUS_MILES);
-	const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
+	const { userCoords, refreshUserLocation } = useLocationCache();
 	const eventsRequestAbortRef = useRef<AbortController | null>(null);
 	const eventsRequestSeqRef = useRef(0);
 	const isMountedRef = useRef(true);
@@ -396,35 +396,6 @@ const EventsScreen = () => {
 	const handleRadiusChange = useCallback((nextRadius: number) => {
 		setSearchRadius(Math.max(1, nextRadius));
 	}, []);
-
-	// Function to ensure location permission is granted
-	const ensureLocationPermission = useCallback(async (): Promise<boolean> => {
-		const current = await Location.getForegroundPermissionsAsync();
-		if (current.status === 'granted') {
-			return true;
-		}
-		if (!current.canAskAgain) {
-			return false;
-		}
-		const requested = await Location.requestForegroundPermissionsAsync();
-		return requested.status === 'granted';
-	}, []);
-
-	// Function to refresh user location — deduplicates identical coord updates to avoid spurious re-fetches
-	const refreshUserLocation = useCallback(async () => {
-		try {
-			const granted = await ensureLocationPermission();
-			if (!granted) {
-				return;
-			}
-			const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-			const lat = position.coords.latitude;
-			const lon = position.coords.longitude;
-			setUserCoords((prev) => (prev?.lat === lat && prev?.lon === lon ? prev : { lat, lon }));
-		} catch {
-			// Location unavailable; caller will use fallback coordinates
-		}
-	}, [ensureLocationPermission]);
 
 	// Fetch events function
 	const fetchEvents = useCallback(
