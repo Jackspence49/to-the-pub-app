@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import { Colors } from '../../constants/theme';
 // React Native components
@@ -17,18 +17,18 @@ import {
 
 //types
 import { useLocationCache } from '../../hooks/UseLocationCache';
+import { useEventTagFilters } from '../../hooks/useEventTagFilters';
 import { useEvents } from '../../hooks/useEvents';
-import type { Event, EventTag, ThemeName } from '../../types/index';
+import type { Event, ThemeName } from '../../types/index';
 
 // Components
 import EventCard from '../../components/eventCard';
 import { EventTagFilterSheet } from '../../components/eventTagFilterSheet';
 
-import { EVENT_TAGS_ENDPOINT, INFINITE_SCROLL_CONFIG } from '../../utils/constants';
-import { extractTagItems, mapToEventTag, normalizeDateOnly } from '../../utils/Eventmappers';
+import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
+import { normalizeDateOnly } from '../../utils/Eventmappers';
 
 // Default Parameters
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 const DEFAULT_RADIUS_MILES = 10;
 const DISTANCE_UNIT = 'miles';
 const RADIUS_OPTIONS = [1, 3, 5, 10];
@@ -276,15 +276,22 @@ const EventsScreen = () => {
 		() => normalizeTagIds(normalizeTagParamList(searchParams.eventTagId)),
 		[searchParams.eventTagId]
 	);
-	const hasAppliedInitialTagsRef = useRef(false);
 
-	const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initialSelectedTagIds);
-	const [availableTags, setAvailableTags] = useState<EventTag[]>([]);
-	const [areTagsLoading, setAreTagsLoading] = useState(false);
-	const [tagsError, setTagsError] = useState<string | null>(null);
-	const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
 	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_RADIUS_MILES);
 	const { userCoords, refreshUserLocation } = useLocationCache();
+	const {
+		selectedTagIds,
+		availableTags,
+		areTagsLoading,
+		tagsError,
+		isFilterSheetVisible,
+		selectedTagNames,
+		fetchAvailableTags,
+		handleApplyFilters,
+		handleClearTags,
+		openFilterSheet,
+		closeFilterSheet,
+	} = useEventTagFilters(initialSelectedTagIds);
 	const {
 		events,
 		isInitialLoading,
@@ -296,68 +303,6 @@ const EventsScreen = () => {
 		handleEndReached,
 		handleRetry,
 	} = useEvents(userCoords, selectedTagIds, searchRadius);
-
-	useEffect(() => {
-		if (hasAppliedInitialTagsRef.current) {
-			return;
-		}
-		setSelectedTagIds(initialSelectedTagIds);
-		hasAppliedInitialTagsRef.current = true;
-	}, [initialSelectedTagIds]);
-
-	// Function to fetch available event tags
-	const fetchAvailableTags = useCallback(async () => {
-		if (!API_BASE_URL) {
-			setTagsError('Set EXPO_PUBLIC_API_URL in your .env file to load event tags.');
-			setAvailableTags([]);
-			return;
-		}
-
-		setAreTagsLoading(true);
-		try {
-			setTagsError(null);
-			const response = await fetch(EVENT_TAGS_ENDPOINT);
-			if (!response.ok) {
-				throw new Error(`Failed to fetch tags (status ${response.status})`);
-			}
-
-			const payload = await response.json();
-			const incoming = extractTagItems(payload).map(mapToEventTag);
-			setAvailableTags(incoming);
-		} catch (err) {
-			setTagsError(err instanceof Error ? err.message : 'Unable to load event tags right now.');
-		} finally {
-			setAreTagsLoading(false);
-		}
-	}, []);
-
-	useEffect(() => {
-		fetchAvailableTags();
-	}, [fetchAvailableTags]);
-
-	// Memoized list of selected tag names for display
-	const selectedTagNames = useMemo(
-		() => availableTags.filter((tag) => selectedTagIds.includes(tag.id)).map((tag) => tag.name),
-		[availableTags, selectedTagIds]
-	);
-
-	// Tag filter changes automatically trigger a re-fetch via useEvents deps
-	const handleApplyFilters = useCallback((nextTagIds: string[]) => {
-		setSelectedTagIds(normalizeTagIds(nextTagIds));
-	}, []);
-
-	const handleClearTags = useCallback(() => {
-		setSelectedTagIds([]);
-	}, []);
-
-	// Handlers for opening and closing the filter sheet
-	const openFilterSheet = useCallback(() => {
-		setIsFilterSheetVisible(true);
-	}, []);
-
-	const closeFilterSheet = useCallback(() => {
-		setIsFilterSheetVisible(false);
-	}, []);
 
 	// Handler for opening event details
 	const handleOpenEvent = useCallback(
