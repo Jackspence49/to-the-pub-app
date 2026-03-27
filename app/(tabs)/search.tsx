@@ -100,12 +100,14 @@ export default function SearchScreen() {
 				const data = Array.isArray(payload?.data) ? payload.data : payload;
 				setResults(
 					Array.isArray(data)
-						? data.map((item) => ({
-							id: String(item.id ?? ''),
-							name: item.name ?? 'Unnamed bar',
-							address_city: item.address_city ?? item.city ?? '',
-							address_state: item.address_state ?? item.state ?? '',
-						}))
+						? data
+							.filter((item) => item.id != null && String(item.id).trim() !== '')
+							.map((item) => ({
+								id: String(item.id),
+								name: item.name ?? 'Unnamed bar',
+								address_city: item.address_city ?? item.city ?? '',
+								address_state: item.address_state ?? item.state ?? '',
+							}))
 						: []
 				);
 			} catch (err) {
@@ -114,7 +116,9 @@ export default function SearchScreen() {
 				}
 				setError(err instanceof Error ? err.message : 'Unexpected error occurred.');
 			} finally {
-				setIsLoading(false);
+				if (!signal.aborted) {
+					setIsLoading(false);
+				}
 			}
 		},
 		[]
@@ -128,6 +132,7 @@ export default function SearchScreen() {
 			setIsLoading(false);
 			return;
 		}
+		setIsLoading(true);
 		const controller = new AbortController();
 		const timer = setTimeout(() => {
 			performSearch(term, controller.signal);
@@ -289,6 +294,7 @@ const styles = StyleSheet.create({
 		width: 36,
 		height: 36,
 		borderRadius: 999,
+		borderWidth: 1,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
