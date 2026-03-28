@@ -1,12 +1,14 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import type { ListRenderItem } from 'react-native';
 import { Colors } from '../../constants/theme';
 // React Native components
 import {
 	ActivityIndicator,
 	FlatList,
+	Modal,
+	Pressable,
 	RefreshControl,
 	StyleSheet,
 	Text,
@@ -26,8 +28,9 @@ import type { Event, ThemeName } from '../../types/index';
 import EventCard from '../../components/eventCard';
 import { EventTagFilterSheet } from '../../components/eventTagFilterSheet';
 
-import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
+// Utils
 import { normalizeDateOnly } from '../../utils/Eventmappers';
+import { INFINITE_SCROLL_CONFIG } from '../../utils/constants';
 
 // Default Parameters
 const DEFAULT_RADIUS_MILES = 10;
@@ -105,6 +108,10 @@ type RadiusSelectorProps = {
 // Radius selector component
 const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 	const [isPickerVisible, setPickerVisible] = useState(false);
+	const [dropdownTop, setDropdownTop] = useState(0);
+	const [dropdownLeft, setDropdownLeft] = useState(0);
+	const [dropdownWidth, setDropdownWidth] = useState(0);
+	const buttonRef = useRef<View>(null);
 	const palette = Colors[theme];
 
 	const handleSelect = useCallback(
@@ -115,13 +122,22 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 		[onChange]
 	);
 
+	const handleOpen = useCallback(() => {
+		buttonRef.current?.measureInWindow((x, y, width, height) => {
+			setDropdownTop(y + height + 6);
+			setDropdownLeft(x);
+			setDropdownWidth(width);
+			setPickerVisible(true);
+		});
+	}, []);
+
 	const unitLabel = DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT;
 	const currentLabel = `Location: ${value} ${unitLabel}`;
 	return (
-		<View style={styles.radiusPickerContainer}>
+		<View ref={buttonRef} style={styles.radiusPickerContainer}>
 			<TouchableOpacity
 				style={[styles.radiusPickerButton, { borderColor: palette.border, backgroundColor: palette.background }]}
-				onPress={() => setPickerVisible((prev) => !prev)}
+				onPress={isPickerVisible ? () => setPickerVisible(false) : handleOpen}
 				activeOpacity={0.85}
 				accessibilityLabel={`Search radius: ${value} ${unitLabel}. Tap to change.`}
 				accessibilityRole="button"
@@ -130,23 +146,30 @@ const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) => {
 				<MaterialIcons name={isPickerVisible ? 'arrow-drop-up' : 'arrow-drop-down'} size={22} color={palette.cardTitle} />
 			</TouchableOpacity>
 
-			{isPickerVisible ? (
-				<View style={[styles.radiusPickerDropdown, { backgroundColor: palette.container, borderColor: palette.border }]}>
-					{RADIUS_OPTIONS.map((option) => (
-						<TouchableOpacity
-							key={option}
-							style={styles.radiusPickerOption}
-							onPress={() => handleSelect(option)}
-							accessibilityLabel={`${option} ${unitLabel}`}
-							accessibilityRole="button"
-						>
-							<Text style={[styles.radiusPickerOptionText, { color: option === value ? palette.cardTitle : palette.cardSubtitle }]}>
-								{option} {unitLabel}
-							</Text>
-						</TouchableOpacity>
-					))}
-				</View>
-			) : null}
+			<Modal visible={isPickerVisible} transparent animationType="none" onRequestClose={() => setPickerVisible(false)}>
+				<Pressable style={styles.radiusModalBackdrop} onPress={() => setPickerVisible(false)}>
+					<View
+						style={[
+							styles.radiusPickerDropdown,
+							{ top: dropdownTop, left: dropdownLeft, width: dropdownWidth, backgroundColor: palette.container, borderColor: palette.border },
+						]}
+					>
+						{RADIUS_OPTIONS.map((option) => (
+							<TouchableOpacity
+								key={option}
+								style={styles.radiusPickerOption}
+								onPress={() => handleSelect(option)}
+								accessibilityLabel={`${option} ${unitLabel}`}
+								accessibilityRole="button"
+							>
+								<Text style={[styles.radiusPickerOptionText, { color: option === value ? palette.cardTitle : palette.cardSubtitle }]}>
+									{option} {unitLabel}
+								</Text>
+							</TouchableOpacity>
+						))}
+					</View>
+				</Pressable>
+			</Modal>
 		</View>
 	);
 };
@@ -432,15 +455,6 @@ const EventsScreen = () => {
 	]);
 
 	const ListEmpty = useCallback(() => {
-		if (isInitialLoading) {
-			return (
-				<View style={styles.emptyState}>
-					<ActivityIndicator color={palette.actionButton} size="large" />
-					<Text style={[styles.emptyStateText, { color: palette.filterTextActive }]}>Loading events...</Text>
-				</View>
-			);
-		}
-
 		if (error) {
 			// Header banner already shows the error with a retry button — avoid duplicating it here
 			return null;
@@ -454,7 +468,7 @@ const EventsScreen = () => {
 				</Text>
 			</View>
 		);
-	}, [error, isInitialLoading, palette]);
+	}, [error, palette]);
 
 	const ListFooter = useCallback(() => {
 		if (isPaginating) {
@@ -476,10 +490,22 @@ const EventsScreen = () => {
 		return null;
 	}, [events.length, hasMore, isPaginating, palette]);
 
+	if (isInitialLoading && events.length === 0) {
+		return (
+			<View style={[styles.container, { backgroundColor: palette.background }]}>
+				<View style={styles.centerContent}>
+					<ActivityIndicator size="large" color={palette.actionButton} />
+					<Text style={[styles.statusText, { color: palette.cardTitle }]}>Loading events...</Text>
+				</View>
+			</View>
+		);
+	}
+
 	return (
 		<View style={[styles.container, { backgroundColor: palette.background }]}>
 			<FlatList
 				ref={listRef}
+				style={[styles.list, { backgroundColor: palette.background }]}
 				data={listRows}
 				keyExtractor={(item) => item.key}
 				renderItem={renderItem}
@@ -529,6 +555,19 @@ export default EventsScreen;
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
+	},
+	list: {
+		flex: 1,
+	},
+	centerContent: {
+		flex: 1,
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingHorizontal: 32,
+	},
+	statusText: {
+		marginTop: 12,
+		fontSize: 16,
 	},
 	listContent: {
 		paddingBottom: 32,
@@ -606,22 +645,19 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 		fontWeight: '700',
 	},
+	radiusModalBackdrop: {
+		flex: 1,
+	},
 	radiusPickerDropdown: {
 		position: 'absolute',
-		top: '100%',
-		left: 0,
-		right: 0,
-		marginTop: 6,
 		borderRadius: 12,
 		borderWidth: 1,
 		paddingVertical: 6,
-		overflow: 'hidden',
 		shadowColor: '#000',
 		shadowOpacity: 0.18,
 		shadowRadius: 12,
 		shadowOffset: { width: 0, height: 6 },
 		elevation: 22,
-		zIndex: 22,
 	},
 	radiusPickerOption: {
 		paddingVertical: 12,
