@@ -222,6 +222,11 @@ export type EventsCache = {
   hasMore: boolean;
 };
 
+// Row types for the events FlatList (date separators and event cards)
+export type EventListRow =
+  | { type: 'date'; key: string; label: string }
+  | { type: 'event'; key: string; event: Event };
+
 // Cache structure for bars data
 export type BarsCache = {
   key: string;

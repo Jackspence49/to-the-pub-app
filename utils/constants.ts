@@ -33,6 +33,8 @@ export const EVENTS_BASE_QUERY_PARAMS: QueryParams = {
 }
 
 export const RADIUS_OPTIONS = [1, 3, 5, 10];
+export const DEFAULT_EVENT_RADIUS_MILES = 10;
+export const DISTANCE_UNIT = 'miles';
 
 // Infinite Scroll Configuration
 export const INFINITE_SCROLL_CONFIG: InfiniteScrollConfig = {

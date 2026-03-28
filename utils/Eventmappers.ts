@@ -1,6 +1,40 @@
 // Functions to map raw API data to Event objects
 import type { Event, EventTag, LooseObject } from '@/types/index';
 
+// Parse a route param (string | string[]) into a deduplicated array of tag IDs
+export const parseTagParam = (value?: string | string[]): string[] => {
+	if (!value) return [];
+	const rawList = Array.isArray(value) ? value : value.split(',');
+	return Array.from(new Set(rawList.map((entry) => entry.trim()).filter(Boolean)));
+};
+
+// Returns the start of day (midnight) for a given date
+const startOfDay = (input: Date): Date => {
+	const copy = new Date(input);
+	copy.setHours(0, 0, 0, 0);
+	return copy;
+};
+
+// Format an event date string as a human-readable relative label
+export const formatRelativeEventDay = (value?: string): string => {
+	if (!value) return 'Date coming soon';
+
+	// Parse date-only strings (YYYY-MM-DD) as local time to avoid UTC midnight off-by-one
+	const date = new Date(value.includes('T') ? value : `${value}T00:00:00`);
+	if (Number.isNaN(date.getTime())) return 'Date coming soon';
+
+	const today = startOfDay(new Date());
+	const target = startOfDay(date);
+	const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+
+	if (diffDays === 0) return 'Today';
+	if (diffDays === 1) return 'Tomorrow';
+	if (diffDays > 1 && diffDays <= 6) {
+		return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date);
+	}
+	return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).format(date);
+};
+
 // Function to extract event items from various API response structures
 export const extractEventItems = (payload: unknown): LooseObject[] => {
 	if (!payload) {
