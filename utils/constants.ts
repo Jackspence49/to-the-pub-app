@@ -46,6 +46,12 @@ export const INFINITE_SCROLL_CONFIG: InfiniteScrollConfig = {
   cacheTimeout: 300000, // 5 minutes
 };
 
+// Search screen configuration
+export const SAVED_BARS_KEY = 'ttp-saved-bars';
+export const MAX_SAVED_BARS = 50;
+export const SEARCH_DEBOUNCE_MS = 300;
+export const MAX_QUERY_LENGTH = 100;
+
 // Day Name to Index Mapping
 export const DAY_NAME_INDEX: Record<string, number> = {
   sunday: 0,
