@@ -288,10 +288,10 @@ const styles = StyleSheet.create({
 	dateSeparatorPill: {
 		alignSelf: 'flex-start',
 		marginHorizontal: 20,
-		marginTop: 12,
-		marginBottom: 6,
+		marginTop: 20,
+		marginBottom: 0,
 		paddingHorizontal: 14,
-		paddingVertical: 8,
+		paddingVertical: 6,
 		borderRadius: 999,
 		borderWidth: 1,
 	},
