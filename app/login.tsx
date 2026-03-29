@@ -1,6 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { Redirect, useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -35,31 +35,8 @@ const initialFormState: LoginFormState = {
 export default function LoginScreen() {
   const { login, status } = useAuth();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = (colorScheme ?? 'light') as ThemeName;
+  const theme = (useColorScheme() ?? 'dark') as ThemeName;
   const palette = Colors[theme];
-
-  const tokens = useMemo(() => {
-    const isLight = theme === 'light';
-    return {
-      heroBackground: isLight ? '#fff7ed' : '#3c1d0b',
-      heroAccent: isLight ? '#9a3412' : '#fde68a',
-      heroBody: isLight ? '#7c2d12' : '#fed7aa',
-      cardBackground: isLight ? '#ffffff' : '#0f172a',
-      cardBorder: isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(148, 163, 184, 0.35)',
-      fieldBackground: isLight ? '#f8fafc' : '#111827',
-      fieldBorder: isLight ? '#e2e8f0' : '#1f2937',
-      placeholder: '#94a3b8',
-      label: isLight ? '#0f172a' : '#f8fafc',
-      helper: isLight ? '#475569' : '#cbd5f5',
-      errorText: '#b91c1c',
-      errorBackground: isLight ? '#fef2f2' : '#2f0e0e',
-      errorBorder: '#fca5a5',
-      primaryButtonBackground: isLight ? '#f97316' : '#fb923c',
-      primaryButtonText: '#0f172a',
-      secondaryBorder: isLight ? 'rgba(15, 23, 42, 0.2)' : 'rgba(255, 255, 255, 0.25)',
-    };
-  }, [theme]);
 
   const [form, setForm] = useState<LoginFormState>(initialFormState);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -135,31 +112,31 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.heroCard, { backgroundColor: tokens.heroBackground }]}
+        <View style={[styles.heroCard, { backgroundColor: palette.loginHeroBackground }]}
         >
-          <Text style={[styles.heroEyebrow, { color: tokens.heroAccent }]}>Welcome back</Text>
+          <Text style={[styles.heroEyebrow, { color: palette.loginHeroAccent }]}>Welcome back</Text>
           <Text style={[styles.heroTitle, { color: palette.text }]}>Log back in</Text>
-          <Text style={[styles.heroBody, { color: tokens.heroBody }]}>Your favorite spots and tonight&rsquo;s best local events are just a tap away.</Text>
+          <Text style={[styles.heroBody, { color: palette.loginHeroBody }]}>Your favorite spots and tonight&rsquo;s best local events are just a tap away.</Text>
         </View>
 
-        <View style={[styles.formCard, { backgroundColor: tokens.cardBackground, borderColor: tokens.cardBorder }]}
+        <View style={[styles.formCard, { backgroundColor: palette.cardSurface, borderColor: palette.border }]}
         >
           <Text style={[styles.sectionTitle, { color: palette.text }]}>Your account</Text>
 
           <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: tokens.label }]}>Email</Text>
+            <Text style={[styles.label, { color: palette.text }]}>Email</Text>
             <View
               style={[
                 styles.inputWrapper,
-                { backgroundColor: tokens.fieldBackground, borderColor: errors.email ? tokens.errorText : tokens.fieldBorder },
+                { backgroundColor: palette.background, borderColor: errors.email ? palette.networkErrorText : palette.border },
               ]}
             >
-              <FontAwesome name="envelope" size={16} color={tokens.helper} style={styles.inputIcon} />
+              <FontAwesome name="envelope" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
               <TextInput
                 value={form.email}
                 onChangeText={(value) => handleFieldChange('email', value)}
                 placeholder="alex@example.com"
-                placeholderTextColor={tokens.placeholder}
+                placeholderTextColor={palette.icon}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
@@ -167,28 +144,28 @@ export default function LoginScreen() {
                 returnKeyType="next"
               />
             </View>
-            {errors.email ? <Text style={[styles.errorText, { color: tokens.errorText }]}>{errors.email}</Text> : null}
+            {errors.email ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.email}</Text> : null}
           </View>
 
           <View style={styles.fieldGroup}>
             <View style={styles.labelRow}>
-              <Text style={[styles.label, { color: tokens.label }]}>Password</Text>
+              <Text style={[styles.label, { color: palette.text }]}>Password</Text>
               <TouchableOpacity onPress={() => setShowPassword((current) => !current)}>
-                <Text style={[styles.togglePassword, { color: tokens.helper }]}>{showPassword ? 'Hide' : 'Show'}</Text>
+                <Text style={[styles.togglePassword, { color: palette.cardSubtitle }]}>{showPassword ? 'Hide' : 'Show'}</Text>
               </TouchableOpacity>
             </View>
             <View
               style={[
                 styles.inputWrapper,
-                { backgroundColor: tokens.fieldBackground, borderColor: errors.password ? tokens.errorText : tokens.fieldBorder },
+                { backgroundColor: palette.background, borderColor: errors.password ? palette.networkErrorText : palette.border },
               ]}
             >
-              <FontAwesome name="lock" size={16} color={tokens.helper} style={styles.inputIcon} />
+              <FontAwesome name="lock" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
               <TextInput
                 value={form.password}
                 onChangeText={(value) => handleFieldChange('password', value)}
                 placeholder="••••••••"
-                placeholderTextColor={tokens.placeholder}
+                placeholderTextColor={palette.icon}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoComplete="password"
@@ -196,14 +173,14 @@ export default function LoginScreen() {
                 returnKeyType="done"
               />
             </View>
-            {errors.password ? <Text style={[styles.errorText, { color: tokens.errorText }]}>{errors.password}</Text> : null}
+            {errors.password ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.password}</Text> : null}
           </View>
 
           {errors.global ? (
-            <View style={[styles.feedbackPanel, { backgroundColor: tokens.errorBackground, borderColor: tokens.errorBorder }]}
+            <View style={[styles.feedbackPanel, { backgroundColor: palette.networkErrorBackground, borderColor: palette.networkErrorBorder }]}
             >
-              <Text style={[styles.feedbackTitle, { color: tokens.errorText }]}>Try again</Text>
-              <Text style={[styles.feedbackBody, { color: tokens.errorText }]}>{errors.global}</Text>
+              <Text style={[styles.feedbackTitle, { color: palette.networkErrorText }]}>Try again</Text>
+              <Text style={[styles.feedbackBody, { color: palette.networkErrorText }]}>{errors.global}</Text>
             </View>
           ) : null}
 
@@ -213,22 +190,22 @@ export default function LoginScreen() {
             activeOpacity={0.9}
             style={[
               styles.primaryButton,
-              { backgroundColor: tokens.primaryButtonBackground, opacity: isSubmitting ? 0.7 : 1 },
+              { backgroundColor: palette.loginPrimaryButton, opacity: isSubmitting ? 0.7 : 1 },
             ]}
           >
             {isSubmitting ? (
-              <ActivityIndicator color={tokens.primaryButtonText} />
+              <ActivityIndicator color={palette.loginPrimaryButtonText} />
             ) : (
-              <Text style={[styles.primaryButtonText, { color: tokens.primaryButtonText }]}>Sign in</Text>
+              <Text style={[styles.primaryButtonText, { color: palette.loginPrimaryButtonText }]}>Sign in</Text>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => router.push('/register')}
-            style={[styles.secondaryButton, { borderColor: tokens.secondaryBorder }]}
+            style={[styles.secondaryButton, { borderColor: palette.border }]}
             activeOpacity={0.85}
           >
-            <Text style={[styles.secondaryButtonText, { color: tokens.helper }]}>Need an account? Register</Text>
+            <Text style={[styles.secondaryButtonText, { color: palette.cardSubtitle }]}>Need an account? Register</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

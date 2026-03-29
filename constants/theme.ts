@@ -45,7 +45,14 @@ export const Colors = {
   networkErrorText: '#B71C1C',
 
     text: '#11181C',
-    tabIconDefault: '#687076'
+    tabIconDefault: '#687076',
+
+    // Login / Register
+    loginHeroBackground: '#fff7ed',
+    loginHeroAccent: '#9a3412',
+    loginHeroBody: '#7c2d12',
+    loginPrimaryButton: '#f97316',
+    loginPrimaryButtonText: '#0f172a',
   },
   dark: {
     // layout
@@ -87,6 +94,13 @@ export const Colors = {
 
     text: '#F5F5F5',
     tabIconDefault: '#9BA1A6',
+
+    // Login / Register
+    loginHeroBackground: '#3c1d0b',
+    loginHeroAccent: '#fde68a',
+    loginHeroBody: '#fed7aa',
+    loginPrimaryButton: '#fb923c',
+    loginPrimaryButtonText: '#0f172a',
   },
 };
 
