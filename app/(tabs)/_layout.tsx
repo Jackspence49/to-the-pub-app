@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/theme';
-import { Redirect, Tabs } from 'expo-router'; // Tab layout with authentication check
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View, useColorScheme } from 'react-native';
 
@@ -12,7 +12,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 // Custom hooks for theming and authentication
 import { useAuth } from '@/hooks/use-auth';
 
-//Get Auth status and theme colors
 export default function TabLayout() {
   const { status } = useAuth();  
   const theme = useColorScheme() ?? 'dark';
