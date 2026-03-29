@@ -34,7 +34,10 @@ export default function SearchScreen() {
 	const router = useRouter();
 
 	const { query, setQuery, results, isLoading, error, canSearch } = useSearch();
-	const { savedBars, saveBar, clearSavedBars } = useSavedBars();
+	const { savedBars, saveBar, removeSavedBar, clearSavedBars } = useSavedBars();
+
+	const showRecentBars = !canSearch && savedBars.length > 0;
+	const listData = showRecentBars ? savedBars : results;
 
 	const handlePressResult = useCallback(
 		(bar: searchBar) => {
@@ -45,18 +48,22 @@ export default function SearchScreen() {
 	);
 
 	const renderItem = useCallback<ListRenderItem<searchBar>>(
-		({ item }) => <SearchResultCard bar={item} theme={theme} onPress={() => handlePressResult(item)} />,
-		[handlePressResult, theme]
+		({ item }) => (
+			<SearchResultCard
+				bar={item}
+				theme={theme}
+				onPress={() => handlePressResult(item)}
+				onRemove={showRecentBars ? () => removeSavedBar(item.id) : undefined}
+			/>
+		),
+		[handlePressResult, removeSavedBar, showRecentBars, theme]
 	);
-
-	const showRecentBars = !canSearch && savedBars.length > 0;
-	const listData = showRecentBars ? savedBars : results;
 
 	const listEmptyComponent = useMemo(() => {
 		if (showRecentBars || isLoading) return null;
-		const text = !canSearch
-			? 'Start typing to find a bar (min 2 characters).'
-			: error ?? (listData.length === 0 ? 'No bars found yet. Try another name?' : null);
+		const text = canSearch
+			? error ?? (listData.length === 0 ? 'No bars found yet. Try another name?' : null)
+			: null;
 		if (!text) return null;
 		return (
 			<View style={styles.statusWrapper}>
@@ -68,52 +75,56 @@ export default function SearchScreen() {
 	return (
 		<View style={[styles.container, { backgroundColor: palette.background }]}>
 			<Stack.Screen options={{ title: 'Search', headerLargeTitle: false }} />
-			<View style={styles.searchBarWrapper}>
-				<TextInput
-					placeholder="Search for a bar"
-					placeholderTextColor={palette.cardSubtitle}
-					style={[
-						styles.searchInput,
-						{ color: palette.cardTitle, borderColor: palette.border, backgroundColor: palette.cardSurface },
-					]}
-					value={query}
-					onChangeText={setQuery}
-					autoCapitalize="none"
-					autoCorrect={false}
-					returnKeyType="search"
-					onSubmitEditing={Keyboard.dismiss}
-					maxLength={MAX_QUERY_LENGTH}
-				/>
-				{query ? (
-					<TouchableOpacity
-						onPress={() => setQuery('')}
-						style={[styles.clearButton, { backgroundColor: palette.pillBackground, borderColor: palette.border }]}
-						accessibilityRole="button"
-						accessibilityLabel="Clear search"
-					>
-						<MaterialIcons name="close" size={16} color={palette.cardTitle} />
-					</TouchableOpacity>
+			<View style={styles.headerContent}>
+				<Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Search</Text>
+				<View style={styles.searchBarWrapper}>
+					<TextInput
+						placeholder="Search for a bar"
+						placeholderTextColor={palette.cardSubtitle}
+						style={[
+							styles.searchInput,
+							{ color: palette.cardTitle, borderColor: palette.border, backgroundColor: palette.cardSurface },
+						]}
+						value={query}
+						onChangeText={setQuery}
+						autoCapitalize="none"
+						autoCorrect={false}
+						returnKeyType="search"
+						onSubmitEditing={Keyboard.dismiss}
+						maxLength={MAX_QUERY_LENGTH}
+					/>
+					{query ? (
+						<TouchableOpacity
+							onPress={() => setQuery('')}
+							style={[styles.clearButton, { backgroundColor: palette.filterActivePill, borderColor: palette.filterActivePill }]}
+							accessibilityRole="button"
+							accessibilityLabel="Clear search"
+						>
+							<MaterialIcons name="close" size={16} color={palette.filterTextActive} />
+						</TouchableOpacity>
+					) : null}
+				</View>
+
+				{showRecentBars ? (
+					<View style={styles.sectionHeaderRow}>
+						<Text style={[styles.sectionTitle, { color: palette.cardTitle }]}>Recents</Text>
+						<TouchableOpacity
+							onPress={clearSavedBars}
+							accessibilityRole="button"
+							accessibilityLabel="Clear recent bars"
+							style={[styles.clearRecentPill, { backgroundColor: palette.filterActivePill }]}
+						>
+							<Text style={[styles.clearRecentText, { color: palette.filterTextActive }]}>Clear</Text>
+						</TouchableOpacity>
+					</View>
+				) : null}
+
+				{isLoading && results.length === 0 ? (
+					<View style={styles.statusWrapper}>
+						<ActivityIndicator color={palette.actionButton} />
+					</View>
 				) : null}
 			</View>
-
-			{showRecentBars ? (
-				<View style={styles.sectionHeaderRow}>
-					<Text style={[styles.sectionTitle, { color: palette.cardTitle }]}>Recent</Text>
-					<TouchableOpacity
-						onPress={clearSavedBars}
-						accessibilityRole="button"
-						accessibilityLabel="Clear recent bars"
-					>
-						<Text style={[styles.clearRecentText, { color: palette.cardSubtitle }]}>Clear</Text>
-					</TouchableOpacity>
-				</View>
-			) : null}
-
-			{isLoading && results.length === 0 ? (
-				<View style={styles.statusWrapper}>
-					<ActivityIndicator color={palette.actionButton} />
-				</View>
-			) : null}
 
 			<FlatList
 				data={listData}
@@ -131,10 +142,23 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 	},
+	headerContent: {
+		paddingTop: 12,
+		paddingHorizontal: 20,
+		paddingBottom: 12,
+	},
+	listHeader: {
+		paddingTop: 12,
+		paddingHorizontal: 20,
+		paddingBottom: 12,
+		zIndex: 30,
+		elevation: 30,
+		overflow: 'visible',
+		position: 'relative',
+	},
 	searchBarWrapper: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		marginHorizontal: 20,
 		marginTop: 16,
 	},
 	searchInput: {
@@ -163,20 +187,28 @@ const styles = StyleSheet.create({
 		fontSize: 15,
 	},
 	resultsList: {
-		paddingVertical: 24,
+		paddingVertical: 0,
 	},
 	sectionHeaderRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		justifyContent: 'space-between',
-		marginHorizontal: 20,
 		marginTop: 12,
 	},
 	sectionTitle: {
 		fontSize: 16,
 		fontWeight: '700',
 	},
+	clearRecentPill: {
+		paddingHorizontal: 14,
+		paddingVertical: 6,
+		borderRadius: 999,
+	},
 	clearRecentText: {
 		fontSize: 14,
+	},
+	screenTitle: {
+		fontSize: 26,
+		fontWeight: '700',
 	},
 });

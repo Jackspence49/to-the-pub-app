@@ -47,6 +47,17 @@ export const useSavedBars = () => {
 		[persist]
 	);
 
+	const removeSavedBar = useCallback(
+		(barId: string) => {
+			setSavedBars((previous) => {
+				const next = previous.filter((entry) => entry.id !== barId);
+				persist(next);
+				return next;
+			});
+		},
+		[persist]
+	);
+
 	const clearSavedBars = useCallback(async () => {
 		setSavedBars([]);
 		try {
@@ -56,5 +67,5 @@ export const useSavedBars = () => {
 		}
 	}, []);
 
-	return { savedBars, saveBar, clearSavedBars };
+	return { savedBars, saveBar, removeSavedBar, clearSavedBars };
 };

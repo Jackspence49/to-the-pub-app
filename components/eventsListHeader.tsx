@@ -47,7 +47,7 @@ export const EventsListHeader = ({
 
 	return (
 		<View style={[styles.listHeader, { backgroundColor: palette.background }]}>
-			<Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Upcoming events</Text>
+			<Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Upcoming Events</Text>
 
 			<View style={styles.headerControlsRow}>
 				<View style={styles.filterButtonRow}>
