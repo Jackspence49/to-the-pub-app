@@ -1,5 +1,5 @@
 // Functions to map raw API data to Bar objects
-import type { Bar, BarTag, LooseObject } from '@/types/index';
+import type { Bar, BarHours, BarTag, LooseObject } from '@/types/index';
 import { DAY_NAME_INDEX } from './constants';
 import { normalizeTwitterUrl, toNumber } from './helpers';
 
@@ -141,6 +141,16 @@ const extractTodayClosingMeta = (
   };
 };
 
+// Map raw hour data to BarHours type
+export const mapToBarHour = (raw: LooseObject): BarHours => ({
+  id: String(raw.id ?? ''),
+  day_of_week: typeof raw.day_of_week === 'number' ? raw.day_of_week : Number(raw.dayOfWeek ?? 0),
+  open_time: raw.open_time ?? raw.openTime ?? '',
+  close_time: raw.close_time ?? raw.closeTime ?? '',
+  is_closed: Boolean(raw.is_closed ?? raw.isClosed ?? false),
+  crosses_midnight: Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false),
+});
+
 // Map raw bar data to Bar type
 export const mapToBar = (raw: LooseObject, index: number): Bar => {
   const rawTags = raw.tags || [];
@@ -167,9 +177,13 @@ export const mapToBar = (raw: LooseObject, index: number): Bar => {
     eventbrite: raw.eventbrite ?? undefined,
     distance_miles: toNumber(raw.distance_miles) ?? undefined,
     distance_km: toNumber(raw.distance_km) ?? undefined,
-    closes_at: typeof raw.closes_at === 'string' && raw.closes_at.trim().length > 0 ? raw.closes_at.trim() : undefined,
+    closes_at: (typeof raw.closes_at === 'string' && raw.closes_at.trim().length > 0)
+      ? raw.closes_at.trim()
+      : extractTodayClosingMeta(raw).closesAt,
     tags: dedupedTags,
-    hours: raw.hours || [],
+    hours: Array.isArray(raw.hours)
+      ? raw.hours.map((h: LooseObject) => mapToBarHour(h)).filter((h) => typeof h.day_of_week === 'number')
+      : [],
   };
 };
 

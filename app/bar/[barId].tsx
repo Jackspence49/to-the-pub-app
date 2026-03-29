@@ -1,86 +1,31 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, useColorScheme } from 'react-native';
+import { StyleSheet, View, useColorScheme } from 'react-native';
+import { Colors } from '../../constants/theme';
 
-import BarDetails from '@/components/barDetails';
-import { Colors } from '@/constants/theme';
-import { Bar, BarHours, BarTag } from '@/types';
+// Types
+import type { Bar } from '../../types/index';
 
-type LooseObject = Record<string, any>;
+// Utils
+import { mapToBar } from '../../utils/Barmappers';
+
+// Components
+import BarDetails from '../../components/barDetails';
 
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
 const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
-const ensureProtocol = (value: string) => (value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
-
-const normalizeTwitterUrl = (value?: string | null) => {
-  if (!value) return undefined;
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^(?:www\.)?(?:twitter\.com|x\.com)(?:\/|$)/i.test(trimmed)) return ensureProtocol(trimmed);
-  const handle = trimmed.replace(/^@/, '');
-  if (!handle) return undefined;
-  return `https://x.com/${handle}`;
-};
-
-const mapToBarTag = (raw: LooseObject, index: number): BarTag | null => {
-  if (!raw) return null;
-  if (typeof raw === 'string') return { id: raw, name: raw };
-  const name = raw.name ?? raw.title ?? raw.label ?? raw.slug;
-  if (!name) return null;
-  const id = raw.id ?? raw.tag_id ?? raw.slug ?? `${name}-${index}`;
-  return { id: String(id), name: String(name), category: raw.category ?? raw.type ?? undefined };
-};
-
-const mapToBarHour = (raw: LooseObject): BarHours => ({
-  id: String(raw.id ?? ''),
-  day_of_week: typeof raw.day_of_week === 'number' ? raw.day_of_week : Number(raw.dayOfWeek ?? 0),
-  open_time: raw.open_time ?? raw.openTime ?? '',
-  close_time: raw.close_time ?? raw.closeTime ?? '',
-  is_closed: Boolean(raw.is_closed ?? raw.isClosed ?? false),
-  crosses_midnight: Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false),
-});
-
-const mapToBar = (raw: LooseObject): Bar => {
-  const tags = Array.isArray(raw.tags)
-    ? raw.tags.map((tag: LooseObject, index: number) => mapToBarTag(tag, index)).filter((tag): tag is BarTag => Boolean(tag))
-    : [];
-  const hours = Array.isArray(raw.hours)
-    ? raw.hours.map((hour: LooseObject) => mapToBarHour(hour)).filter((h) => typeof h.day_of_week === 'number')
-    : [];
-  return {
-    id: String(raw.id ?? ''),
-    name: raw.name ?? raw.title ?? 'Unnamed bar',
-    description: raw.description ?? undefined,
-    address_street: raw.address_street ?? raw.street ?? undefined,
-    address_city: raw.address_city ?? raw.city ?? undefined,
-    address_state: raw.address_state ?? raw.state ?? undefined,
-    address_zip: raw.address_zip ?? raw.zip ?? raw.postal_code ?? undefined,
-    latitude: raw.latitude ?? undefined,
-    longitude: raw.longitude ?? undefined,
-    phone: raw.phone ?? raw.phone_number ?? undefined,
-    website: raw.website ?? raw.site ?? undefined,
-    instagram: raw.instagram ?? undefined,
-    facebook: raw.facebook ?? undefined,
-    twitter: normalizeTwitterUrl(raw.twitter ?? raw.twitter_url ?? raw.x ?? raw.x_url),
-    posh: raw.posh ?? undefined,
-    eventbrite: raw.eventbrite ?? undefined,
-    tags,
-    hours,
-  };
-};
-
 export default function BarDetailScreen() {
   const { barId } = useLocalSearchParams<{ barId?: string }>();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const palette = Colors[(colorScheme ?? 'light') as keyof typeof Colors];
+  const theme = useColorScheme() ?? 'dark';
+  const palette = Colors[theme];
   const [bar, setBar] = useState<Bar | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const fetchBarDetail = useCallback(async () => {
+  useEffect(() => {
     if (!barId) {
       setError('Missing bar identifier.');
       setIsLoading(false);
@@ -91,25 +36,28 @@ export default function BarDetailScreen() {
       setIsLoading(false);
       return;
     }
+    const controller = new AbortController();
     setIsLoading(true);
-    try {
-      setError(null);
-      const response = await fetch(`${normalizedBaseUrl}/bars/${barId}?include=hours,tags`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch bar details (status ${response.status})`);
-      }
-      const payload = await response.json();
-      setBar(mapToBar(payload.data ?? payload));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load bar details right now.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [barId]);
+    setError(null);
+    fetch(`${normalizedBaseUrl}/bars/${barId}?include=hours,tags`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Failed to fetch bar details (status ${response.status})`);
+        return response.json();
+      })
+      .then((payload) => {
+        setBar(mapToBar(payload.data ?? payload, 0));
+      })
+      .catch((err) => {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        setError(err instanceof Error ? err.message : 'Unable to load bar details right now.');
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, [barId, retryCount]);
 
-  useEffect(() => {
-    fetchBarDetail();
-  }, [fetchBarDetail]);
+  const handleRetry = useCallback(() => setRetryCount((c) => c + 1), []);
 
   const handleViewUpcomingEvents = useCallback(() => {
     if (!bar?.id) return;
@@ -120,14 +68,14 @@ export default function BarDetailScreen() {
   }, [bar, router]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: palette.background }}>
+    <View style={[styles.container, { backgroundColor: palette.background }]}>
       <Stack.Screen
         options={{
           headerTransparent: true,
           headerTitle: '',
           headerBackTitle: '',
           headerBackButtonDisplayMode: 'minimal',
-          headerTintColor: '#ffffff',
+          headerTintColor: palette.cardSurface,
           headerShadowVisible: false,
         }}
       />
@@ -135,9 +83,15 @@ export default function BarDetailScreen() {
         bar={bar}
         isLoading={isLoading}
         error={error}
-        onRetry={fetchBarDetail}
+        onRetry={handleRetry}
         onViewUpcomingEvents={handleViewUpcomingEvents}
       />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});

@@ -331,7 +331,15 @@ export default function BarDetails({
 	}
 
 	if (!bar) {
-		return null;
+		return (
+			<View style={styles.centerContent}>
+				<Text style={[styles.errorTitle, { color: palette.text }]}>Unable to load bar</Text>
+				<Text style={[styles.errorDescription, { color: palette.cardSubtitle }]}>Something went wrong loading this bar.</Text>
+				<TouchableOpacity style={[styles.retryButton, { borderColor: palette.activePill }]} onPress={onRetry}>
+					<Text style={[styles.retryButtonText, { color: palette.activePill }]}>Try again</Text>
+				</TouchableOpacity>
+			</View>
+		);
 	}
 
 	return (
