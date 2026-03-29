@@ -1,6 +1,6 @@
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, useColorScheme, View, type ImageSourcePropType } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -12,7 +12,6 @@ type Palette = (typeof Colors)[ThemeName];
 type EventDetailsProps = {
 	title?: string;
 	description?: string;
-	image?: ImageSourcePropType | null;
 	dateLabel?: string;
   startTimeLabel?: string;
   endTimeLabel?: string;
@@ -73,13 +72,15 @@ export default function EventDetails({
       {/* Header */}
       <View style={styles.heroWrapper}>
     <View style={[styles.hero, { backgroundColor: palette.iconSelected, paddingTop: heroTopPadding }]}> 
-        <View style={[styles.heroTopRow, ]}>
-          <View style={[styles.tagPill, { backgroundColor: palette.pillBackground, borderColor: palette.pillBorder }]}> 
-            <Text style={[styles.tagPillText, { color: palette.pillText }]}>
-              {tagLabel}
-            </Text>
+        {tagLabel ? (
+          <View style={[styles.heroTopRow]}>
+            <View style={[styles.tagPill, { backgroundColor: palette.pillBackground, borderColor: palette.pillBorder }]}>
+              <Text style={[styles.tagPillText, { color: palette.pillText }]}>
+                {tagLabel}
+              </Text>
+            </View>
           </View>
-        </View>
+        ) : null}
           <Text style={[styles.eventTitle, { color: palette.cardTitle }]}> 
             {title}
           </Text>
@@ -393,36 +394,5 @@ const createStyles = (palette: Palette) => StyleSheet.create({
 	timeValueInline: {
 		fontSize: 16,
 		fontWeight: '600',
-	},
-	timeRow: {
-		flexDirection: 'row',
-		marginTop: 12,
-		borderWidth: 1,
-		borderColor: '#e5e7eb',
-		borderRadius: 12,
-		backgroundColor: '#f9fafb',
-		overflow: 'hidden',
-	},
-	timeColumn: {
-		flex: 1,
-		paddingVertical: 12,
-		paddingHorizontal: 14,
-	},
-	timeColumnRight: {
-		borderLeftWidth: 1,
-		borderLeftColor: '#e5e7eb',
-	},
-	timeLabel: {
-		fontSize: 12,
-		fontWeight: '600',
-		color: '#6b7280',
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-	},
-	timeValue: {
-		marginTop: 6,
-		fontSize: 16,
-		fontWeight: '600',
-		color: '#111827',
 	},
 });

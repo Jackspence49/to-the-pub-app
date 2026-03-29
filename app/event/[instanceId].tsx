@@ -212,8 +212,7 @@ export default function EventDetailScreen() {
               endTimeLabel={endTimeLabel ?? undefined}
               locationLabel={event.bar_name ?? undefined}
               tagLabel={event.event_tag_name ?? undefined}
-              recurrencePattern={undefined}
-              addressLabel={addressLabel ?? undefined}
+addressLabel={addressLabel ?? undefined}
               onPressOpenMap={handleOpenMaps}
               crossesMidnight={event.crosses_midnight}
               onPressLocation={event.bar_id ? handleViewBarDetails : undefined}
