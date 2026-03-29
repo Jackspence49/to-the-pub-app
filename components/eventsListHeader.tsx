@@ -8,19 +8,19 @@ import {
 	View,
 } from 'react-native';
 import { Colors } from '../constants/theme';
-import type { ThemeName } from '../types/index';
+import type { SelectedTagEntry, ThemeName } from '../types/index';
 import { RadiusSelector } from './radiusSelector';
 
 type EventsListHeaderProps = {
 	theme: ThemeName;
 	selectedTagIds: string[];
-	selectedTagNames: string[];
+	selectedTagEntries: SelectedTagEntry[];
 	searchRadius: number;
 	areTagsLoading: boolean;
 	tagsError: string | null;
 	error: string | null;
 	onOpenFilterSheet: () => void;
-	onClearTags: () => void;
+	onRemoveTag: (tagId: string) => void;
 	onRadiusChange: (value: number) => void;
 	onRetryTags: () => void;
 	onRetryEvents: () => void;
@@ -29,21 +29,19 @@ type EventsListHeaderProps = {
 export const EventsListHeader = ({
 	theme,
 	selectedTagIds,
-	selectedTagNames,
+	selectedTagEntries,
 	searchRadius,
 	areTagsLoading,
 	tagsError,
 	error,
 	onOpenFilterSheet,
-	onClearTags,
+	onRemoveTag,
 	onRadiusChange,
 	onRetryTags,
 	onRetryEvents,
 }: EventsListHeaderProps) => {
 	const palette = Colors[theme];
 	const highlightColor = palette.filterActivePill;
-	const preview = selectedTagNames.slice(0, 2).join(', ');
-	const remaining = Math.max(0, selectedTagIds.length - 2);
 
 	return (
 		<View style={[styles.listHeader, { backgroundColor: palette.background }]}>
@@ -63,27 +61,32 @@ export const EventsListHeader = ({
 							Filters{selectedTagIds.length ? ` (${selectedTagIds.length})` : ''}
 						</Text>
 					</TouchableOpacity>
-					{selectedTagIds.length ? (
-						<TouchableOpacity
-							onPress={onClearTags}
-							style={[styles.inlineClearButton, { borderColor: highlightColor }]}
-							activeOpacity={0.85}
-							accessibilityLabel="Clear tag filters"
-							accessibilityRole="button"
-						>
-							<Text style={[styles.inlineClearText, { color: highlightColor }]}>Clear</Text>
-						</TouchableOpacity>
-					) : null}
 				</View>
 				<View style={styles.radiusColumn}>
 					<RadiusSelector value={searchRadius} onChange={onRadiusChange} theme={theme} />
 				</View>
 			</View>
 
-			{selectedTagNames.length ? (
-				<Text style={[styles.selectedTagsText, { color: palette.cardSubtitle }]}>
-					{preview}{remaining ? ` +${remaining} more` : ''}
-				</Text>
+			{selectedTagEntries.length ? (
+				<View style={styles.selectedTagChipRow}>
+					{selectedTagEntries.map((entry) => (
+						<View
+							key={entry.normalized}
+							style={[styles.selectedTagChip, { borderColor: palette.border, backgroundColor: palette.filterContainer }]}
+						>
+							<Text style={[styles.selectedTagChipLabel, { color: palette.pillText }]} numberOfLines={1}>
+								{entry.label}
+							</Text>
+							<TouchableOpacity
+								onPress={() => onRemoveTag(entry.normalized)}
+								style={[styles.selectedTagChipClose, { backgroundColor: palette.filterContainer }]}
+								hitSlop={6}
+							>
+								<MaterialIcons name="close" size={14} color={palette.text} />
+							</TouchableOpacity>
+						</View>
+					))}
+				</View>
 			) : null}
 
 			{tagsError ? (
@@ -180,20 +183,31 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		textAlign: 'center',
 	},
-	inlineClearButton: {
+	selectedTagChipRow: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginTop: 8,
+	},
+	selectedTagChip: {
+		flexDirection: 'row',
+		alignItems: 'center',
 		paddingHorizontal: 12,
-		paddingVertical: 8,
-		borderRadius: 10,
-		borderWidth: 1.5,
+		paddingVertical: 6,
+		borderRadius: 999,
+		borderWidth: 1,
+		gap: 6,
 	},
-	inlineClearText: {
-		fontSize: 14,
-		fontWeight: '600',
-	},
-	selectedTagsText: {
+	selectedTagChipLabel: {
 		fontSize: 13,
-		marginTop: 6,
-		fontStyle: 'italic',
+		fontWeight: '700',
+	},
+	selectedTagChipClose: {
+		width: 20,
+		height: 20,
+		borderRadius: 10,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	filterLoadRow: {
 		flexDirection: 'row',

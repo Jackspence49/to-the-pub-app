@@ -59,6 +59,19 @@ export const useEventTagFilters = (initialTagIds: string[] = []) => {
     [availableTags, selectedTagIds]
   );
 
+  // { normalized: id, label: name } entries for chip display
+  const selectedTagEntries = useMemo(
+    () =>
+      availableTags
+        .filter((tag) => selectedTagIds.includes(tag.id))
+        .map((tag) => ({ normalized: tag.id, label: tag.name })),
+    [availableTags, selectedTagIds]
+  );
+
+  const handleRemoveTag = useCallback((tagId: string) => {
+    setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+  }, []);
+
   const handleApplyFilters = useCallback((nextTagIds: string[]) => {
     setSelectedTagIds(normalizeTagIds(nextTagIds));
     setIsFilterSheetVisible(false);
@@ -83,9 +96,11 @@ export const useEventTagFilters = (initialTagIds: string[] = []) => {
     tagsError,
     isFilterSheetVisible,
     selectedTagNames,
+    selectedTagEntries,
     fetchAvailableTags,
     handleApplyFilters,
     handleClearTags,
+    handleRemoveTag,
     openFilterSheet,
     closeFilterSheet,
   };

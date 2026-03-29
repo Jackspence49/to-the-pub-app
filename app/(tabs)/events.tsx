@@ -48,10 +48,10 @@ export default function EventsScreen() {
 		areTagsLoading,
 		tagsError,
 		isFilterSheetVisible,
-		selectedTagNames,
+		selectedTagEntries,
 		fetchAvailableTags,
 		handleApplyFilters,
-		handleClearTags,
+		handleRemoveTag,
 		openFilterSheet,
 		closeFilterSheet,
 	} = useEventTagFilters(initialSelectedTagIds);
@@ -148,13 +148,13 @@ export default function EventsScreen() {
 		<EventsListHeader
 			theme={theme}
 			selectedTagIds={selectedTagIds}
-			selectedTagNames={selectedTagNames}
+			selectedTagEntries={selectedTagEntries}
 			searchRadius={searchRadius}
 			areTagsLoading={areTagsLoading}
 			tagsError={tagsError}
 			error={error}
 			onOpenFilterSheet={openFilterSheet}
-			onClearTags={handleClearTags}
+			onRemoveTag={handleRemoveTag}
 			onRadiusChange={handleRadiusChange}
 			onRetryTags={fetchAvailableTags}
 			onRetryEvents={handleRetry}
@@ -162,13 +162,13 @@ export default function EventsScreen() {
 	), [
 		theme,
 		selectedTagIds,
-		selectedTagNames,
+		selectedTagEntries,
 		searchRadius,
 		areTagsLoading,
 		tagsError,
 		error,
 		openFilterSheet,
-		handleClearTags,
+		handleRemoveTag,
 		handleRadiusChange,
 		fetchAvailableTags,
 		handleRetry,
