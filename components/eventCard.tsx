@@ -5,6 +5,7 @@ import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-
 
 
 import type { Event } from '@/types/index';
+import { formatEventTime } from '@/utils/helpers';
 
 export type EventCardTokens = {
 	cardBackground: string;
@@ -24,21 +25,6 @@ export type EventCardProps = {
 	onPress?: () => void;
 };
 
-const formatEventTime = (value?: string): string => {
-	if (!value) {
-		return 'Time TBD';
-	}
-
-	const date = new Date(value);
-	if (Number.isNaN(date.getTime())) {
-		return 'Time TBD';
-	}
-
-	return new Intl.DateTimeFormat('en-US', {
-		hour: 'numeric',
-		minute: '2-digit',
-	}).format(date);
-};
 
 const formatDistance = (value: number | undefined, unit: string): string | null => {
 	if (typeof value !== 'number' || Number.isNaN(value) || value < 0) {
@@ -61,8 +47,8 @@ const EventCard = ({ event, distanceUnit = 'miles', onPress }: EventCardProps) =
 	const theme = useColorScheme() ?? 'dark';
 	const palette = Colors[theme];
 	const barName = event.bar_name;
-	const startTimeLabel = formatEventTime(event.start_time);
-	const endTimeLabel = formatEventTime(event.end_time);
+	const startTimeLabel = formatEventTime(event.start_time) ?? 'Time TBD';
+	const endTimeLabel = formatEventTime(event.end_time) ?? 'Time TBD';
 	const distanceLabel = formatDistance(event.distanceMiles, distanceUnit);
 	const eventTagName = event.event_tag_name;
 

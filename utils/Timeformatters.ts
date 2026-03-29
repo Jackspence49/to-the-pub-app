@@ -69,7 +69,6 @@ export const formatClosingTimeLabel = (closesAt?: string): string | null => {
 //
 // utils/barUtils.ts
 
-
 export const getTodaysHours = (hours: BarHours[]) => {
   const todayIndex = new Date().getDay(); 
   const todaysSchedule = hours.find(h => h.day_of_week === todayIndex);

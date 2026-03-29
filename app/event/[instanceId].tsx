@@ -20,7 +20,7 @@ import type { Event, ThemeName } from '../../types/index';
 // Utils
 import { mapToEvent } from '../../utils/Eventmappers';
 import { EVENTS_ENDPOINT, NORMALIZED_BASE_URL } from '../../utils/constants';
-import { ensureProtocol } from '../../utils/helpers';
+import { formatEventDay, formatEventTime, openExternal, openPhone } from '../../utils/helpers';
 
 // Components
 import EventDetails from '../../components/eventDetails';
@@ -32,47 +32,6 @@ type ActionButton = {
   onPress: () => void;
 };
 
-const formatEventDay = (value?: string): string => {
-  if (!value) return 'Date coming soon';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Date coming soon';
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
-};
-
-const formatEventTime = (value?: string): string | null => {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const openExternal = async (url?: string) => {
-  if (!url) return;
-  try {
-    await Linking.openURL(ensureProtocol(url));
-  } catch (err) {
-    console.warn('Unable to open URL', err);
-  }
-};
-
-const openPhone = async (phone?: string) => {
-  if (!phone) return;
-  const digits = phone.replace(/[^0-9+]/g, '');
-  if (!digits) return;
-  try {
-    await Linking.openURL(`tel:${digits}`);
-  } catch (err) {
-    console.warn('Unable to open dialer', err);
-  }
-};
 
 export default function EventDetailScreen() {
   const { instanceId } = useLocalSearchParams<{ instanceId?: string }>();
@@ -218,7 +177,7 @@ export default function EventDetailScreen() {
           headerTitle: '',
           headerBackTitle: '',
           headerBackButtonDisplayMode: 'minimal',
-          headerTintColor: '#ffffff',
+          headerTintColor: palette.cardTitle,
           headerShadowVisible: false,
         }}
       />

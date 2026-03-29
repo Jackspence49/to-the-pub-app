@@ -15,7 +15,7 @@ import {
 import MapView, { Marker, Region } from 'react-native-maps';
 import { Bar, BarHours } from '../types/index';
 import { HERO_MAP_DELTA } from '../utils/constants';
-import { toSocialUrl } from '../utils/helpers';
+import { openExternal, openPhone, toSocialUrl } from '../utils/helpers';
 
 export type ContactAction = {
 	key: string;
@@ -45,7 +45,6 @@ const HERO_MAP_STYLE = [
 
 const DAY_ABBREVIATIONS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const ensureProtocol = (value: string) => (value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
 
 const formatHourToken = (value?: string | null) => {
 	if (!value || typeof value !== 'string') {
@@ -99,31 +98,6 @@ const createHeroRegion = (coordinates: ReturnType<typeof computeCoordinates>): R
 	};
 };
 
-const openExternal = async (url?: string) => {
-	if (!url) {
-		return;
-	}
-	try {
-		await Linking.openURL(ensureProtocol(url));
-	} catch (error) {
-		console.warn('Unable to open URL', error);
-	}
-};
-
-const openPhone = async (phone?: string) => {
-	if (!phone) {
-		return;
-	}
-	const digits = phone.replace(/[^0-9+]/g, '');
-	if (!digits) {
-		return;
-	}
-	try {
-		await Linking.openURL(`tel:${digits}`);
-	} catch (error) {
-		console.warn('Unable to open dialer', error);
-	}
-};
 
 const openMapsForAddress = async (address?: string) => {
 	if (!address) {
