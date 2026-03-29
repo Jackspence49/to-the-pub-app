@@ -57,9 +57,9 @@ export const useSearch = () => {
 			setIsLoading(false);
 			return;
 		}
-		setIsLoading(true);
 		const controller = new AbortController();
 		const timer = setTimeout(() => {
+			setIsLoading(true);
 			performSearch(term, controller.signal);
 		}, SEARCH_DEBOUNCE_MS);
 		return () => {

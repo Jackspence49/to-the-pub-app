@@ -60,14 +60,11 @@ export default function SearchScreen() {
 	);
 
 	const listEmptyComponent = useMemo(() => {
-		if (showRecentBars || isLoading) return null;
-		const text = canSearch
-			? error ?? (listData.length === 0 ? 'No bars found yet. Try another name?' : null)
-			: null;
-		if (!text) return null;
+		if (showRecentBars || isLoading || error) return null;
+		if (!canSearch || listData.length > 0) return null;
 		return (
 			<View style={styles.statusWrapper}>
-				<Text style={[styles.helperText, { color: palette.cardSubtitle }]}>{text}</Text>
+				<Text style={[styles.helperText, { color: palette.cardSubtitle }]}>No bars found. Try a different name?</Text>
 			</View>
 		);
 	}, [canSearch, error, isLoading, listData.length, showRecentBars, palette]);
@@ -124,6 +121,12 @@ export default function SearchScreen() {
 						<ActivityIndicator color={palette.actionButton} />
 					</View>
 				) : null}
+
+				{error && !isLoading ? (
+					<View style={styles.statusWrapper}>
+						<Text style={[styles.helperText, { color: palette.cardSubtitle }]}>{error}</Text>
+					</View>
+				) : null}
 			</View>
 
 			<FlatList
@@ -146,15 +149,6 @@ const styles = StyleSheet.create({
 		paddingTop: 12,
 		paddingHorizontal: 20,
 		paddingBottom: 12,
-	},
-	listHeader: {
-		paddingTop: 12,
-		paddingHorizontal: 20,
-		paddingBottom: 12,
-		zIndex: 30,
-		elevation: 30,
-		overflow: 'visible',
-		position: 'relative',
 	},
 	searchBarWrapper: {
 		flexDirection: 'row',
