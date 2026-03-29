@@ -43,19 +43,20 @@ export const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) 
 		});
 	}, []);
 
-	const unitLabel = DISTANCE_UNIT === 'miles' ? 'mi' : DISTANCE_UNIT;
-	const currentLabel = `Location: ${value} ${unitLabel}`;
+	const unitAbbr = DISTANCE_UNIT === 'miles' ? 'mi' : 'km';
+	const unitFull = DISTANCE_UNIT === 'miles' ? 'miles' : 'kilometers';
+	const currentLabel = `Radius: ${value} ${unitAbbr}`;
 
 	return (
 		<View ref={buttonRef} style={styles.radiusPickerContainer}>
 			<TouchableOpacity
-				style={[styles.radiusPickerButton, { borderColor: palette.border, backgroundColor: palette.background }]}
+				style={[styles.radiusPickerButton, { borderColor: palette.filterActivePill, backgroundColor: palette.cardSurface }]}
 				onPress={isPickerVisible ? () => setPickerVisible(false) : handleOpen}
 				activeOpacity={0.85}
-				accessibilityLabel={`Search radius: ${value} ${unitLabel}. Tap to change.`}
+				accessibilityLabel={`Search radius: ${value} ${unitAbbr}. Tap to change.`}
 				accessibilityRole="button"
 			>
-				<Text style={[styles.radiusPickerValue, { color: palette.cardTitle }]}>{currentLabel}</Text>
+				<Text style={[styles.radiusPickerValue, { color: palette.filterActivePill }]}>{currentLabel}</Text>
 				<MaterialIcons name={isPickerVisible ? 'arrow-drop-up' : 'arrow-drop-down'} size={22} color={palette.cardTitle} />
 			</TouchableOpacity>
 
@@ -72,11 +73,11 @@ export const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) 
 								key={option}
 								style={styles.radiusPickerOption}
 								onPress={() => handleSelect(option)}
-								accessibilityLabel={`${option} ${unitLabel}`}
+								accessibilityLabel={`${option} ${unitFull}`}
 								accessibilityRole="button"
 							>
-								<Text style={[styles.radiusPickerOptionText, { color: option === value ? palette.cardTitle : palette.cardSubtitle }]}>
-									{option} {unitLabel}
+								<Text style={[styles.radiusPickerOptionText, { color: option === value ? palette.filterActivePill : palette.cardSubtitle }]}>
+									{option} {unitFull}
 								</Text>
 							</TouchableOpacity>
 						))}
@@ -99,14 +100,15 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		justifyContent: 'space-between',
 		borderWidth: 1,
-		borderRadius: 12,
-		paddingHorizontal: 14,
-		paddingVertical: 10,
+		borderRadius: 14,
+		paddingHorizontal: 20,
+		paddingVertical: 12,
 		minWidth: 160,
+		minHeight: 48,
 		gap: 10,
 	},
 	radiusPickerValue: {
-		fontSize: 15,
+		fontSize: 18,
 		fontWeight: '700',
 	},
 	radiusModalBackdrop: {

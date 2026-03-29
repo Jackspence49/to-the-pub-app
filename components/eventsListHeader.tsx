@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'flex-start',
 		gap: 12,
-		marginTop: 12,
+		marginTop: 16,
 		flexWrap: 'wrap',
 		position: 'relative',
 		overflow: 'visible',
@@ -163,6 +163,7 @@ const styles = StyleSheet.create({
 	filterButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
+		justifyContent: 'center',
 		paddingVertical: 12,
 		paddingHorizontal: 20,
 		borderRadius: 14,
@@ -177,6 +178,7 @@ const styles = StyleSheet.create({
 	filterButtonText: {
 		fontSize: 18,
 		fontWeight: '700',
+		textAlign: 'center',
 	},
 	inlineClearButton: {
 		paddingHorizontal: 12,
