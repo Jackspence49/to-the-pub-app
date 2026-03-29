@@ -211,14 +211,22 @@ export const mapToEvent = (raw: LooseObject): Event => {
 		return typeof numeric === 'number' ? numeric : undefined;
 	})();
 
+	const barId = raw.bar_id ?? raw.bar?.id ?? raw.barId ?? undefined;
+
 	return {
 		instance_id: String(primaryId),
 		event_id: eventIdSource ? String(eventIdSource) : undefined,
 		title: raw.title ?? raw.name ?? 'Untitled event',
 		description: raw.description ?? raw.summary ?? raw.subtitle ?? undefined,
+		bar_id: barId ? String(barId) : undefined,
 		bar_name: barName,
+		address_street: raw.address_street ?? raw.bar?.address_street ?? undefined,
 		address_city: city ?? undefined,
 		address_state: state ?? undefined,
+		address_zip: raw.address_zip ?? raw.bar?.address_zip ?? undefined,
+		phone: raw.phone ?? raw.bar?.phone ?? undefined,
+		website: raw.website ?? raw.bar?.website ?? undefined,
+		external_url: raw.external_url ?? raw.external_link ?? raw.custom_external_link ?? undefined,
 		start_time: startDateTime ?? raw.begin_at ?? undefined,
 		end_time: endDateTime ?? undefined,
 		event_tag_name: eventTagName,
