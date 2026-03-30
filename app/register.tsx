@@ -148,7 +148,9 @@ export default function RegisterScreen() {
     }
 
     const phoneCandidate = payload.phone.trim();
-    if (phoneCandidate && phoneCandidate.replace(/\D/g, '').length !== 10) {
+    if (!phoneCandidate) {
+      nextErrors.phone = 'Phone number is required.';
+    } else if (phoneCandidate.replace(/\D/g, '').length !== 10) {
       nextErrors.phone = 'Enter a 10-digit US number (e.g. 555-123-4567).';
     }
 
@@ -175,10 +177,8 @@ export default function RegisterScreen() {
         email: form.email.trim(),
         password: form.password,
         dob: toIsoDate(form.dob.trim())!,
+        phone: toE164Phone(form.phone),
       };
-      if (form.phone.trim()) {
-        body.phone = toE164Phone(form.phone);
-      }
 
       const response = await fetch(REGISTER_ENDPOINT, {
         method: 'POST',
@@ -348,11 +348,10 @@ export default function RegisterScreen() {
             {errors.dob ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.dob}</Text> : null}
           </View>
 
-          {/* Phone (optional) */}
+          {/* Phone */}
           <View style={styles.fieldGroup} onLayout={(e) => { fieldGroupY.current.phone = e.nativeEvent.layout.y; }}>
             <View style={styles.labelRow}>
               <Text style={[styles.label, { color: palette.text }]}>Phone</Text>
-              <Text style={[styles.helperText, { color: palette.cardSubtitle }]}>Optional</Text>
             </View>
             <View
               style={[
