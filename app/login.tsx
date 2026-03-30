@@ -1,8 +1,9 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { Redirect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -37,6 +38,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const theme = (useColorScheme() ?? 'dark') as ThemeName;
   const palette = Colors[theme];
+
+  const passwordRef = useRef<TextInput>(null);
 
   const [form, setForm] = useState<LoginFormState>(initialFormState);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -75,19 +78,21 @@ export default function LoginScreen() {
     setIsSubmitting(true);
     setErrors({});
 
-    const result = await login({
-      email: form.email.trim(),
-      password: form.password,
-    });
+    try {
+      const result = await login({
+        email: form.email.trim(),
+        password: form.password,
+      });
 
-    setIsSubmitting(false);
+      if (!result.success) {
+        setErrors({ global: result.message ?? 'Unable to sign in. Please try again.' });
+        return;
+      }
 
-    if (!result.success) {
-      setErrors({ global: result.message ?? 'Unable to sign in. Please try again.' });
-      return;
+      router.replace('/(tabs)');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.replace('/(tabs)');
   }, [form, login, router, validate]);
 
   if (status === 'checking') {
@@ -112,17 +117,11 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.heroCard, { backgroundColor: palette.loginHeroBackground }]}
-        >
-          <Text style={[styles.heroEyebrow, { color: palette.loginHeroAccent }]}>Welcome back</Text>
-          <Text style={[styles.heroTitle, { color: palette.text }]}>Log back in</Text>
-          <Text style={[styles.heroBody, { color: palette.loginHeroBody }]}>Your favorite spots and tonight&rsquo;s best local events are just a tap away.</Text>
-        </View>
+        <Image source={require('../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+          <Text style={[styles.heroTitle, { color: palette.text }]}>Welcome, Log in!</Text>
 
         <View style={[styles.formCard, { backgroundColor: palette.cardSurface, borderColor: palette.border }]}
         >
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Your account</Text>
-
           <View style={styles.fieldGroup}>
             <Text style={[styles.label, { color: palette.text }]}>Email</Text>
             <View
@@ -142,6 +141,7 @@ export default function LoginScreen() {
                 autoComplete="email"
                 style={[styles.input, { color: palette.text }]}
                 returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
             </View>
             {errors.email ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.email}</Text> : null}
@@ -162,6 +162,7 @@ export default function LoginScreen() {
             >
               <FontAwesome name="lock" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
               <TextInput
+                ref={passwordRef}
                 value={form.password}
                 onChangeText={(value) => handleFieldChange('password', value)}
                 placeholder="••••••••"
@@ -171,6 +172,7 @@ export default function LoginScreen() {
                 autoComplete="password"
                 style={[styles.input, { color: palette.text }]}
                 returnKeyType="done"
+                onSubmitEditing={handleSubmit}
               />
             </View>
             {errors.password ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.password}</Text> : null}
@@ -224,34 +226,15 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingTop: 80,
   },
-  heroCard: {
-    borderRadius: 24,
-    padding: 24,
-    gap: 10,
-  },
-  heroEyebrow: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
   heroTitle: {
     fontSize: 32,
     fontWeight: '700',
-  },
-  heroBody: {
-    fontSize: 16,
-    lineHeight: 22,
   },
   formCard: {
     borderRadius: 28,
     padding: 24,
     borderWidth: 1,
     gap: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
   },
   fieldGroup: {
     gap: 10,
@@ -327,5 +310,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logo: {
+    height: 150,
+    alignSelf: 'center',
   },
 });

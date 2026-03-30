@@ -48,10 +48,10 @@ export const Colors = {
     tabIconDefault: '#687076',
 
     // Login / Register
-    loginHeroBackground: '#fff7ed',
-    loginHeroAccent: '#9a3412',
-    loginHeroBody: '#7c2d12',
-    loginPrimaryButton: '#f97316',
+    loginHeroBackground: '#FFF8E1',
+    loginHeroAccent: '#424242',
+    loginHeroBody: '#757575',
+    loginPrimaryButton: '#1976D2',
     loginPrimaryButtonText: '#0f172a',
   },
   dark: {
@@ -96,10 +96,10 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
 
     // Login / Register
-    loginHeroBackground: '#3c1d0b',
+    loginHeroBackground: '#2C261A',
     loginHeroAccent: '#fde68a',
     loginHeroBody: '#fed7aa',
-    loginPrimaryButton: '#fb923c',
+    loginPrimaryButton: '#42A5F5',
     loginPrimaryButtonText: '#0f172a',
   },
 };
