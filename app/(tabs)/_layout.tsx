@@ -7,6 +7,7 @@ import { ActivityIndicator, StyleSheet, View, useColorScheme } from 'react-nativ
 // Custom components
 import { HapticTab } from '@/components/haptic-tab';
 import { LogoHeader } from '@/components/logo-header';
+import { ProfileButton } from '@/components/profile-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 // Custom hooks for theming and authentication
@@ -45,6 +46,7 @@ export default function TabLayout() {
         },
         headerShown: true,
         headerTitle: () => <LogoHeader />,
+        headerRight: () => <ProfileButton />,
         headerTitleAlign: 'left',
         headerTitleContainerStyle: {
           alignItems: 'flex-start',
