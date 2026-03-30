@@ -53,6 +53,11 @@ export const Colors = {
     loginHeroBody: '#757575',
     loginPrimaryButton: '#1976D2',
     loginPrimaryButtonText: '#0f172a',
+
+    // Success feedback
+    successBackground: '#ecfccb',
+    successBorder: '#84cc16',
+    successText: '#3f6212',
   },
   dark: {
     // layout
@@ -101,6 +106,11 @@ export const Colors = {
     loginHeroBody: '#fed7aa',
     loginPrimaryButton: '#42A5F5',
     loginPrimaryButtonText: '#0f172a',
+
+    // Success feedback
+    successBackground: '#1a2e05',
+    successBorder: '#65a30d',
+    successText: '#bef264',
   },
 };
 

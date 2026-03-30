@@ -8,6 +8,7 @@ export const BARS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/bars`
 export const BAR_TAGS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/BarTags` : '/get/BarTags';
 export const EVENTS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/events` : '/get/events';
 export const EVENT_TAGS_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/eventTags` : '/get/eventTags';
+export const REGISTER_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/appUsers/register` : '/post/appUsers/register';
 
 // Cache TTLs
 export const LOCATION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes

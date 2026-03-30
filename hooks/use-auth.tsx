@@ -26,6 +26,7 @@ type AuthContextValue = {
   user: AuthenticatedUser | null;
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<AuthActionResult>;
+  loginWithToken: (token: string, user?: AuthenticatedUser | null) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -80,7 +81,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/app-users/login`, {
+      const response = await fetch(`${normalizedBaseUrl}/appUsers/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,6 +120,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
+  const loginWithToken = useCallback(async (newToken: string, newUser?: AuthenticatedUser | null) => {
+    await SecureStore.setItemAsync(TOKEN_STORAGE_KEY, newToken);
+    setToken(newToken);
+    setUser(newUser ?? null);
+    setStatus('authenticated');
+  }, []);
+
   const logout = useCallback(async () => {
     setStatus('checking');
     setUser(null);
@@ -138,9 +146,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       user,
       isAuthenticated: status === 'authenticated',
       login,
+      loginWithToken,
       logout,
     }),
-    [status, token, user, login, logout],
+    [status, token, user, login, loginWithToken, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

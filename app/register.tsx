@@ -1,6 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,10 +15,11 @@ import {
 } from 'react-native';
 
 import { Colors } from '@/constants/theme';
-
+import { useAuth } from '@/hooks/use-auth';
+import { NORMALIZED_BASE_URL, REGISTER_ENDPOINT } from '@/utils/constants';
 
 type ThemeName = keyof typeof Colors;
-type FormField = 'fullName' | 'email' | 'password';
+type FormField = 'fullName' | 'email' | 'password' | 'dob' | 'phone';
 
 type FormErrors = Partial<Record<FormField | 'global', string>>;
 
@@ -26,76 +27,131 @@ type RegisterPayload = {
   fullName: string;
   email: string;
   password: string;
+  dob: string;
+  phone: string;
 };
 
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
-const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
 const initialFormState: RegisterPayload = {
   fullName: '',
   email: '',
   password: '',
+  dob: '',
+  phone: '',
 };
+
+// Accepts MM-DD-YYYY, returns YYYY-MM-DD or null if invalid
+function toIsoDate(mmddyyyy: string): string | null {
+  if (!/^\d{2}-\d{2}-\d{4}$/.test(mmddyyyy)) return null;
+  const [mm, dd, yyyy] = mmddyyyy.split('-');
+  const iso = `${yyyy}-${mm}-${dd}`;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  // Guard against month/day overflow (e.g. 13-01-2000)
+  if (d.getUTCFullYear() !== Number(yyyy) || d.getUTCMonth() + 1 !== Number(mm) || d.getUTCDate() !== Number(dd)) return null;
+  return iso;
+}
+
+function isAtLeast21(isoDate: string): boolean {
+  const dob = new Date(isoDate);
+  if (isNaN(dob.getTime())) return false;
+  const today = new Date();
+  const age = today.getFullYear() - dob.getFullYear();
+  const hasBirthdayPassed =
+    today.getMonth() > dob.getMonth() ||
+    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  return age > 21 || (age === 21 && hasBirthdayPassed);
+}
+
+// Auto-inserts dashes: "1203" → "12-03-", "12031998" → "12-03-1998"
+function formatDobInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+}
+
+// Auto-inserts dashes: "555" → "555", "5551" → "555-1", "5551234567" → "555-123-4567"
+function formatPhoneInput(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// Converts "555-123-4567" → "+15551234567"
+function toE164Phone(formatted: string): string {
+  return `+1${formatted.replace(/\D/g, '')}`;
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = (colorScheme ?? 'light') as ThemeName;
+  const { loginWithToken } = useAuth();
+  const theme = (useColorScheme() ?? 'dark') as ThemeName;
   const palette = Colors[theme];
-
-  const tokens = useMemo(() => {
-    const isLight = theme === 'light';
-    return {
-      heroBackground: isLight ? '#fff7ed' : '#3c1d0b',
-      heroAccent: isLight ? '#9a3412' : '#fde68a',
-      heroBody: isLight ? '#7c2d12' : '#fed7aa',
-      cardBackground: isLight ? '#ffffff' : '#0f172a',
-      cardBorder: isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(148, 163, 184, 0.35)',
-      fieldBackground: isLight ? '#f8fafc' : '#111827',
-      fieldBorder: isLight ? '#e2e8f0' : '#1f2937',
-      fieldBorderFocused: isLight ? '#f97316' : '#fb923c',
-      placeholder: '#94a3b8',
-      label: isLight ? '#0f172a' : '#f8fafc',
-      helper: isLight ? '#475569' : '#cbd5f5',
-      errorText: '#b91c1c',
-      errorBackground: isLight ? '#fef2f2' : '#2f0e0e',
-      errorBorder: '#fca5a5',
-      successBackground: isLight ? '#ecfccb' : '#1a2e05',
-      successBorder: isLight ? '#84cc16' : '#65a30d',
-      successText: isLight ? '#3f6212' : '#bef264',
-      primaryButtonBackground: isLight ? '#f97316' : '#fb923c',
-      primaryButtonText: '#0f172a',
-      secondaryBorder: isLight ? 'rgba(15, 23, 42, 0.2)' : 'rgba(255, 255, 255, 0.25)',
-    };
-  }, [theme]);
 
   const [form, setForm] = useState<RegisterPayload>(initialFormState);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const formCardY = useRef(0);
+  const fieldGroupY = useRef<Partial<Record<FormField, number>>>({});
+
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const dobRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+
+  const scrollToField = (field: FormField) => {
+    const y = (fieldGroupY.current[field] ?? 0) + formCardY.current;
+    scrollViewRef.current?.scrollTo({ y: y - 120, animated: true });
+  };
 
   const handleFieldChange = useCallback((field: FormField, value: string) => {
-    setForm((previous) => ({ ...previous, [field]: value }));
+    const coerced = field === 'dob' ? formatDobInput(value) : field === 'phone' ? formatPhoneInput(value) : value;
+    setForm((previous) => ({ ...previous, [field]: coerced }));
     setErrors((current) => ({ ...current, [field]: undefined, global: undefined }));
   }, []);
 
   const validate = useCallback((payload: RegisterPayload): FormErrors => {
     const nextErrors: FormErrors = {};
+
     if (!payload.fullName.trim()) {
       nextErrors.fullName = 'Add the name people will see.';
     }
+
     const emailCandidate = payload.email.trim();
     if (!emailCandidate) {
       nextErrors.email = 'Email is required.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCandidate)) {
       nextErrors.email = 'Enter a valid email address.';
     }
+
     if (!payload.password) {
       nextErrors.password = 'Create a password.';
     } else if (payload.password.length < 8) {
       nextErrors.password = 'Use at least 8 characters.';
     }
+
+    const dobCandidate = payload.dob.trim();
+    if (!dobCandidate) {
+      nextErrors.dob = 'Date of birth is required.';
+    } else {
+      const iso = toIsoDate(dobCandidate);
+      if (!iso) {
+        nextErrors.dob = 'Enter a valid date (MM-DD-YYYY).';
+      } else if (!isAtLeast21(iso)) {
+        nextErrors.dob = 'You must be at least 21 years old to register.';
+      }
+    }
+
+    const phoneCandidate = payload.phone.trim();
+    if (phoneCandidate && phoneCandidate.replace(/\D/g, '').length !== 10) {
+      nextErrors.phone = 'Enter a 10-digit US number (e.g. 555-123-4567).';
+    }
+
     return nextErrors;
   }, []);
 
@@ -105,26 +161,29 @@ export default function RegisterScreen() {
       setErrors(validationErrors);
       return;
     }
-    if (!normalizedBaseUrl) {
+    if (!NORMALIZED_BASE_URL) {
       setErrors({ global: 'Set EXPO_PUBLIC_API_URL to register new accounts.' });
       return;
     }
 
     setIsSubmitting(true);
-    setStatusMessage(null);
     setErrors({});
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/app-users/register`, {
+      const body: Record<string, string> = {
+        full_name: form.fullName.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        dob: toIsoDate(form.dob.trim())!,
+      };
+      if (form.phone.trim()) {
+        body.phone = toE164Phone(form.phone);
+      }
+
+      const response = await fetch(REGISTER_ENDPOINT, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: form.fullName.trim(),
-          email: form.email.trim(),
-          password: form.password,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
 
       let payload: any = null;
@@ -140,14 +199,15 @@ export default function RegisterScreen() {
         return;
       }
 
-      setStatusMessage(payload?.message ?? 'Welcome aboard! Check your email to verify your account.');
-      setForm(initialFormState);
-    } catch (error) {
+      // Registration succeeded — sign in with the returned token
+      await loginWithToken(payload.token, payload.data ?? null);
+      router.replace('/(tabs)');
+    } catch {
       setErrors({ global: 'Unable to reach the server. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
-  }, [form, validate]);
+  }, [form, validate, loginWithToken, router]);
 
   return (
     <KeyboardAvoidingView
@@ -155,112 +215,172 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[styles.scrollContent, { backgroundColor: palette.background }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.heroCard, { backgroundColor: tokens.heroBackground }]}
-        >
-          <Text style={[styles.heroTitle, { color: palette.text }]}>Join To The Pub</Text>
-          <Text style={[styles.heroBody, { color: tokens.heroBody }]}>Sign up to see what&rsquo;s happening at the bars around you tonight.</Text>
-        </View>
+        <Text style={[styles.heroTitle, { color: palette.text }]}>Join To The Pub</Text>
 
-        <View style={[styles.formCard, { backgroundColor: tokens.cardBackground, borderColor: tokens.cardBorder }]}
-        >
-          <Text style={[styles.sectionTitle, { color: palette.text }]}>Your details</Text>
+        <View style={[styles.formCard, { backgroundColor: palette.cardSurface, borderColor: palette.border }]} onLayout={(e) => { formCardY.current = e.nativeEvent.layout.y; }}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>Your Info</Text>
 
-          <View style={styles.fieldGroup}>
+          {/* Full name */}
+          <View style={styles.fieldGroup} onLayout={(e) => { fieldGroupY.current.fullName = e.nativeEvent.layout.y; }}>
             <View style={styles.labelRow}>
-              <Text style={[styles.label, { color: tokens.label }]}>Full name</Text>
+              <Text style={[styles.label, { color: palette.text }]}>Full name</Text>
             </View>
             <View
               style={[
                 styles.inputWrapper,
-                { backgroundColor: tokens.fieldBackground, borderColor: errors.fullName ? tokens.errorText : tokens.fieldBorder },
+                { backgroundColor: palette.background, borderColor: errors.fullName ? palette.networkErrorText : palette.border },
               ]}
             >
-              <FontAwesome name="user" size={16} color={tokens.helper} style={styles.inputIcon} />
+              <FontAwesome name="user" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
               <TextInput
                 value={form.fullName}
                 onChangeText={(value) => handleFieldChange('fullName', value)}
                 placeholder="Alex Pintman"
-                placeholderTextColor={tokens.placeholder}
+                placeholderTextColor={palette.icon}
                 autoCapitalize="words"
                 autoComplete="name"
                 style={[styles.input, { color: palette.text }]}
                 returnKeyType="next"
+                onSubmitEditing={() => { emailRef.current?.focus(); scrollToField('email'); }}
+                submitBehavior="submit"
               />
             </View>
-            {errors.fullName ? <Text style={[styles.errorText, { color: tokens.errorText }]}>{errors.fullName}</Text> : null}
+            {errors.fullName ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.fullName}</Text> : null}
           </View>
 
-          <View style={styles.fieldGroup}>
+          {/* Email */}
+          <View style={styles.fieldGroup} onLayout={(e) => { fieldGroupY.current.email = e.nativeEvent.layout.y; }}>
             <View style={styles.labelRow}>
-              <Text style={[styles.label, { color: tokens.label }]}>Email</Text>
+              <Text style={[styles.label, { color: palette.text }]}>Email</Text>
             </View>
             <View
               style={[
                 styles.inputWrapper,
-                { backgroundColor: tokens.fieldBackground, borderColor: errors.email ? tokens.errorText : tokens.fieldBorder },
+                { backgroundColor: palette.background, borderColor: errors.email ? palette.networkErrorText : palette.border },
               ]}
             >
-              <FontAwesome name="envelope" size={16} color={tokens.helper} style={styles.inputIcon} />
+              <FontAwesome name="envelope" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
               <TextInput
+                ref={emailRef}
                 value={form.email}
                 onChangeText={(value) => handleFieldChange('email', value)}
                 placeholder="alex@example.com"
-                placeholderTextColor={tokens.placeholder}
+                placeholderTextColor={palette.icon}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
                 style={[styles.input, { color: palette.text }]}
                 returnKeyType="next"
+                onSubmitEditing={() => { passwordRef.current?.focus(); scrollToField('password'); }}
+                submitBehavior="submit"
               />
             </View>
-            {errors.email ? <Text style={[styles.errorText, { color: tokens.errorText }]}>{errors.email}</Text> : null}
+            {errors.email ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.email}</Text> : null}
           </View>
 
-          <View style={styles.fieldGroup}>
+          {/* Password */}
+          <View style={styles.fieldGroup} onLayout={(e) => { fieldGroupY.current.password = e.nativeEvent.layout.y; }}>
             <View style={styles.labelRow}>
-              <Text style={[styles.label, { color: tokens.label }]}>Password</Text>
-              <Text style={[styles.helperText, { color: tokens.helper }]}>8+ characters, mix it up.</Text>
+              <Text style={[styles.label, { color: palette.text }]}>Password</Text>
+              <Text style={[styles.helperText, { color: palette.cardSubtitle }]}>8+ characters, mix it up.</Text>
             </View>
             <View
               style={[
                 styles.inputWrapper,
-                { backgroundColor: tokens.fieldBackground, borderColor: errors.password ? tokens.errorText : tokens.fieldBorder },
+                { backgroundColor: palette.background, borderColor: errors.password ? palette.networkErrorText : palette.border },
               ]}
             >
-              <FontAwesome name="lock" size={16} color={tokens.helper} style={styles.inputIcon} />
+              <FontAwesome name="lock" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
               <TextInput
+                ref={passwordRef}
                 value={form.password}
                 onChangeText={(value) => handleFieldChange('password', value)}
                 placeholder="••••••••"
-                placeholderTextColor={tokens.placeholder}
+                placeholderTextColor={palette.icon}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoComplete="password-new"
                 style={[styles.input, { color: palette.text }]}
-                returnKeyType="done"
+                returnKeyType="next"
+                onSubmitEditing={() => { dobRef.current?.focus(); scrollToField('dob'); }}
+                submitBehavior="submit"
               />
               <TouchableOpacity onPress={() => setShowPassword((current) => !current)}>
-                <Text style={[styles.togglePassword, { color: tokens.helper }]}>{showPassword ? 'Hide' : 'Show'}</Text>
+                <Text style={[styles.togglePassword, { color: palette.cardSubtitle }]}>{showPassword ? 'Hide' : 'Show'}</Text>
               </TouchableOpacity>
             </View>
-            {errors.password ? <Text style={[styles.errorText, { color: tokens.errorText }]}>{errors.password}</Text> : null}
+            {errors.password ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.password}</Text> : null}
+          </View>
+
+          {/* Date of birth */}
+          <View style={styles.fieldGroup} onLayout={(e) => { fieldGroupY.current.dob = e.nativeEvent.layout.y; }}>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: palette.text }]}>Date of birth</Text>
+              <Text style={[styles.helperText, { color: palette.cardSubtitle }]}>Must be 21+</Text>
+            </View>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: palette.background, borderColor: errors.dob ? palette.networkErrorText : palette.border },
+              ]}
+            >
+              <FontAwesome name="calendar" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
+              <TextInput
+                ref={dobRef}
+                value={form.dob}
+                onChangeText={(value) => handleFieldChange('dob', value)}
+                placeholder="MM-DD-YYYY"
+                placeholderTextColor={palette.icon}
+                keyboardType="number-pad"
+                autoCapitalize="none"
+                style={[styles.input, { color: palette.text }]}
+                returnKeyType="next"
+                maxLength={10}
+                onSubmitEditing={() => { phoneRef.current?.focus(); scrollToField('phone'); }}
+                submitBehavior="submit"
+              />
+            </View>
+            {errors.dob ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.dob}</Text> : null}
+          </View>
+
+          {/* Phone (optional) */}
+          <View style={styles.fieldGroup} onLayout={(e) => { fieldGroupY.current.phone = e.nativeEvent.layout.y; }}>
+            <View style={styles.labelRow}>
+              <Text style={[styles.label, { color: palette.text }]}>Phone</Text>
+              <Text style={[styles.helperText, { color: palette.cardSubtitle }]}>Optional</Text>
+            </View>
+            <View
+              style={[
+                styles.inputWrapper,
+                { backgroundColor: palette.background, borderColor: errors.phone ? palette.networkErrorText : palette.border },
+              ]}
+            >
+              <FontAwesome name="phone" size={16} color={palette.cardSubtitle} style={styles.inputIcon} />
+              <TextInput
+                ref={phoneRef}
+                value={form.phone}
+                onChangeText={(value) => handleFieldChange('phone', value)}
+                placeholder="555-123-4567"
+                placeholderTextColor={palette.icon}
+                keyboardType="number-pad"
+                autoCapitalize="none"
+                autoComplete="tel"
+                style={[styles.input, { color: palette.text }]}
+                returnKeyType="done"
+              />
+            </View>
+            {errors.phone ? <Text style={[styles.errorText, { color: palette.networkErrorText }]}>{errors.phone}</Text> : null}
           </View>
 
           {errors.global ? (
-            <View style={[styles.feedbackPanel, { backgroundColor: tokens.errorBackground, borderColor: tokens.errorBorder }]}>
-              <Text style={[styles.feedbackTitle, { color: tokens.errorText }]}>Something went wrong</Text>
-              <Text style={[styles.feedbackBody, { color: tokens.errorText }]}>{errors.global}</Text>
-            </View>
-          ) : null}
-
-          {statusMessage ? (
-            <View style={[styles.feedbackPanel, { backgroundColor: tokens.successBackground, borderColor: tokens.successBorder }]}>
-              <Text style={[styles.feedbackTitle, { color: tokens.successText }]}>Check your inbox</Text>
-              <Text style={[styles.feedbackBody, { color: tokens.successText }]}>{statusMessage}</Text>
+            <View style={[styles.feedbackPanel, { backgroundColor: palette.networkErrorBackground, borderColor: palette.networkErrorBorder }]}>
+              <Text style={[styles.feedbackTitle, { color: palette.networkErrorText }]}>Something went wrong</Text>
+              <Text style={[styles.feedbackBody, { color: palette.networkErrorText }]}>{errors.global}</Text>
             </View>
           ) : null}
 
@@ -270,22 +390,22 @@ export default function RegisterScreen() {
             activeOpacity={0.9}
             style={[
               styles.primaryButton,
-              { backgroundColor: tokens.primaryButtonBackground, opacity: isSubmitting ? 0.7 : 1 },
+              { backgroundColor: palette.loginPrimaryButton, opacity: isSubmitting ? 0.7 : 1 },
             ]}
           >
             {isSubmitting ? (
-              <ActivityIndicator color={tokens.primaryButtonText} />
+              <ActivityIndicator color={palette.loginPrimaryButtonText} />
             ) : (
-              <Text style={[styles.primaryButtonText, { color: tokens.primaryButtonText }]}>Create account</Text>
+              <Text style={[styles.primaryButtonText, { color: palette.loginPrimaryButtonText }]}>Create account</Text>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => router.back()}
-            style={[styles.secondaryButton, { borderColor: tokens.secondaryBorder }]}
+            style={[styles.secondaryButton, { borderColor: palette.border }]}
             activeOpacity={0.85}
           >
-            <Text style={[styles.secondaryButtonText, { color: tokens.helper }]}>Back to Login</Text>
+            <Text style={[styles.secondaryButtonText, { color: palette.cardSubtitle }]}>Back to Login</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -304,24 +424,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingTop: 80,
   },
-  heroCard: {
-    borderRadius: 24,
-    padding: 24,
-    gap: 10,
-  },
-  heroEyebrow: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
   heroTitle: {
     fontSize: 32,
     fontWeight: '700',
-  },
-  heroBody: {
-    fontSize: 16,
-    lineHeight: 22,
   },
   formCard: {
     borderRadius: 28,
