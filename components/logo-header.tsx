@@ -1,7 +1,7 @@
 
 import { Colors } from '@/constants/theme';
 import React from 'react';
-import { StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Image, StyleSheet, useColorScheme, View } from 'react-native';
 
 
 
@@ -10,7 +10,7 @@ export function LogoHeader() {
   const palette = Colors[theme];
   return (
     <View style={[styles.container, { backgroundColor: palette.container }]}>
-      <Text style={{ color: palette.cardTitle }}>To The Pub</Text>
+      <Image source={require('../assets/images/headerLogo.png')} style={styles.logo} resizeMode="contain" />
     </View>
   );
 }
@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   logo: {
-    height: 150,
-    width: 400,
+    width: 150,
+    height: 55
   },
 });
