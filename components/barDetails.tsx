@@ -1,8 +1,9 @@
 import { Colors } from '@/constants/theme';
 import { FontAwesome } from '@expo/vector-icons';
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
 	ActivityIndicator,
+	Alert,
 	Linking,
 	Platform,
 	ScrollView,
@@ -109,8 +110,8 @@ const openMapsForAddress = async (address?: string) => {
 		: `https://www.google.com/maps/search/?api=1&query=${encoded}`;
 	try {
 		await Linking.openURL(url);
-	} catch (error) {
-		console.warn('Unable to open maps', error);
+	} catch {
+		Alert.alert('Unable to open maps', 'Please try searching for the address manually.');
 	}
 };
 
@@ -273,14 +274,13 @@ export default function BarDetails({
 		() => (bar?.tags ?? []).filter((tag) => (tag.category ?? '').toLowerCase() === 'amenity'),
 		[bar?.tags],
 	);
-	const handleOpenMap = useMemo(() => {
+	const hasMapAction = Boolean(onPressOpenMap ?? addressLabel);
+	const handleOpenMap = useCallback(() => {
 		if (onPressOpenMap) {
-			return onPressOpenMap;
+			onPressOpenMap();
+		} else if (addressLabel) {
+			openMapsForAddress(addressLabel);
 		}
-		if (addressLabel) {
-			return () => openMapsForAddress(addressLabel);
-		}
-		return null;
 	}, [addressLabel, onPressOpenMap]);
 
 	if (isLoading) {
@@ -323,29 +323,29 @@ export default function BarDetails({
 			contentInsetAdjustmentBehavior="never"
 			showsVerticalScrollIndicator={false}
 		>
-				{/* Map */}
-				{heroRegion && coordinates ? (
-					<View style={styles.heroMapWrapper}>
-						<MapView
-							style={styles.heroMap}
-							initialRegion={heroRegion}
-							customMapStyle={Platform.OS === 'android' ? HERO_MAP_STYLE : undefined}
-							pointerEvents="none"
-							scrollEnabled={false}
-							zoomEnabled={false}
-							rotateEnabled={false}
-							pitchEnabled={false}
-						>
-							<Marker
-								coordinate={coordinates}
-								title={bar.name}
-								description={addressLabel ?? undefined}
-								pinColor={palette.actionButton}
-								flat
-							/>
-						</MapView>
-					</View>
-				) : null}
+			{/* Map */}
+			{heroRegion && coordinates ? (
+				<View style={styles.heroMapWrapper}>
+					<MapView
+						style={styles.heroMap}
+						initialRegion={heroRegion}
+						customMapStyle={Platform.OS === 'android' ? HERO_MAP_STYLE : undefined}
+						pointerEvents="none"
+						scrollEnabled={false}
+						zoomEnabled={false}
+						rotateEnabled={false}
+						pitchEnabled={false}
+					>
+						<Marker
+							coordinate={coordinates}
+							title={bar.name}
+							description={addressLabel ?? undefined}
+							pinColor={palette.actionButton}
+							flat
+						/>
+					</MapView>
+				</View>
+			) : null}
 
 			<View style={styles.pageContent}>
 				{/* Bar Details */}
@@ -388,7 +388,7 @@ export default function BarDetails({
 							<Text style={[styles.addressText, { color: palette.cardSubtitle }]}>
 								{addressLabel}
 							</Text>
-							{handleOpenMap ? (
+							{hasMapAction ? (
 								<TouchableOpacity
 									onPress={handleOpenMap}
 									style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
@@ -466,20 +466,20 @@ export default function BarDetails({
 				) : null}
 						
 
-					{/* Upcoming Events */}
-					<View style={styles.sectionEnd}> 
-						<TouchableOpacity
-							onPress={onViewUpcomingEvents}
-							accessibilityRole="button"
-							accessibilityLabel={`See upcoming events at ${bar.name}`}
-							style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
-							activeOpacity={0.85}
-						>
-							<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>See upcoming events</Text>
-						</TouchableOpacity>
-					</View>
+				{/* Upcoming Events */}
+				<View style={styles.sectionEnd}>
+					<TouchableOpacity
+						onPress={onViewUpcomingEvents}
+						accessibilityRole="button"
+						accessibilityLabel={`See upcoming events at ${bar.name}`}
+						style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
+						activeOpacity={0.85}
+					>
+						<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>See upcoming events</Text>
+					</TouchableOpacity>
+				</View>
 			</View>
-			</ScrollView>
+		</ScrollView>
 		);
 	}
 
@@ -584,7 +584,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 	typeRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'space-between',
 		gap: 12,
 	},
 	tagsBlock: {

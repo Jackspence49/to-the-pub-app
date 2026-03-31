@@ -74,7 +74,7 @@ export const BarCard = ({ bar, onPress }: BarCardProps) => {
         <View style={styles.socialRow}>
           {bar.instagram ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(toSocialUrl(bar.instagram!, 'instagram'))}
+              onPress={() => openExternalLink(toSocialUrl(bar.instagram ?? '', 'instagram'))}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
@@ -83,7 +83,7 @@ export const BarCard = ({ bar, onPress }: BarCardProps) => {
           ) : null}
           {bar.twitter ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(toSocialUrl(bar.twitter!, 'twitter'))}
+              onPress={() => openExternalLink(toSocialUrl(bar.twitter ?? '', 'twitter'))}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
@@ -92,7 +92,7 @@ export const BarCard = ({ bar, onPress }: BarCardProps) => {
           ) : null}
           {bar.facebook ? (
             <TouchableOpacity
-              onPress={() => openExternalLink(toSocialUrl(bar.facebook!, 'facebook'))}
+              onPress={() => openExternalLink(toSocialUrl(bar.facebook ?? '', 'facebook'))}
               style={[styles.socialButton, { borderColor: palette.pillBorder }]}
               activeOpacity={0.8}
             >
@@ -126,7 +126,6 @@ const styles = StyleSheet.create({
   barName: {
     fontSize: 20,
     fontWeight: '700',
-    flex: 1,
   },
   addressText: {
     fontSize: 15,
