@@ -71,16 +71,18 @@ function formatDobInput(raw: string): string {
   return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
 }
 
-// Auto-inserts dashes: "555" → "555", "5551" → "555-1", "5551234567" → "555-123-4567"
+// Auto-inserts dashes for US numbers. International numbers (starting with +) are left as-is.
 function formatPhoneInput(raw: string): string {
+  if (raw.startsWith('+')) return raw;
   const digits = raw.replace(/\D/g, '').slice(0, 10);
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
   return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-// Converts "555-123-4567" → "+15551234567"
+// If already E.164, send as-is. Otherwise treat as 10-digit US number and prepend +1.
 function toE164Phone(formatted: string): string {
+  if (formatted.startsWith('+')) return formatted.replace(/[^\d+]/g, '');
   return `+1${formatted.replace(/\D/g, '')}`;
 }
 
@@ -131,8 +133,16 @@ export default function RegisterScreen() {
 
     if (!payload.password) {
       nextErrors.password = 'Create a password.';
-    } else if (payload.password.length < 8) {
-      nextErrors.password = 'Use at least 8 characters.';
+    } else if (payload.password.length < 12) {
+      nextErrors.password = 'Use at least 12 characters.';
+    } else if (!/[a-z]/.test(payload.password)) {
+      nextErrors.password = 'Include at least one lowercase letter.';
+    } else if (!/[A-Z]/.test(payload.password)) {
+      nextErrors.password = 'Include at least one uppercase letter.';
+    } else if (!/[0-9]/.test(payload.password)) {
+      nextErrors.password = 'Include at least one number.';
+    } else if (!/[!@#$%^&*()\-_=+\[\]{};':"\\|,.<>/?]/.test(payload.password)) {
+      nextErrors.password = 'Include at least one special character (e.g. !@#$%).';
     }
 
     const dobCandidate = payload.dob.trim();
@@ -150,6 +160,10 @@ export default function RegisterScreen() {
     const phoneCandidate = payload.phone.trim();
     if (!phoneCandidate) {
       nextErrors.phone = 'Phone number is required.';
+    } else if (phoneCandidate.startsWith('+')) {
+      if (!/^\+[1-9]\d{1,14}$/.test(phoneCandidate.replace(/[^\d+]/g, ''))) {
+        nextErrors.phone = 'Enter a valid international number (e.g. +14155552671).';
+      }
     } else if (phoneCandidate.replace(/\D/g, '').length !== 10) {
       nextErrors.phone = 'Enter a 10-digit US number (e.g. 555-123-4567).';
     }
@@ -180,11 +194,20 @@ export default function RegisterScreen() {
         phone: toE164Phone(form.phone),
       };
 
-      const response = await fetch(REGISTER_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+
+      let response;
+      try {
+        response = await fetch(REGISTER_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       let payload: any = null;
       try {
@@ -200,10 +223,18 @@ export default function RegisterScreen() {
       }
 
       // Registration succeeded — sign in with the returned token
+      if (!payload?.token) {
+        setErrors({ global: 'Registration succeeded but sign-in failed. Please log in.' });
+        return;
+      }
       await loginWithToken(payload.token, payload.data ?? null);
       router.replace('/(tabs)');
-    } catch {
-      setErrors({ global: 'Unable to reach the server. Please try again.' });
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        setErrors({ global: 'The request timed out. Please check your connection and try again.' });
+      } else {
+        setErrors({ global: 'Unable to reach the server. Please try again.' });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -240,7 +271,7 @@ export default function RegisterScreen() {
               <TextInput
                 value={form.fullName}
                 onChangeText={(value) => handleFieldChange('fullName', value)}
-                placeholder="Alex Pintman"
+                placeholder="John Smith"
                 placeholderTextColor={palette.icon}
                 autoCapitalize="words"
                 autoComplete="name"
@@ -269,7 +300,7 @@ export default function RegisterScreen() {
                 ref={emailRef}
                 value={form.email}
                 onChangeText={(value) => handleFieldChange('email', value)}
-                placeholder="alex@example.com"
+                placeholder="john.smith@example.com"
                 placeholderTextColor={palette.icon}
                 autoCapitalize="none"
                 keyboardType="email-address"
@@ -285,10 +316,7 @@ export default function RegisterScreen() {
 
           {/* Password */}
           <View style={styles.fieldGroup} onLayout={(e) => { fieldGroupY.current.password = e.nativeEvent.layout.y; }}>
-            <View style={styles.labelRow}>
-              <Text style={[styles.label, { color: palette.text }]}>Password</Text>
-              <Text style={[styles.helperText, { color: palette.cardSubtitle }]}>8+ characters, mix it up.</Text>
-            </View>
+            <Text style={[styles.label, { color: palette.text }]}>Password</Text>
             <View
               style={[
                 styles.inputWrapper,
@@ -300,7 +328,7 @@ export default function RegisterScreen() {
                 ref={passwordRef}
                 value={form.password}
                 onChangeText={(value) => handleFieldChange('password', value)}
-                placeholder="••••••••"
+                placeholder="••••••••••••"
                 placeholderTextColor={palette.icon}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
@@ -364,7 +392,7 @@ export default function RegisterScreen() {
                 ref={phoneRef}
                 value={form.phone}
                 onChangeText={(value) => handleFieldChange('phone', value)}
-                placeholder="555-123-4567"
+                placeholder="555-123-4567 or +14155552671"
                 placeholderTextColor={palette.icon}
                 keyboardType="number-pad"
                 autoCapitalize="none"
