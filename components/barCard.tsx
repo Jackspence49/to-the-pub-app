@@ -7,7 +7,6 @@ import type { BarCardProps } from '../types';
 import { formatCityAddress, formatDistanceLabel, openExternalLink, toSocialUrl } from '../utils/helpers';
 
 
-
 export const BarCard = ({ bar, onPress }: BarCardProps) => {
   const theme  = useColorScheme() ?? 'dark';
   const palette = Colors[theme];
@@ -31,7 +30,7 @@ export const BarCard = ({ bar, onPress }: BarCardProps) => {
       disabled={!onPress}
     >
       <View style={styles.cardHeader}>
-        <Text style={[styles.BarName, { color: palette.cardTitle }]} numberOfLines={1}>
+        <Text style={[styles.barName, { color: palette.cardTitle }]} numberOfLines={1}>
           {bar.name}
         </Text>
       </View>
@@ -115,18 +114,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     marginHorizontal: 20,
     borderWidth: 1,
+    shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 3,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 6,
   },
-  BarName: {
+  barName: {
     fontSize: 20,
     fontWeight: '700',
     flex: 1,
