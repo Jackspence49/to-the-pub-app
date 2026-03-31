@@ -118,7 +118,7 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Image source={require('../assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={[styles.heroTitle, { color: palette.text }]}>Welcome, Log in!</Text>
+        <Text style={[styles.heroTitle, { color: palette.text }]}>Welcome, Log in!</Text>
 
         <View style={[styles.formCard, { backgroundColor: palette.cardSurface, borderColor: palette.border }]}
         >
@@ -134,7 +134,7 @@ export default function LoginScreen() {
               <TextInput
                 value={form.email}
                 onChangeText={(value) => handleFieldChange('email', value)}
-                placeholder="alex@example.com"
+                placeholder="john.smith@example.com"
                 placeholderTextColor={palette.icon}
                 autoCapitalize="none"
                 keyboardType="email-address"
@@ -313,6 +313,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     height: 150,
+    width: '100%',
     alignSelf: 'center',
   },
 });
