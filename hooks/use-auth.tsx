@@ -81,16 +81,25 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     try {
-      const response = await fetch(`${normalizedBaseUrl}/appUsers/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-        }),
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+
+      let response;
+      try {
+        response = await fetch(`${normalizedBaseUrl}/appUsers/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       let payload: any = null;
       try {
@@ -112,10 +121,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setStatus('authenticated');
 
       return { success: true };
-    } catch {
+    } catch (error: any) {
       return {
         success: false,
-        message: 'Unable to sign in right now. Please try again.',
+        message: error?.name === 'AbortError'
+          ? 'The request timed out. Please check your connection and try again.'
+          : 'Unable to sign in right now. Please try again.',
       };
     }
   }, []);

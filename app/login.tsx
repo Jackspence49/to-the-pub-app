@@ -165,7 +165,7 @@ export default function LoginScreen() {
                 ref={passwordRef}
                 value={form.password}
                 onChangeText={(value) => handleFieldChange('password', value)}
-                placeholder="••••••••"
+                placeholder="••••••••••••"
                 placeholderTextColor={palette.icon}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
