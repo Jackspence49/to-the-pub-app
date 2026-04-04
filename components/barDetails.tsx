@@ -35,8 +35,6 @@ type BarsProps = {
 	onPressOpenMap?: () => void;
 };
 
-
-
 const HERO_MAP_STYLE = [
 	{ featureType: 'road.highway', elementType: 'geometry', stylers: [{ visibility: 'off' }] },
 	{ featureType: 'road.highway', elementType: 'labels', stylers: [{ visibility: 'off' }] },
@@ -106,7 +104,7 @@ const openMapsForAddress = async (address?: string) => {
 	}
 	const encoded = encodeURIComponent(address);
 	const url = Platform.OS === 'ios'
-		? `http://maps.apple.com/?q=${encoded}`
+		? `maps://?q=${encoded}`
 		: `https://www.google.com/maps/search/?api=1&query=${encoded}`;
 	try {
 		await Linking.openURL(url);
@@ -427,18 +425,18 @@ export default function BarDetails({
 					<View style={[styles.section]}>
 						<Text style={[styles.sectionLabel, { color: palette.pillText }]}>Contact</Text>
 						<View style={styles.contactList}>
-						{contactActions.map((action) => (
-							<TouchableOpacity
-								key={action.key}
-								onPress={action.onPress}
-								accessibilityRole="button"
-								accessibilityLabel={action.accessibilityLabel}
-								style={[styles.contactActionButton, { borderColor: palette.pillBorder, backgroundColor: palette.pillBackground }]}
-								activeOpacity={0.8}
-							>
-								<FontAwesome name={action.iconName} size={18} color={palette.pillText} />
-								<Text style={[styles.contactActionText, { color: palette.filterText }]}>{action.label ?? action.key}</Text>
-							</TouchableOpacity>
+							{contactActions.map((action) => (
+								<TouchableOpacity
+									key={action.key}
+									onPress={action.onPress}
+									accessibilityRole="button"
+									accessibilityLabel={action.accessibilityLabel}
+									style={[styles.contactActionButton, { borderColor: palette.pillBorder, backgroundColor: palette.pillBackground }]}
+									activeOpacity={0.8}
+								>
+									<FontAwesome name={action.iconName} size={18} color={palette.pillText} />
+									<Text style={[styles.contactActionText, { color: palette.filterText }]}>{action.label ?? action.key}</Text>
+								</TouchableOpacity>
 							))}
 						</View>
 					</View>
@@ -522,7 +520,6 @@ const createStyles = (palette: typeof Colors[keyof typeof Colors]) => StyleSheet
 		fontSize: 16,
 		fontWeight: '600',
 		flexShrink: 1,
-		textAlign: 'right',
 		marginBottom: 4,
 	},
 	eventTitle: {

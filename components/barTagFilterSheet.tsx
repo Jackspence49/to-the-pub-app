@@ -79,11 +79,10 @@ export const TagFilterSheet = ({
   const draftSelectionSet = useMemo(() => new Set(draftSelection), [draftSelection]);
 
   const toggleTag = useCallback((tagId: string) => {
-    setDraftSelection((previous) =>
-      previous.includes(tagId)
-        ? previous.filter((id) => id !== tagId)
-        : [...previous, tagId]
-    );
+    setDraftSelection((previous) => {
+      const has = previous.includes(tagId);
+      return has ? previous.filter((id) => id !== tagId) : [...previous, tagId];
+    });
   }, []);
 
   const handleApply = useCallback(() => {
@@ -100,6 +99,7 @@ export const TagFilterSheet = ({
       visible={visible}
       animationType="fade"
       transparent
+      statusBarTranslucent
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
@@ -109,6 +109,7 @@ export const TagFilterSheet = ({
           styles.container,
           { backgroundColor: palette.background, borderColor: palette.border, paddingBottom: Math.max(24, insets.bottom) },
         ]}
+        accessibilityViewIsModal
       >
         <Text style={[styles.title, { color: palette.text }]}>Bar Tags</Text>
 
@@ -142,8 +143,10 @@ export const TagFilterSheet = ({
                       { borderBottomColor: palette.border },
                     ]}
                     onPress={() => toggleCategory(category)}
-                    activeOpacity={0.8}
+activeOpacity={0.8}
                     accessibilityRole="button"
+                    accessibilityLabel={`${category}${selectedCount > 0 ? `, ${selectedCount} selected` : ''}`}
+                    accessibilityHint="Double tap to expand or collapse"
                     accessibilityState={{ expanded: isExpanded }}
                   >
                     <Text style={[styles.categoryLabel, { color: palette.text }]}>
@@ -176,6 +179,7 @@ export const TagFilterSheet = ({
                           onPress={() => toggleTag(item.id)}
                           activeOpacity={0.85}
                           accessibilityRole="checkbox"
+                          accessibilityLabel={item.name}
                           accessibilityState={{ checked: isChecked }}
                         >
                           <MaterialIcons

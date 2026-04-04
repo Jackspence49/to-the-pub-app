@@ -33,7 +33,7 @@ import { BarsListHeader } from '../../components/barsListHeader';
 import {
   BarsEmptyState,
   FilteredEmptyState,
-} from '../../components/emptyStates';
+} from '../../components/barEmptyStates';
 
 
 // Main screen component
@@ -176,7 +176,7 @@ export default function BarsScreen() {
 
   // Empty component
   const listEmptyComponent = useMemo(() => (
-    !isLoading && !isRefreshing ? (
+    !isLoading && !isRefreshing && !errorMessage ? (
       filteredBars.length === 0 && selectedTags.length > 0 ? (
         <FilteredEmptyState
           selectedTagEntries={selectedTagEntries}
@@ -184,19 +184,18 @@ export default function BarsScreen() {
           theme={theme}
         />
       ) : bars.length === 0 ? (
-        <BarsEmptyState error={errorMessage} onRetry={handleRetry} theme={theme} />
+        <BarsEmptyState theme={theme} />
       ) : null
     ) : null
   ), [
     isLoading,
     isRefreshing,
+    errorMessage,
     filteredBars.length,
     selectedTags.length,
     selectedTagEntries,
     handleClearFilters,
     bars.length,
-    errorMessage,
-    handleRetry,
     theme,
   ]);
 
@@ -237,6 +236,7 @@ export default function BarsScreen() {
             onOpenSettings={handleOpenSettings}
             onRetryLocation={refreshUserLocation}
             onRetryTags={retryFetchTags}
+            onRetry={handleRetry}
             onOpenFilterSheet={openFilterSheet}
             onClearFilters={handleClearFilters}
             onRemoveTag={handleRemoveTag}

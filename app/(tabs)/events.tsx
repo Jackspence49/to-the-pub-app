@@ -1,4 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
 	ActivityIndicator,
@@ -27,6 +28,7 @@ import { useScrollRestoration } from '../../hooks/useScrollRestoration';
 
 // Components
 import EventCard from '../../components/eventCard';
+import { EventsEmptyState } from '../../components/eventEmptyStates';
 import { EventTagFilterSheet } from '../../components/eventTagFilterSheet';
 import { EventsListHeader } from '../../components/eventsListHeader';
 
@@ -41,7 +43,11 @@ export default function EventsScreen() {
 	);
 
 	const [searchRadius, setSearchRadius] = useState<number>(DEFAULT_EVENT_RADIUS_MILES);
-	const { userCoords, refreshUserLocation } = useLocationCache();
+	const { userCoords, locationDeniedPermanently, refreshUserLocation } = useLocationCache();
+
+	const handleOpenSettings = useCallback(() => {
+		Linking.openSettings();
+	}, []);
 	const {
 		selectedTagIds,
 		availableTags,
@@ -153,11 +159,14 @@ export default function EventsScreen() {
 			areTagsLoading={areTagsLoading}
 			tagsError={tagsError}
 			error={error}
+			locationDeniedPermanently={locationDeniedPermanently}
 			onOpenFilterSheet={openFilterSheet}
 			onRemoveTag={handleRemoveTag}
 			onRadiusChange={handleRadiusChange}
 			onRetryTags={fetchAvailableTags}
 			onRetryEvents={handleRetry}
+			onOpenSettings={handleOpenSettings}
+			onRetryLocation={refreshUserLocation}
 		/>
 	), [
 		theme,
@@ -167,24 +176,26 @@ export default function EventsScreen() {
 		areTagsLoading,
 		tagsError,
 		error,
+		locationDeniedPermanently,
 		openFilterSheet,
 		handleRemoveTag,
 		handleRadiusChange,
 		fetchAvailableTags,
 		handleRetry,
+		handleOpenSettings,
+		refreshUserLocation,
 	]);
 
 	const listEmptyComponent = useMemo(() => {
 		if (error) return null;
 		return (
-			<View style={styles.emptyState}>
-				<Text style={[styles.emptyStateTitle, { color: palette.filterText }]}>Nothing scheduled yet</Text>
-				<Text style={[styles.emptyStateText, { color: palette.filterText }]}>
-					We could not find upcoming events for the selected tags.
-				</Text>
-			</View>
+			<EventsEmptyState
+				selectedTagEntries={selectedTagEntries}
+				onClear={() => handleApplyFilters([])}
+				theme={theme}
+			/>
 		);
-	}, [error, palette]);
+	}, [error, selectedTagEntries, handleApplyFilters, theme]);
 
 	const listFooterComponent = useMemo(() => {
 		if (isPaginating) {
@@ -300,22 +311,6 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 		letterSpacing: 0.3,
 		textTransform: 'uppercase',
-	},
-	emptyState: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		padding: 32,
-		gap: 8,
-	},
-	emptyStateTitle: {
-		fontSize: 18,
-		fontWeight: '700',
-		textAlign: 'center',
-	},
-	emptyStateText: {
-		fontSize: 14,
-		textAlign: 'center',
 	},
 	listFooter: {
 		padding: 20,

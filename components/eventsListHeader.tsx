@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
+import { LocationPermissionBanner } from './barEmptyStates';
 import {
 	ActivityIndicator,
 	StyleSheet,
@@ -19,11 +20,14 @@ type EventsListHeaderProps = {
 	areTagsLoading: boolean;
 	tagsError: string | null;
 	error: string | null;
+	locationDeniedPermanently: boolean;
 	onOpenFilterSheet: () => void;
 	onRemoveTag: (tagId: string) => void;
 	onRadiusChange: (value: number) => void;
 	onRetryTags: () => void;
 	onRetryEvents: () => void;
+	onOpenSettings: () => void;
+	onRetryLocation: () => void;
 };
 
 export const EventsListHeader = ({
@@ -34,11 +38,14 @@ export const EventsListHeader = ({
 	areTagsLoading,
 	tagsError,
 	error,
+	locationDeniedPermanently,
 	onOpenFilterSheet,
 	onRemoveTag,
 	onRadiusChange,
 	onRetryTags,
 	onRetryEvents,
+	onOpenSettings,
+	onRetryLocation,
 }: EventsListHeaderProps) => {
 	const palette = Colors[theme];
 	const highlightColor = palette.filterActivePill;
@@ -46,6 +53,14 @@ export const EventsListHeader = ({
 	return (
 		<View style={[styles.listHeader, { backgroundColor: palette.background }]}>
 			<Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Upcoming Events</Text>
+
+			{locationDeniedPermanently ? (
+				<LocationPermissionBanner
+					theme={theme}
+					onOpenSettings={onOpenSettings}
+					onRetry={onRetryLocation}
+				/>
+			) : null}
 
 			<View style={styles.headerControlsRow}>
 				<View style={styles.filterButtonRow}>

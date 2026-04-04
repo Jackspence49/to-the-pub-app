@@ -3,7 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { SelectedTagEntry, TagFilterOption, ThemeName } from '../types';
-import { ErrorBanner, LocationPermissionBanner } from './emptyStates';
+import { ErrorBanner, LocationPermissionBanner } from './barEmptyStates';
 
 type Props = {
   locationDeniedPermanently: boolean;
@@ -17,6 +17,7 @@ type Props = {
   onOpenSettings: () => void;
   onRetryLocation: () => void;
   onRetryTags: () => void;
+  onRetry: () => void;
   onOpenFilterSheet: () => void;
   onClearFilters: () => void;
   onRemoveTag: (normalized: string) => void;
@@ -34,6 +35,7 @@ export function BarsListHeader({
   onOpenSettings,
   onRetryLocation,
   onRetryTags,
+  onRetry,
   onOpenFilterSheet,
   onClearFilters,
   onRemoveTag,
@@ -45,7 +47,7 @@ export function BarsListHeader({
     availableTags.length > 0 ||
     selectedTags.length > 0 ||
     !!tagsError ||
-    (barsCount > 0 && !!errorMessage);
+    !!errorMessage;
 
   if (!shouldRender) return null;
 
@@ -137,7 +139,29 @@ export function BarsListHeader({
         </View>
       ) : null}
 
-      {barsCount > 0 && errorMessage ? (
+      {errorMessage && barsCount === 0 ? (
+        <View
+          style={[
+            styles.errorCard,
+            { backgroundColor: palette.networkErrorBackground, borderColor: palette.networkErrorBorder },
+          ]}
+        >
+          <Text style={[styles.errorCardTitle, { color: palette.networkErrorText }]}>
+            Unable to load bars
+          </Text>
+          <Text style={[styles.errorCardMessage, { color: palette.networkErrorText }]}>
+            {errorMessage}
+          </Text>
+          <TouchableOpacity
+            style={[styles.errorCardRetry, { borderColor: palette.networkErrorButton }]}
+            onPress={onRetry}
+          >
+            <Text style={[styles.errorCardRetryText, { color: palette.networkErrorButton }]}>
+              Try again
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : errorMessage && barsCount > 0 ? (
         <ErrorBanner message={errorMessage} theme={theme} />
       ) : null}
     </View>
@@ -199,7 +223,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 8,
   },
   selectedTagChip: {
     flexDirection: 'row',
@@ -212,7 +235,7 @@ const styles = StyleSheet.create({
   },
   selectedTagChipLabel: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   selectedTagChipClose: {
     width: 20,
@@ -224,5 +247,30 @@ const styles = StyleSheet.create({
   tagsErrorText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  errorCard: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  errorCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  errorCardMessage: {
+    fontSize: 13,
+  },
+  errorCardRetry: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  errorCardRetryText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
