@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TagFilterSheetProps } from '../types';
 
 const UNCATEGORIZED = 'Other';
@@ -26,6 +27,7 @@ export const TagFilterSheet = ({
 }: TagFilterSheetProps) => {
   const palette = Colors[theme];
   const highlightColor = palette.filterActivePill;
+  const insets = useSafeAreaInsets();
   const [draftSelection, setDraftSelection] = useState<string[]>(selectedTags);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
@@ -53,7 +55,7 @@ export const TagFilterSheet = ({
       // Default: all categories collapsed
       setExpandedCategories(new Set());
     }
-  }, [visible, selectedTags, groups]);
+  }, [visible, selectedTags]);
 
   const toggleCategory = useCallback((category: string) => {
     setExpandedCategories((prev) => {
@@ -65,14 +67,16 @@ export const TagFilterSheet = ({
         // Scroll so the header + first tag are visible
         const y = categoryYRef.current.get(category);
         if (y !== undefined) {
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             scrollRef.current?.scrollTo({ y, animated: true });
-          }, 50);
+          });
         }
       }
       return next;
     });
   }, []);
+
+  const draftSelectionSet = useMemo(() => new Set(draftSelection), [draftSelection]);
 
   const toggleTag = useCallback((tagId: string) => {
     setDraftSelection((previous) =>
@@ -103,7 +107,7 @@ export const TagFilterSheet = ({
       <View
         style={[
           styles.container,
-          { backgroundColor: palette.background, borderColor: palette.border },
+          { backgroundColor: palette.background, borderColor: palette.border, paddingBottom: Math.max(24, insets.bottom) },
         ]}
       >
         <Text style={[styles.title, { color: palette.text }]}>Bar Tags</Text>
@@ -124,7 +128,7 @@ export const TagFilterSheet = ({
             groups.map(([category, categoryTags]) => {
               const isExpanded = expandedCategories.has(category);
               const selectedCount = categoryTags.filter((t) =>
-                draftSelection.includes(t.id)
+                draftSelectionSet.has(t.id)
               ).length;
 
               return (
@@ -152,7 +156,7 @@ export const TagFilterSheet = ({
                           { backgroundColor: highlightColor },
                         ]}
                       >
-                        <Text style={styles.badgeText}>{selectedCount}</Text>
+                        <Text style={[styles.badgeText, { color: palette.filterTextActive }]}>{selectedCount}</Text>
                       </View>
                     )}
                     <MaterialIcons
@@ -164,7 +168,7 @@ export const TagFilterSheet = ({
 
                   {isExpanded &&
                     categoryTags.map((item) => {
-                      const isChecked = draftSelection.includes(item.id);
+                      const isChecked = draftSelectionSet.has(item.id);
                       return (
                         <TouchableOpacity
                           key={item.id}
@@ -182,7 +186,7 @@ export const TagFilterSheet = ({
                             }
                             size={22}
                             color={isChecked ? highlightColor : palette.text}
-                            style={styles.checkbox}
+
                           />
                           <Text
                             style={[
@@ -229,7 +233,7 @@ export const TagFilterSheet = ({
             ]}
             activeOpacity={0.9}
           >
-            <Text style={styles.actionPrimaryText}>Apply Filters</Text>
+            <Text style={[styles.actionPrimaryText, { color: palette.filterTextActive }]}>Apply Filters</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -242,14 +246,14 @@ export default TagFilterSheet;
 const styles = StyleSheet.create({
   scrim: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   container: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: 520,
+    height: '65%',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,
@@ -290,7 +294,6 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#ffffff',
   },
   row: {
     flexDirection: 'row',
@@ -298,9 +301,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingLeft: 8,
     gap: 8,
-  },
-  checkbox: {
-    marginRight: 8,
   },
   rowLabel: {
     fontSize: 15,
@@ -340,6 +340,5 @@ const styles = StyleSheet.create({
   actionPrimaryText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#ffffff',
   },
 });

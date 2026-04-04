@@ -156,8 +156,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   filterCard: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
     borderRadius: 16,
     gap: 12,
   },
