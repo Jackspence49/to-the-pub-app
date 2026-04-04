@@ -55,11 +55,13 @@ export const EventsListHeader = ({
 			<Text style={[styles.screenTitle, { color: palette.cardTitle }]}>Upcoming Events</Text>
 
 			{locationDeniedPermanently ? (
-				<LocationPermissionBanner
-					theme={theme}
-					onOpenSettings={onOpenSettings}
-					onRetry={onRetryLocation}
-				/>
+				<View style={styles.locationBannerWrapper}>
+					<LocationPermissionBanner
+						theme={theme}
+						onOpenSettings={onOpenSettings}
+						onRetry={onRetryLocation}
+					/>
+				</View>
 			) : null}
 
 			<View style={styles.headerControlsRow}>
@@ -262,5 +264,8 @@ const styles = StyleSheet.create({
 	retryButtonText: {
 		fontSize: 13,
 		fontWeight: '600',
+	},
+	locationBannerWrapper: {
+		marginTop: 16,
 	},
 });
