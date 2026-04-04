@@ -174,7 +174,10 @@ export const formatEventDay = (value?: string): string => {
 
 export const formatEventTime = (value?: string): string | null => {
   if (!value) return null;
-  const date = new Date(value);
+  const normalized = /^\d{2}:\d{2}(:\d{2})?$/.test(value)
+    ? `1970-01-01T${value}`
+    : value;
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',

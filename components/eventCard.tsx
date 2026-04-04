@@ -7,18 +7,6 @@ import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-
 import type { Event } from '@/types/index';
 import { formatEventTime } from '@/utils/helpers';
 
-export type EventCardTokens = {
-	cardBackground: string;
-	cardBorder: string;
-	filterActivePill: string;
-	filterTextActive: string;
-	cardTitle: string;
-	cardSubtitle: string;
-	pillBackground: string;
-	pillText: string;
-	iconSelected: string;
-};
-
 export type EventCardProps = {
 	event: Event;
 	distanceUnit?: string;
@@ -46,7 +34,7 @@ const formatDistance = (value: number | undefined, unit: string): string | null 
 const EventCard = ({ event, distanceUnit = 'miles', onPress }: EventCardProps) => {
 	const theme = useColorScheme() ?? 'dark';
 	const palette = Colors[theme];
-	const barName = event.bar_name;
+	const barName = event.bar_name ?? 'Unknown venue';
 	const startTimeLabel = formatEventTime(event.start_time) ?? 'Time TBD';
 	const endTimeLabel = formatEventTime(event.end_time) ?? 'Time TBD';
 	const distanceLabel = formatDistance(event.distanceMiles, distanceUnit);
@@ -126,7 +114,10 @@ const styles = StyleSheet.create({
 		borderRadius: 18,
 		overflow: 'hidden',
 		borderWidth: 1,
-		shadowOffset: { width: 0, height: 4 },
+		shadowColor: '#000',
+		shadowOpacity: 0.08,
+		shadowRadius: 18,
+		shadowOffset: { width: 0, height: 8 },
 		elevation: 2,
 	},
 	cardBody: {
