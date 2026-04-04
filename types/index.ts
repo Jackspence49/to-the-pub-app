@@ -170,6 +170,7 @@ export type TagFilterOption = {
   id: string;
   name: string;
   normalizedName: string;
+  category?: string;
 };
 
 // Selected tag entry for UI display

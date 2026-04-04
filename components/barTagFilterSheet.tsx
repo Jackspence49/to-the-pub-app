@@ -2,17 +2,19 @@
 
 import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import type { TagFilterSheetProps } from '../types';
+
+const UNCATEGORIZED = 'Other';
 
 export const TagFilterSheet = ({
   visible,
@@ -25,12 +27,52 @@ export const TagFilterSheet = ({
   const palette = Colors[theme];
   const highlightColor = palette.filterActivePill;
   const [draftSelection, setDraftSelection] = useState<string[]>(selectedTags);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const scrollRef = useRef<ScrollView>(null);
+  const categoryYRef = useRef<Map<string, number>>(new Map());
+
+  // Group tags by category
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof tags>();
+    for (const tag of tags) {
+      const key = tag.category ?? UNCATEGORIZED;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(tag);
+    }
+    // Sort categories alphabetically, UNCATEGORIZED last
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === UNCATEGORIZED) return 1;
+      if (b === UNCATEGORIZED) return -1;
+      return a.localeCompare(b);
+    });
+  }, [tags]);
 
   useEffect(() => {
     if (visible) {
       setDraftSelection(selectedTags);
+      // Default: all categories collapsed
+      setExpandedCategories(new Set());
     }
-  }, [selectedTags, visible]);
+  }, [visible, selectedTags, groups]);
+
+  const toggleCategory = useCallback((category: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+        // Scroll so the header + first tag are visible
+        const y = categoryYRef.current.get(category);
+        if (y !== undefined) {
+          setTimeout(() => {
+            scrollRef.current?.scrollTo({ y, animated: true });
+          }, 50);
+        }
+      }
+      return next;
+    });
+  }, []);
 
   const toggleTag = useCallback((tagId: string) => {
     setDraftSelection((previous) =>
@@ -66,61 +108,125 @@ export const TagFilterSheet = ({
       >
         <Text style={[styles.title, { color: palette.text }]}>Bar Tags</Text>
 
-        <FlatList
-          data={tags}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
-            const isChecked = draftSelection.includes(item.id);
-            return (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => toggleTag(item.id)}
-                activeOpacity={0.85}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isChecked }}
-              >
-                <MaterialIcons
-                  name={isChecked ? 'check-box' : 'check-box-outline-blank'}
-                  size={22}
-                  color={isChecked ? highlightColor : palette.text}
-                  style={styles.checkbox}
-                />
-                <Text
-                  style={[
-                    styles.rowLabel,
-                    { color: isChecked ? palette.pillText : palette.text },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-          contentContainerStyle={tags.length === 0 ? styles.emptyContent : undefined}
-          ListEmptyComponent={
+        <ScrollView
+          ref={scrollRef}
+          style={styles.list}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {groups.length === 0 ? (
             <View style={styles.emptyContent}>
               <Text style={[styles.emptyText, { color: palette.filterText }]}>
                 No tags available.
               </Text>
             </View>
-          }
-          style={styles.list}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
+          ) : (
+            groups.map(([category, categoryTags]) => {
+              const isExpanded = expandedCategories.has(category);
+              const selectedCount = categoryTags.filter((t) =>
+                draftSelection.includes(t.id)
+              ).length;
+
+              return (
+                <View
+                  key={category}
+                  onLayout={(e) => categoryYRef.current.set(category, e.nativeEvent.layout.y)}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryHeader,
+                      { borderBottomColor: palette.border },
+                    ]}
+                    onPress={() => toggleCategory(category)}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: isExpanded }}
+                  >
+                    <Text style={[styles.categoryLabel, { color: palette.text }]}>
+                      {category}
+                    </Text>
+                    {selectedCount > 0 && (
+                      <View
+                        style={[
+                          styles.badge,
+                          { backgroundColor: highlightColor },
+                        ]}
+                      >
+                        <Text style={styles.badgeText}>{selectedCount}</Text>
+                      </View>
+                    )}
+                    <MaterialIcons
+                      name={isExpanded ? 'expand-less' : 'expand-more'}
+                      size={22}
+                      color={palette.text}
+                    />
+                  </TouchableOpacity>
+
+                  {isExpanded &&
+                    categoryTags.map((item) => {
+                      const isChecked = draftSelection.includes(item.id);
+                      return (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={styles.row}
+                          onPress={() => toggleTag(item.id)}
+                          activeOpacity={0.85}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: isChecked }}
+                        >
+                          <MaterialIcons
+                            name={
+                              isChecked
+                                ? 'check-box'
+                                : 'check-box-outline-blank'
+                            }
+                            size={22}
+                            color={isChecked ? highlightColor : palette.text}
+                            style={styles.checkbox}
+                          />
+                          <Text
+                            style={[
+                              styles.rowLabel,
+                              {
+                                color: isChecked
+                                  ? palette.pillText
+                                  : palette.text,
+                              },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {item.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
 
         <View style={styles.actionRow}>
           <TouchableOpacity
             onPress={handleClearAll}
-            style={[styles.actionButton, styles.actionGhost, { borderColor: palette.pillBorder }]}
+            style={[
+              styles.actionButton,
+              styles.actionGhost,
+              { borderColor: palette.pillBorder },
+            ]}
             activeOpacity={0.85}
           >
-            <Text style={[styles.actionGhostText, { color: palette.text }]}>Clear All</Text>
+            <Text style={[styles.actionGhostText, { color: palette.text }]}>
+              Clear All
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleApply}
-            style={[styles.actionButton, styles.actionPrimary, { backgroundColor: highlightColor }]}
+            style={[
+              styles.actionButton,
+              styles.actionPrimary,
+              { backgroundColor: highlightColor },
+            ]}
             activeOpacity={0.9}
           >
             <Text style={styles.actionPrimaryText}>Apply Filters</Text>
@@ -143,6 +249,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    height: 520,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,
@@ -156,12 +263,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   list: {
-    maxHeight: 340,
+    flex: 1,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+  },
+  categoryLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  badge: {
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
+    paddingLeft: 8,
     gap: 8,
   },
   checkbox: {

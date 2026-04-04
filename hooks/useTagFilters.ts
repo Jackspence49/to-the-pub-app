@@ -58,10 +58,15 @@ export const useTagFilters = (
           if (!tagId || tagMap.has(tagId)) {
             return;
           }
+          const category =
+            typeof tag?.category === 'string' && tag.category.trim()
+              ? tag.category.trim()
+              : undefined;
           tagMap.set(tagId, {
             id: tagId,
             name,
-            normalizedName: tagId, // Use tagId as normalizedName since normalization is removed
+            normalizedName: tagId,
+            category,
           });
         });
 
