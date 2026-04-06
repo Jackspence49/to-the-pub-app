@@ -212,13 +212,15 @@ export default function EventDetailScreen() {
               endTimeLabel={endTimeLabel ?? undefined}
               locationLabel={event.bar_name ?? undefined}
               tagLabel={event.event_tag_name ?? undefined}
-addressLabel={addressLabel ?? undefined}
+              recurrencePattern={event.recurrence_pattern}
+              addressLabel={addressLabel ?? undefined}
+              horizontalInset={20}
               onPressOpenMap={handleOpenMaps}
               onPressLocation={event.bar_id ? handleViewBarDetails : undefined}
               actionButtons={actionButtons}
               onPressViewBarEvents={handleViewBarEvents}
               showActionSection
-              barActionsEnabled={Boolean(event.bar_id)}
+
             />
           </View>
         </ScrollView>

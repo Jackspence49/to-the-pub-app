@@ -5,32 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import type { ThemeName } from '@/types';
+import type { EventDetailsProps, ThemeName } from '@/types';
 
 type Palette = (typeof Colors)[ThemeName];
-
-type EventDetailsProps = {
-	title?: string;
-	description?: string;
-	dateLabel?: string;
-	startTimeLabel?: string;
-	endTimeLabel?: string;
-	locationLabel?: string;
-	addressLabel?: string;
-	tagLabel?: string;
-	recurrencePattern?: string;
-	onPressLocation?: () => void;
-	onPressOpenMap?: () => void;
-	actionButtons?: {
-		key: string;
-		label: string;
-		iconName: React.ComponentProps<typeof FontAwesome>['name'];
-		onPress: () => void;
-	}[];
-	onPressViewBarEvents?: () => void;
-	showActionSection?: boolean;
-	barActionsEnabled?: boolean;
-};
 
 export default function EventDetails({
 	title,
@@ -43,17 +20,16 @@ export default function EventDetails({
 	actionButtons,
 	onPressViewBarEvents,
 	showActionSection = true,
-	barActionsEnabled = true,
+	horizontalInset = 0,
 	startTimeLabel,
 	endTimeLabel,
 	addressLabel,
 	onPressOpenMap,
 }: EventDetailsProps) {
-	const colorScheme = useColorScheme();
-	const theme = (colorScheme ?? 'light') as ThemeName;
+	const theme = useColorScheme() ?? 'dark';
 	const palette = Colors[theme];
 	const insets = useSafeAreaInsets();
-	const styles = React.useMemo(() => createStyles(palette), [palette]);
+	const styles = React.useMemo(() => createStyles(palette, horizontalInset), [palette, horizontalInset]);
 
 	const heroTopPadding = Math.max(insets.top + 8, 20);
 
@@ -196,10 +172,11 @@ export default function EventDetails({
 			{/* More Information */}
 			<View style={styles.sectionEnd}>
 				<TouchableOpacity
-					onPress={barActionsEnabled ? onPressViewBarEvents : undefined}
+					onPress={onPressViewBarEvents}
 					style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
 					activeOpacity={0.9}
-					disabled={!barActionsEnabled}
+					accessibilityRole='button'
+					accessibilityLabel='See all upcoming events at this venue'
 				>
 					<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>See all upcoming events</Text>
 				</TouchableOpacity>
@@ -208,11 +185,11 @@ export default function EventDetails({
 	);
 }
 
-const createStyles = (palette: Palette) => StyleSheet.create({
+const createStyles = (palette: Palette, horizontalInset: number) => StyleSheet.create({
 
 	// ── Header
 	heroWrapper: {
-		marginHorizontal: -20,
+		marginHorizontal: -horizontalInset,
 	},
 	hero: {
 		width: '100%',

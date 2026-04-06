@@ -233,6 +233,7 @@ export const mapToEvent = (raw: LooseObject): Event => {
 		event_tag_id: eventTagId ? String(eventTagId) : undefined,
 		date: eventDate ?? startDateTime,
 		crosses_midnight: crossesMidnight,
+		recurrence_pattern: raw.recurrence_pattern ?? undefined,
 		distanceMiles,
 	};
 };

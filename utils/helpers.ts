@@ -187,8 +187,12 @@ export const formatEventTime = (value?: string): string | null => {
 
 export const openExternal = async (url?: string): Promise<void> => {
   if (!url) return;
+  const safe = ensureProtocol(url);
   try {
-    await Linking.openURL(ensureProtocol(url));
+    const canOpen = await Linking.canOpenURL(safe);
+    if (canOpen) {
+      await Linking.openURL(safe);
+    }
   } catch (err) {
     console.warn('Unable to open URL', err);
   }

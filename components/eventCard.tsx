@@ -43,6 +43,8 @@ const EventCard = ({ event, distanceUnit = 'miles', onPress }: EventCardProps) =
 	return (
 		<TouchableOpacity
 			activeOpacity={0.92}
+			accessibilityLabel={event.title}
+			accessibilityRole="button"
 			disabled={!onPress}
 			onPress={onPress}
 			style={[

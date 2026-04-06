@@ -1,5 +1,8 @@
 // types/index.ts
 // All TypeScript type definitions for the bars module
+import type { FontAwesome } from '@expo/vector-icons';
+import type React from 'react';
+
 import type { Colors } from '@/constants/theme';
 
 // Re-exporting types from individual files for easier imports
@@ -130,6 +133,7 @@ export type Event = {
     address_zip?: string;
     phone?: string;
     website?: string;
+    recurrence_pattern?: string;
     latitude?: number;
     longitude?: number;
 	distanceMiles?: number;
@@ -242,4 +246,28 @@ export type BarsCache = {
 export type LoadBarsPageOptions = {
   ignoreCache?: boolean;
   coordsOverride?: Coordinates;
+};
+
+// Props for the event details component
+export type EventDetailsProps = {
+  title?: string;
+  description?: string;
+  dateLabel?: string;
+  startTimeLabel?: string;
+  endTimeLabel?: string;
+  locationLabel?: string;
+  addressLabel?: string;
+  tagLabel?: string;
+  recurrencePattern?: string;
+  onPressLocation?: () => void;
+  onPressOpenMap?: () => void;
+  actionButtons?: {
+    key: string;
+    label: string;
+    iconName: React.ComponentProps<typeof FontAwesome>['name'];
+    onPress: () => void;
+  }[];
+  onPressViewBarEvents?: () => void;
+  showActionSection?: boolean;
+  horizontalInset?: number;
 };
