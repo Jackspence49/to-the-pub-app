@@ -214,10 +214,7 @@ export default function EventDetailScreen() {
               tagLabel={event.event_tag_name ?? undefined}
 addressLabel={addressLabel ?? undefined}
               onPressOpenMap={handleOpenMaps}
-              crossesMidnight={event.crosses_midnight}
               onPressLocation={event.bar_id ? handleViewBarDetails : undefined}
-              barName={event.bar_name ?? undefined}
-              onPressBarDetails={event.bar_id ? handleViewBarDetails : undefined}
               actionButtons={actionButtons}
               onPressViewBarEvents={handleViewBarEvents}
               showActionSection
