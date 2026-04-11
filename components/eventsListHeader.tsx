@@ -98,6 +98,8 @@ export const EventsListHeader = ({
 								onPress={() => onRemoveTag(entry.normalized)}
 								style={[styles.selectedTagChipClose, { backgroundColor: palette.filterContainer }]}
 								hitSlop={6}
+								accessibilityLabel={`Remove ${entry.label} filter`}
+								accessibilityRole="button"
 							>
 								<MaterialIcons name="close" size={14} color={palette.text} />
 							</TouchableOpacity>
