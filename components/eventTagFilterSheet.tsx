@@ -2,7 +2,7 @@
 
 import { Colors } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback } from 'react';
 import {
 	ActivityIndicator,
 	FlatList,
@@ -28,31 +28,18 @@ export const EventTagFilterSheet = ({
 }: EventTagFilterSheetProps) => {
 	const palette = Colors[theme];
 	const highlightColor = palette.filterActivePill;
-	const [draftSelection, setDraftSelection] = useState<string[]>(selectedTagIds);
-
-	useEffect(() => {
-		if (visible) {
-			setDraftSelection(selectedTagIds);
-		}
-	}, [selectedTagIds, visible]);
-
-	const filteredTags = useMemo(() => tags, [tags]);
-
 	const toggleTag = useCallback(
 		(tagId: string) => {
-			setDraftSelection((previous) => {
-				const next = previous.includes(tagId) ? [] : [tagId];
-				onApply(next);
-				onClose();
-				return next;
-			});
+			const next = selectedTagIds.includes(tagId) ? [] : [tagId];
+			onApply(next);
+			onClose();
 		},
-		[onApply, onClose]
+		[selectedTagIds, onApply, onClose]
 	);
 
 	const renderTagRow = useCallback(
 		({ item }: { item: EventTag }) => {
-			const isChecked = draftSelection.includes(item.id);
+			const isChecked = selectedTagIds.includes(item.id);
 			return (
 				<TouchableOpacity
 					style={styles.filterRow}
@@ -73,7 +60,7 @@ export const EventTagFilterSheet = ({
 				</TouchableOpacity>
 			);
 		},
-		[draftSelection, highlightColor, palette.cardTitle, toggleTag]
+		[selectedTagIds, highlightColor, palette.cardTitle, toggleTag]
 	);
 
 	return (
@@ -100,21 +87,23 @@ export const EventTagFilterSheet = ({
 					</View>
 				) : error ? (
 					<View style={styles.filterStateColumn}>
-						<Text style={[styles.filterStateErrorText, { color: palette.cardTitle }]}>{error}</Text>
-						<TouchableOpacity
-							onPress={onRetry}
-							style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
-							activeOpacity={0.85}
-						>
-							<Text style={[styles.filterStateRetryText, { color: highlightColor }]}>Retry</Text>
-						</TouchableOpacity>
+						<Text style={[styles.filterStateErrorText, { color: palette.networkErrorText }]}>{error}</Text>
+						{onRetry && (
+							<TouchableOpacity
+								onPress={onRetry}
+								style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
+								activeOpacity={0.85}
+							>
+								<Text style={[styles.filterStateRetryText, { color: highlightColor }]}>Retry</Text>
+							</TouchableOpacity>
+						)}
 					</View>
 				) : (
 					<FlatList
-						data={filteredTags}
+						data={tags}
 						keyExtractor={(item) => item.id}
 						renderItem={renderTagRow}
-						contentContainerStyle={filteredTags.length === 0 ? styles.filterEmptyContent : undefined}
+						contentContainerStyle={tags.length === 0 ? styles.filterEmptyContent : undefined}
 						ListEmptyComponent={
 							<View style={styles.filterEmptyState}>
 								<Text style={[styles.filterStateText, { color: palette.cardSubtitle }]}>No tags available.</Text>

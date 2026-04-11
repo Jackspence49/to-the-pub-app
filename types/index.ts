@@ -206,7 +206,7 @@ export type EventTagFilterSheetProps = {
   selectedTagIds: string[];
   onApply: (tagIds: string[]) => void;
   onClose: () => void;
-  onRetry: () => void;
+  onRetry?: () => void;
   isLoading: boolean;
   error: string | null;
   theme: ThemeName;
