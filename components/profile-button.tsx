@@ -12,7 +12,7 @@ export function ProfileButton() {
   const handlePress = () => {
     Alert.alert(
       'Account',
-      undefined,
+      'What would you like to do?',
       [
         {
           text: 'Log Out',
@@ -28,7 +28,7 @@ export function ProfileButton() {
   };
 
   return (
-    <TouchableOpacity onPress={handlePress} style={styles.button} hitSlop={8}>
+    <TouchableOpacity onPress={handlePress} style={styles.button} hitSlop={8} accessibilityRole="button" accessibilityLabel="Account">
       <UserCircle size={28} color={palette.icon} strokeWidth={1.5} />
     </TouchableOpacity>
   );

@@ -10,7 +10,7 @@ export function LogoHeader() {
   const palette = Colors[theme];
   return (
     <View style={[styles.container, { backgroundColor: palette.container }]}>
-      <Image source={require('../assets/images/headerLogo.png')} style={styles.logo} resizeMode="contain" />
+      <Image source={require('../assets/images/headerLogo.png')} style={styles.logo} resizeMode="contain" accessibilityRole="image" accessibilityLabel="To The Pub" />
     </View>
   );
 }

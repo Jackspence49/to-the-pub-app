@@ -61,7 +61,7 @@ export const RadiusSelector = ({ value, onChange, theme }: RadiusSelectorProps) 
 			</TouchableOpacity>
 
 			<Modal visible={isPickerVisible} transparent animationType="none" onRequestClose={() => setPickerVisible(false)}>
-				<Pressable style={styles.radiusModalBackdrop} onPress={() => setPickerVisible(false)}>
+				<Pressable style={styles.radiusModalBackdrop} onPress={() => setPickerVisible(false)} accessibilityRole="button" accessibilityLabel="Close radius selector">
 					<View
 						style={[
 							styles.radiusPickerDropdown,

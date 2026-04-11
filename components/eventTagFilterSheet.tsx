@@ -80,7 +80,12 @@ export const EventTagFilterSheet = ({
 			presentationStyle="overFullScreen"
 			onRequestClose={onClose}
 		>
-			<Pressable style={styles.scrim} onPress={onClose} />
+			<Pressable
+				style={styles.scrim}
+				onPress={onClose}
+				accessibilityRole="button"
+				accessibilityLabel="Close filter sheet"
+			/>
 			<View
 				style={[
 					styles.container,

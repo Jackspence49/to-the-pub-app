@@ -103,7 +103,12 @@ export const TagFilterSheet = ({
       presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.scrim} onPress={onClose} />
+      <Pressable
+        style={styles.scrim}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close filter sheet"
+      />
       <View
         style={[
           styles.container,
@@ -143,7 +148,7 @@ export const TagFilterSheet = ({
                       { borderBottomColor: palette.border },
                     ]}
                     onPress={() => toggleCategory(category)}
-activeOpacity={0.8}
+                    activeOpacity={0.8}
                     accessibilityRole="button"
                     accessibilityLabel={`${category}${selectedCount > 0 ? `, ${selectedCount} selected` : ''}`}
                     accessibilityHint="Double tap to expand or collapse"
@@ -257,7 +262,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '65%',
+    maxHeight: '65%',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,
