@@ -13,6 +13,7 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { EventTag, EventTagFilterSheetProps } from '../types';
 
 export const EventTagFilterSheet = ({
@@ -28,6 +29,8 @@ export const EventTagFilterSheet = ({
 }: EventTagFilterSheetProps) => {
 	const palette = Colors[theme];
 	const highlightColor = palette.filterActivePill;
+	const insets = useSafeAreaInsets();
+
 	const toggleTag = useCallback(
 		(tagId: string) => {
 			const next = selectedTagIds.includes(tagId) ? [] : [tagId];
@@ -42,25 +45,30 @@ export const EventTagFilterSheet = ({
 			const isChecked = selectedTagIds.includes(item.id);
 			return (
 				<TouchableOpacity
-					style={styles.filterRow}
+					style={styles.row}
 					onPress={() => toggleTag(item.id)}
-					activeOpacity={0.8}
+					activeOpacity={0.85}
 					accessibilityRole="radio"
 					accessibilityState={{ selected: isChecked }}
 				>
 					<MaterialIcons
 						name={isChecked ? 'radio-button-checked' : 'radio-button-unchecked'}
 						size={22}
-						color={isChecked ? highlightColor : palette.cardTitle}
-						style={styles.filterRowCheckbox}
+						color={isChecked ? highlightColor : palette.text}
 					/>
-					<Text style={[styles.filterRowLabel, { color: palette.cardTitle }]} numberOfLines={1}>
+					<Text
+						style={[
+							styles.rowLabel,
+							{ color: isChecked ? palette.pillText : palette.text },
+						]}
+						numberOfLines={1}
+					>
 						{item.name}
 					</Text>
 				</TouchableOpacity>
 			);
 		},
-		[selectedTagIds, highlightColor, palette.cardTitle, toggleTag]
+		[selectedTagIds, highlightColor, palette.text, palette.pillText, toggleTag]
 	);
 
 	return (
@@ -68,33 +76,35 @@ export const EventTagFilterSheet = ({
 			visible={visible}
 			animationType="fade"
 			transparent
+			statusBarTranslucent
 			presentationStyle="overFullScreen"
 			onRequestClose={onClose}
 		>
-			<Pressable style={styles.sheetScrim} onPress={onClose} />
+			<Pressable style={styles.scrim} onPress={onClose} />
 			<View
 				style={[
-					styles.sheetContainer,
-					{ backgroundColor: palette.container, borderColor: palette.border },
+					styles.container,
+					{ backgroundColor: palette.background, borderColor: palette.border, paddingBottom: Math.max(24, insets.bottom) },
 				]}
+				accessibilityViewIsModal
 			>
-				<Text style={[styles.sheetTitle, { color: palette.cardTitle }]}>Filter Events</Text>
+				<Text style={[styles.title, { color: palette.text }]}>Filter Events</Text>
 
 				{isLoading ? (
-					<View style={styles.filterStateRow}>
+					<View style={styles.stateRow}>
 						<ActivityIndicator color={highlightColor} />
-						<Text style={[styles.filterStateText, { color: palette.cardTitle }]}>Loading tags...</Text>
+						<Text style={[styles.stateText, { color: palette.text }]}>Loading tags...</Text>
 					</View>
 				) : error ? (
-					<View style={styles.filterStateColumn}>
-						<Text style={[styles.filterStateErrorText, { color: palette.networkErrorText }]}>{error}</Text>
+					<View style={styles.stateColumn}>
+						<Text style={[styles.stateErrorText, { color: palette.networkErrorText }]}>{error}</Text>
 						{onRetry && (
 							<TouchableOpacity
 								onPress={onRetry}
-								style={[styles.filterStateRetryButton, { borderColor: highlightColor }]}
+								style={[styles.retryButton, { borderColor: highlightColor }]}
 								activeOpacity={0.85}
 							>
-								<Text style={[styles.filterStateRetryText, { color: highlightColor }]}>Retry</Text>
+								<Text style={[styles.retryText, { color: highlightColor }]}>Retry</Text>
 							</TouchableOpacity>
 						)}
 					</View>
@@ -103,13 +113,13 @@ export const EventTagFilterSheet = ({
 						data={tags}
 						keyExtractor={(item) => item.id}
 						renderItem={renderTagRow}
-						contentContainerStyle={tags.length === 0 ? styles.filterEmptyContent : undefined}
+						contentContainerStyle={tags.length === 0 ? styles.emptyContent : undefined}
 						ListEmptyComponent={
-							<View style={styles.filterEmptyState}>
-								<Text style={[styles.filterStateText, { color: palette.cardSubtitle }]}>No tags available.</Text>
+							<View style={styles.emptyState}>
+								<Text style={[styles.stateText, { color: palette.filterText }]}>No tags available.</Text>
 							</View>
 						}
-						style={styles.filterList}
+						style={tags.length > 0 ? styles.list : undefined}
 						showsVerticalScrollIndicator={false}
 						keyboardShouldPersistTaps="handled"
 					/>
@@ -122,85 +132,73 @@ export const EventTagFilterSheet = ({
 export default EventTagFilterSheet;
 
 const styles = StyleSheet.create({
-	sheetScrim: {
-		position: 'absolute',
-		top: 0,
-		left: 0,
-		right: 0,
-		bottom: 0,
-		backgroundColor: 'transparent',
+	scrim: {
+		flex: 1,
+		backgroundColor: 'rgba(0,0,0,0.4)',
 	},
-	sheetContainer: {
+	container: {
 		position: 'absolute',
 		left: 0,
 		right: 0,
 		bottom: 0,
-		borderTopLeftRadius: 22,
-		borderTopRightRadius: 22,
+		maxHeight: '65%',
+		paddingHorizontal: 20,
+		paddingTop: 12,
+		paddingBottom: 24,
+		borderTopLeftRadius: 20,
+		borderTopRightRadius: 20,
 		borderWidth: 1,
-		padding: 20,
-		maxHeight: '50%',
-		shadowColor: '#000',
-		shadowOpacity: 0.25,
-		shadowRadius: 12,
-		shadowOffset: { width: 0, height: -4 },
-		elevation: 10,
 	},
-	sheetTitle: {
+	title: {
 		fontSize: 18,
 		fontWeight: '700',
-		textAlign: 'center',
-		marginBottom: 14,
+		marginBottom: 12,
 	},
-	filterStateRow: {
+	list: {
+		flex: 1,
+	},
+	stateRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
 	},
-	filterStateColumn: {
+	stateColumn: {
 		gap: 8,
 	},
-	filterStateText: {
+	stateText: {
 		fontSize: 14,
 	},
-	filterStateErrorText: {
+	stateErrorText: {
 		fontSize: 14,
 		fontWeight: '600',
 	},
-	filterStateRetryButton: {
+	retryButton: {
 		alignSelf: 'flex-start',
 		borderRadius: 999,
 		borderWidth: 1,
 		paddingHorizontal: 16,
 		paddingVertical: 8,
 	},
-	filterStateRetryText: {
+	retryText: {
 		fontSize: 14,
 		fontWeight: '600',
 	},
-	filterList: {
-		marginTop: 14,
-	},
-	filterEmptyContent: {
+	emptyContent: {
 		flexGrow: 1,
 	},
-	filterEmptyState: {
+	emptyState: {
 		alignItems: 'center',
-		paddingVertical: 20,
+		paddingVertical: 24,
 	},
-	filterRow: {
+	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		paddingVertical: 10,
-		paddingHorizontal: 4,
-		gap: 12,
+		paddingLeft: 8,
+		gap: 8,
 	},
-	filterRowCheckbox: {
-		marginLeft: 4,
-	},
-	filterRowLabel: {
+	rowLabel: {
 		fontSize: 15,
-		fontWeight: '600',
-		flexShrink: 1,
+		flex: 1,
 	},
 });
