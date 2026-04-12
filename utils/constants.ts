@@ -12,6 +12,7 @@ export const REGISTER_ENDPOINT = NORMALIZED_BASE_URL ? `${NORMALIZED_BASE_URL}/a
 
 // Cache TTLs
 export const LOCATION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+export const LOCATION_TIMEOUT_MS = 10_000; // 10 seconds before falling back to defaults
 
 // Default Coordinates (Boston)
 export const DEFAULT_COORDS: Coordinates = {

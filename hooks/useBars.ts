@@ -60,6 +60,7 @@ export const useBars = (
   const cacheRef = useRef<BarsCache | null>(null);
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map());
   const hasMoreRef = useRef(true);
+  const loadBarsPageRef = useRef<typeof loadBarsPage>(null!);
 
   useEffect(() => {
     hasMoreRef.current = pagination.hasMore;
@@ -168,7 +169,10 @@ export const useBars = (
 
         const payload: PayloadWithPagination = await response.json();
         const rawItems = extractBarItems(payload);
-        const startIndex = (page - 1) * pageSize;
+        const startIndex =
+          page === 1
+            ? 0
+            : INFINITE_SCROLL_CONFIG.initialPageSize + (page - 2) * INFINITE_SCROLL_CONFIG.subsequentPageSize;
         const items = await mapBarsInBatches(rawItems, startIndex);
         
         nextHasMore = shouldContinuePagination(payload, items.length, pageSize);
@@ -209,7 +213,7 @@ export const useBars = (
           const prefetchTarget = page + INFINITE_SCROLL_CONFIG.prefetchPages;
           if (nextHasMore && !inFlightPagesRef.current.has(prefetchTarget)) {
             queuedRequestRef.current = null;
-            loadBarsPage(prefetchTarget, 'prefetch', {
+            loadBarsPageRef.current(prefetchTarget, 'prefetch', {
               ignoreCache: true,
               coordsOverride: coordsToUse,
             });
@@ -247,7 +251,7 @@ export const useBars = (
           const nextRequest = queuedRequestRef.current;
           queuedRequestRef.current = null;
           setTimeout(() => {
-            loadBarsPage(nextRequest.page, nextRequest.mode, {
+            loadBarsPageRef.current(nextRequest.page, nextRequest.mode, {
               ...(nextRequest.options ?? {}),
               ignoreCache: true,
             });
@@ -257,6 +261,12 @@ export const useBars = (
     },
     [getPageSize, selectedTags, userCoords]
   );
+
+  // Keep ref pointing at the latest loadBarsPage so async callbacks
+  // (prefetch, queued-request dispatch) always use current tags/coords.
+  useEffect(() => {
+    loadBarsPageRef.current = loadBarsPage;
+  }, [loadBarsPage]);
 
   /**
    * Refresh bars (pull-to-refresh)
@@ -273,6 +283,16 @@ export const useBars = (
     cacheRef.current = null;
     loadBarsPage(1, 'refresh', { ignoreCache: true });
   }, [loadBarsPage]);
+
+  /**
+   * Trigger the initial load, optionally with a coords override
+   */
+  const loadInitial = useCallback(
+    (coordsOverride?: Coordinates) => {
+      loadBarsPage(1, 'initial', { coordsOverride });
+    },
+    [loadBarsPage]
+  );
 
   /**
    * Retry after error
@@ -320,7 +340,7 @@ export const useBars = (
     error: pagination.error,
     totalCount: pagination.totalCount,
     currentPage: pagination.currentPage,
-    loadBarsPage,
+    loadInitial,
     handleRefresh,
     handleRetry,
     handleLoadMore,

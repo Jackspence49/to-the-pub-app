@@ -2,7 +2,7 @@
 import * as Location from 'expo-location';
 import { useCallback, useRef, useState } from 'react';
 import type { Coordinates, LocationCache } from '../types/index';
-import { DEFAULT_COORDS, LOCATION_CACHE_TTL_MS } from '../utils/constants';
+import { DEFAULT_COORDS, LOCATION_CACHE_TTL_MS, LOCATION_TIMEOUT_MS } from '../utils/constants';
 
 // Hook to manage location with caching and permission handling
 export const useLocationCache = () => {
@@ -60,9 +60,13 @@ export const useLocationCache = () => {
         return null;
       }
 
-      const location = await Location.getCurrentPositionAsync({
+      const locationPromise = Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Location request timed out')), LOCATION_TIMEOUT_MS)
+      );
+      const location = await Promise.race([locationPromise, timeoutPromise]);
 
       const coords: Coordinates = {
         lat: location.coords.latitude,

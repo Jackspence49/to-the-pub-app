@@ -61,7 +61,7 @@ export default function BarsScreen() {
       isLoadingMore,
       isRefreshing,
       error,
-      loadBarsPage,
+      loadInitial,
       handleRefresh,
       handleRetry,
       handleLoadMore,
@@ -109,7 +109,7 @@ export default function BarsScreen() {
       const coords = await getCurrentCoordinates();
       
       if (!cancelled) {
-        loadBarsPage(1, 'initial', { coordsOverride: coords });
+        loadInitial(coords);
       }
     };
 
@@ -118,7 +118,7 @@ export default function BarsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [getCurrentCoordinates, loadBarsPage]);
+  }, [getCurrentCoordinates, loadInitial]);
 
   // Warm the location cache each time this tab comes into focus.
   // The result is intentionally discarded — this is a background side-effect so that
