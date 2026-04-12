@@ -8,9 +8,11 @@ import { DEFAULT_COORDS, LOCATION_CACHE_TTL_MS, LOCATION_TIMEOUT_MS } from '../u
 export const useLocationCache = () => {
   const [userCoords, setUserCoords] = useState<Coordinates | null>(null);
   const [locationDeniedPermanently, setLocationDeniedPermanently] = useState(false);
-  
+
   const permissionStatusRef = useRef<Location.PermissionStatus | null>(null);
   const lastCoordsRef = useRef<LocationCache | null>(null);
+  const userCoordsRef = useRef<Coordinates | null>(null);
+  const inflightRef = useRef<Promise<Coordinates | null> | null>(null);
 
   // Permission flow: ensureLocationPermission() checks the stored status first; 
   // If unknown, it reads foreground permission, short-circuits on granted,otherwise requests it. 
@@ -30,7 +32,6 @@ export const useLocationCache = () => {
     
     if (!current.canAskAgain) {
       setLocationDeniedPermanently(true);
-      console.warn('Location permission permanently denied; using fallback coordinates.');
       return false;
     }
     
@@ -44,7 +45,6 @@ export const useLocationCache = () => {
     
     if (!requested.canAskAgain) {
       setLocationDeniedPermanently(true);
-      console.warn('Location permission permanently denied; using fallback coordinates.');
     }
     
     return false;
@@ -54,36 +54,48 @@ export const useLocationCache = () => {
   //Then uses Location.getCurrentPositionAsync() with balanced accuracy to get lat/lon, 
   //stores them with a timestamp in lastCoordsRef, and updates userCoords state.
   const refreshUserLocation = useCallback(async (): Promise<Coordinates | null> => {
-    try {
-      const hasPermission = await ensureLocationPermission();
-      if (!hasPermission) {
-        return null;
-      }
-
-      const locationPromise = Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Location request timed out')), LOCATION_TIMEOUT_MS)
-      );
-      const location = await Promise.race([locationPromise, timeoutPromise]);
-
-      const coords: Coordinates = {
-        lat: location.coords.latitude,
-        lon: location.coords.longitude,
-      };
-
-      lastCoordsRef.current = {
-        coords,
-        fetchedAt: Date.now(),
-      };
-
-      setUserCoords(coords);
-      return coords;
-    } catch (err) {
-      console.warn('Failed to get current position:', err);
-      return null;
+    if (inflightRef.current) {
+      return inflightRef.current;
     }
+
+    const fetch = async (): Promise<Coordinates | null> => {
+      try {
+        const hasPermission = await ensureLocationPermission();
+        if (!hasPermission) {
+          return null;
+        }
+
+        const locationPromise = Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Location request timed out')), LOCATION_TIMEOUT_MS)
+        );
+        const location = await Promise.race([locationPromise, timeoutPromise]);
+
+        const coords: Coordinates = {
+          lat: location.coords.latitude,
+          lon: location.coords.longitude,
+        };
+
+        lastCoordsRef.current = {
+          coords,
+          fetchedAt: Date.now(),
+        };
+
+        userCoordsRef.current = coords;
+        setUserCoords(coords);
+        return coords;
+      } catch (err) {
+        console.warn('[useLocationCache] Failed to fetch location:', err);
+        return null;
+      } finally {
+        inflightRef.current = null;
+      }
+    };
+
+    inflightRef.current = fetch();
+    return inflightRef.current;
   }, [ensureLocationPermission]);
 
   // Caching: getCachedLocation() returns the last coords 
@@ -105,8 +117,8 @@ export const useLocationCache = () => {
     }
 
     const fresh = await refreshUserLocation();
-    return fresh ?? userCoords ?? DEFAULT_COORDS;
-  }, [getCachedLocation, refreshUserLocation, userCoords]);
+    return fresh ?? userCoordsRef.current ?? DEFAULT_COORDS;
+  }, [getCachedLocation, refreshUserLocation]);
 
   return {
     userCoords,
@@ -115,7 +127,5 @@ export const useLocationCache = () => {
     refreshUserLocation,
     getCachedLocation,
     getCurrentCoordinates,
-    permissionStatusRef,
-    lastCoordsRef,
   };
 };

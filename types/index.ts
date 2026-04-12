@@ -151,6 +151,7 @@ export type InfiniteScrollConfig = {
   maxConcurrentRequests: number;
   prefetchPages: number;
   cacheTimeout: number;
+  requestTimeout: number;
 };
 
 // Pagination state for lists

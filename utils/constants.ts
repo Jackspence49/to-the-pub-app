@@ -46,6 +46,7 @@ export const INFINITE_SCROLL_CONFIG: InfiniteScrollConfig = {
   maxConcurrentRequests: 2,
   prefetchPages: 1,
   cacheTimeout: 300000, // 5 minutes
+  requestTimeout: 15000, // 15 seconds
 };
 
 // Search screen configuration

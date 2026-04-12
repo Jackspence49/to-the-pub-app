@@ -52,11 +52,11 @@ export const useBars = (
   // Refs for managing requests and cache
   const inFlightPagesRef = useRef<Set<number>>(new Set());
   const activeRequestCountRef = useRef(0);
-  const queuedRequestRef = useRef<{
+  const queuedRequestsRef = useRef<{
     page: number;
     mode: LoadMode;
     options?: LoadBarsPageOptions;
-  } | null>(null);
+  }[]>([]);
   const cacheRef = useRef<BarsCache | null>(null);
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map());
   const hasMoreRef = useRef(true);
@@ -118,7 +118,7 @@ export const useBars = (
 
       // Check concurrent request limit
       if (activeRequestCountRef.current >= INFINITE_SCROLL_CONFIG.maxConcurrentRequests) {
-        queuedRequestRef.current = { page, mode, options: { ...options, ignoreCache: true } };
+        queuedRequestsRef.current.push({ page, mode, options: { ...options, ignoreCache: true } });
         return;
       }
 
@@ -147,6 +147,11 @@ export const useBars = (
 
       const pageSize = getPageSize(page);
       let nextHasMore: boolean | null = null;
+      let didTimeout = false;
+      const timeoutId = setTimeout(() => {
+        didTimeout = true;
+        controller.abort();
+      }, INFINITE_SCROLL_CONFIG.requestTimeout);
 
       try {
         const queryParams: QueryParams = {
@@ -212,7 +217,7 @@ export const useBars = (
         ) {
           const prefetchTarget = page + INFINITE_SCROLL_CONFIG.prefetchPages;
           if (nextHasMore && !inFlightPagesRef.current.has(prefetchTarget)) {
-            queuedRequestRef.current = null;
+            queuedRequestsRef.current = [];
             loadBarsPageRef.current(prefetchTarget, 'prefetch', {
               ignoreCache: true,
               coordsOverride: coordsToUse,
@@ -220,13 +225,15 @@ export const useBars = (
           }
         }
       } catch (err) {
-        if ((err as Error).name === 'AbortError') {
+        const isAbort = (err as Error).name === 'AbortError';
+        if (isAbort && !didTimeout) {
           return;
         }
-        
-        const message =
-          err instanceof Error ? err.message : 'Something went wrong while loading bars.';
-        
+
+        const message = isAbort
+          ? 'Request timed out. Please try again.'
+          : err instanceof Error ? err.message : 'Something went wrong while loading bars.';
+
         setPagination((prev) => ({
           ...prev,
           error: new Error(message),
@@ -234,28 +241,34 @@ export const useBars = (
           isLoadingMore: false,
         }));
       } finally {
+        clearTimeout(timeoutId);
+
         if (mode === 'refresh') {
           setIsRefreshing(false);
         }
-        
+
         inFlightPagesRef.current.delete(page);
         activeRequestCountRef.current = Math.max(0, activeRequestCountRef.current - 1);
         abortControllersRef.current.delete(page);
 
-        // Process queued request
-        if (
-          queuedRequestRef.current &&
-          activeRequestCountRef.current < INFINITE_SCROLL_CONFIG.maxConcurrentRequests &&
-          (queuedRequestRef.current.mode !== 'load-more' ? true : hasMoreRef.current)
+        // Process queued requests
+        while (
+          queuedRequestsRef.current.length > 0 &&
+          activeRequestCountRef.current < INFINITE_SCROLL_CONFIG.maxConcurrentRequests
         ) {
-          const nextRequest = queuedRequestRef.current;
-          queuedRequestRef.current = null;
+          const nextRequest = queuedRequestsRef.current[0];
+          if (nextRequest.mode === 'load-more' && !hasMoreRef.current) {
+            queuedRequestsRef.current.shift();
+            continue;
+          }
+          queuedRequestsRef.current.shift();
           setTimeout(() => {
             loadBarsPageRef.current(nextRequest.page, nextRequest.mode, {
               ...(nextRequest.options ?? {}),
               ignoreCache: true,
             });
           }, 0);
+          break;
         }
       }
     },
@@ -272,7 +285,7 @@ export const useBars = (
    * Refresh bars (pull-to-refresh)
    */
   const handleRefresh = useCallback(() => {
-    queuedRequestRef.current = null;
+    queuedRequestsRef.current = [];
     inFlightPagesRef.current.forEach((page) => {
       const controller = abortControllersRef.current.get(page);
       controller?.abort();
@@ -281,8 +294,8 @@ export const useBars = (
     abortControllersRef.current.clear();
     activeRequestCountRef.current = 0;
     cacheRef.current = null;
-    loadBarsPage(1, 'refresh', { ignoreCache: true });
-  }, [loadBarsPage]);
+    loadBarsPageRef.current(1, 'refresh', { ignoreCache: true });
+  }, []);
 
   /**
    * Trigger the initial load, optionally with a coords override
@@ -299,7 +312,7 @@ export const useBars = (
    */
   const handleRetry = useCallback(() => {
     const mode: LoadMode = pagination.data.length ? 'refresh' : 'initial';
-    queuedRequestRef.current = null;
+    queuedRequestsRef.current = [];
     inFlightPagesRef.current.forEach((page) => {
       const controller = abortControllersRef.current.get(page);
       controller?.abort();
