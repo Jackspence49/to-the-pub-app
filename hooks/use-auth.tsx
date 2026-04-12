@@ -45,6 +45,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let isMounted = true;
 
+    const pingLastAccessed = (activeToken: string) => {
+      if (!normalizedBaseUrl) return;
+      fetch(`${normalizedBaseUrl}/appUsers/ping`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${activeToken}` },
+      }).catch(() => {});
+    };
+
     const bootstrapAuth = async () => {
       try {
         const storedToken = await SecureStore.getItemAsync(TOKEN_STORAGE_KEY);
@@ -55,6 +63,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (storedToken) {
           setToken(storedToken);
           setStatus('authenticated');
+          pingLastAccessed(storedToken);
         } else {
           setStatus('unauthenticated');
         }
