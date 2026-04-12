@@ -14,7 +14,7 @@ export const useSearch = () => {
 	const trimmedQuery = query.trim();
 	const canSearch = useMemo(() => trimmedQuery.length >= 2, [trimmedQuery]);
 
-	const performSearch = useCallback(async (searchTerm: string, signal: AbortSignal) => {
+	const performSearch = useCallback(async (searchTerm: string, signal: AbortSignal, attempt = 0) => {
 		if (!NORMALIZED_BASE_URL) {
 			setError('Set EXPO_PUBLIC_API_URL to search for bars.');
 			return;
@@ -43,6 +43,10 @@ export const useSearch = () => {
 			);
 		} catch (err) {
 			if (err instanceof Error && err.name === 'AbortError') return;
+			if (attempt < 1 && !signal.aborted) {
+				await new Promise((res) => setTimeout(res, 1000));
+				return performSearch(searchTerm, signal, attempt + 1);
+			}
 			setError(err instanceof Error ? err.message : 'Unexpected error occurred.');
 		} finally {
 			if (!signal.aborted) setIsLoading(false);
@@ -59,7 +63,6 @@ export const useSearch = () => {
 		}
 		const controller = new AbortController();
 		const timer = setTimeout(() => {
-			setIsLoading(true);
 			performSearch(term, controller.signal);
 		}, SEARCH_DEBOUNCE_MS);
 		return () => {
@@ -68,5 +71,5 @@ export const useSearch = () => {
 		};
 	}, [performSearch, trimmedQuery]);
 
-	return { query, setQuery, results, isLoading, error, canSearch };
+	return { query, setQuery, results, isLoading, error, canSearch, effectiveQuery: trimmedQuery };
 };
