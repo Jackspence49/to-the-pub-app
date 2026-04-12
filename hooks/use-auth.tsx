@@ -10,9 +10,13 @@ type LoginPayload = {
 
 type AuthenticatedUser = {
   id: string;
-  name?: string;
   email?: string;
-  [Token: string]: unknown;
+  full_name?: string;
+  phone?: string;
+  dob?: string;
+  last_login?: string;
+  created_at?: string;
+  [key: string]: unknown;
 };
 
 type AuthActionResult = {
@@ -53,20 +57,63 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }).catch(() => {});
     };
 
+    const fetchMe = async (activeToken: string): Promise<AuthenticatedUser | null> => {
+      if (!normalizedBaseUrl) return null;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const response = await fetch(`${normalizedBaseUrl}/appUsers/me`, {
+          headers: { Authorization: `Bearer ${activeToken}` },
+          signal: controller.signal,
+        });
+        if (response.status === 401 || response.status === 403 || response.status === 404) {
+          return null;
+        }
+        if (!response.ok) {
+          throw new Error('server_error');
+        }
+        const json = await response.json();
+        return (json?.data as AuthenticatedUser) ?? null;
+      } finally {
+        clearTimeout(timeout);
+      }
+    };
+
     const bootstrapAuth = async () => {
       try {
         const storedToken = await SecureStore.getItemAsync(TOKEN_STORAGE_KEY);
-        if (!isMounted) {
+        if (!isMounted) return;
+
+        if (!storedToken) {
+          setStatus('unauthenticated');
           return;
         }
 
-        if (storedToken) {
-          setToken(storedToken);
-          setStatus('authenticated');
-          pingLastAccessed(storedToken);
-        } else {
-          setStatus('unauthenticated');
+        let meUser: AuthenticatedUser | null = null;
+        let tokenInvalid = false;
+
+        try {
+          meUser = await fetchMe(storedToken);
+          if (meUser === null && normalizedBaseUrl) {
+            // null from fetchMe means a 401/403/404 — token is bad
+            tokenInvalid = true;
+          }
+        } catch {
+          // Network error or timeout — trust the stored token but user stays null
         }
+
+        if (!isMounted) return;
+
+        if (tokenInvalid) {
+          await SecureStore.deleteItemAsync(TOKEN_STORAGE_KEY);
+          setStatus('unauthenticated');
+          return;
+        }
+
+        setToken(storedToken);
+        setUser(meUser);
+        setStatus('authenticated');
+        pingLastAccessed(storedToken);
       } catch {
         if (isMounted) {
           setStatus('unauthenticated');
@@ -110,9 +157,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         clearTimeout(timeout);
       }
 
-      let payload: any = null;
+      type LoginResponse = { token?: string; message?: string; user?: AuthenticatedUser } | null;
+      let payload: LoginResponse = null;
       try {
-        payload = await response.json();
+        payload = await response.json() as LoginResponse;
       } catch {
         payload = null;
       }
@@ -130,10 +178,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setStatus('authenticated');
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        message: error?.name === 'AbortError'
+        message: (error instanceof Error && error.name === 'AbortError')
           ? 'The request timed out. Please check your connection and try again.'
           : 'Unable to sign in right now. Please try again.',
       };
