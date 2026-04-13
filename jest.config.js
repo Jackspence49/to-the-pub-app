@@ -5,6 +5,9 @@ module.exports = {
       preset: 'ts-jest',
       testEnvironment: 'node',
       testMatch: ['<rootDir>/utils/__tests__/**/*.test.ts'],
+      moduleNameMapper: {
+        '^react-native$': '<rootDir>/__mocks__/react-native.js',
+      },
     },
     {
       displayName: 'hooks',
