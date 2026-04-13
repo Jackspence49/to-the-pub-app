@@ -12,9 +12,11 @@ export const parseTimeToken = (value?: string): Date | null => {
     return null;
   }
 
-  const timestamp = Date.parse(trimmed);
-  if (!Number.isNaN(timestamp)) {
-    return new Date(timestamp);
+  if (trimmed.includes('-') || trimmed.includes('T')) {
+    const timestamp = Date.parse(trimmed);
+    if (!Number.isNaN(timestamp)) {
+      return new Date(timestamp);
+    }
   }
 
   const amPmMatch = trimmed.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)?$/i);

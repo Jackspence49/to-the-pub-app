@@ -209,7 +209,10 @@ const buildDayLabel = (days: number[]) => {
 	}
 	ranges.push({ start, end: prev });
 
-	if (ranges.length > 1 && ranges[0].start === 0 && ranges[ranges.length - 1].end === 6) {
+	const firstRange = ranges[0];
+	const lastRange = ranges[ranges.length - 1];
+	const wrapCandidatesSpanMultiple = firstRange.end > firstRange.start || lastRange.end > lastRange.start;
+	if (ranges.length > 1 && firstRange.start === 0 && lastRange.end === 6 && wrapCandidatesSpanMultiple) {
 		const mergedStart = ranges[ranges.length - 1].start;
 		const mergedEnd = ranges[0].end;
 		const middle = ranges.slice(1, ranges.length - 1);

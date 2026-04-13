@@ -57,110 +57,92 @@ const coerceDayIndex = (value: unknown): number | null => {
   return null;
 };
 
-//Extract closing time metadata from a schedule record
-const extractCloseMetaFromRecord = (
-  record?: LooseObject | null
-): { closesAt?: string; crossesMidnight?: boolean } | null => {
+//Extract closing time from a schedule record
+const extractCloseMetaFromRecord = (record?: LooseObject | null): string | null => {
   if (!record || typeof record !== 'object') {
     return null;
   }
   const closesRaw = record.close_time;
-  const closesAt =
-    typeof closesRaw === 'string' && closesRaw.trim().length > 0 ? closesRaw.trim() : undefined;
-  const crossesMidnight = Boolean(record.crosses_midnight ?? false);
-  if (!closesAt && !crossesMidnight) {
-    return null;
-  }
-  return { closesAt, crossesMidnight };
+  return typeof closesRaw === 'string' && closesRaw.trim().length > 0 ? closesRaw.trim() : null;
 };
 
-//Resolve closing time from various schedule buckets
-const resolveClosingFromSchedules = (
-  raw: LooseObject
-): { closesAt?: string; crossesMidnight?: boolean } | null => {
-  const scheduleBuckets = [raw.hours];
+//Resolve closing time from raw.hours schedule array
+const resolveClosingFromSchedules = (raw: LooseObject): string | null => {
+  if (!Array.isArray(raw.hours)) {
+    return null;
+  }
   const today = new Date().getDay();
-  
-  for (const bucket of scheduleBuckets) {
-    if (!Array.isArray(bucket)) {
+  for (const entry of raw.hours) {
+    if (!entry || typeof entry !== 'object') {
       continue;
     }
-    for (const entry of bucket) {
-      if (!entry || typeof entry !== 'object') {
-        continue;
-      }
-      const record = entry as LooseObject;
-      const entryDay = coerceDayIndex(
-        record.day_of_week ??
-          record.dayOfWeek ??
-          record.day ??
-          record.dayName ??
-          record.weekday ??
-          record.weekDay ??
-          record.name
-      );
-      if (entryDay !== today) {
-        continue;
-      }
-      const meta = extractCloseMetaFromRecord(record);
-      if (meta) {
-        return meta;
-      }
+    const record = entry as LooseObject;
+    const entryDay = coerceDayIndex(
+      record.day_of_week ??
+        record.dayOfWeek ??
+        record.day ??
+        record.dayName ??
+        record.weekday ??
+        record.weekDay ??
+        record.name
+    );
+    if (entryDay !== today) {
+      continue;
+    }
+    const closesAt = extractCloseMetaFromRecord(record);
+    if (closesAt) {
+      return closesAt;
     }
   }
   return null;
 };
 
-/**
- * Extract today's closing time metadata from raw bar data
- */
-const extractTodayClosingMeta = (
-  raw: LooseObject
-): { closesAt?: string; crossesMidnight?: boolean } => {
-  // Prefer schedule-based resolution from the hours array
-  const scheduleMeta = resolveClosingFromSchedules(raw);
-  if (scheduleMeta) {
-    return scheduleMeta;
+// Extract today's closing time from raw bar data
+const extractTodayClosingMeta = (raw: LooseObject): string | undefined => {
+  const fromSchedule = resolveClosingFromSchedules(raw);
+  if (fromSchedule) {
+    return fromSchedule;
   }
+  return typeof raw.close_time === 'string' && raw.close_time.trim().length > 0
+    ? raw.close_time.trim()
+    : undefined;
+};
 
-  // Fallback: direct close_time field if provided
-  const closesAt =
-    typeof raw.close_time === 'string' && raw.close_time.trim().length > 0
-      ? raw.close_time.trim()
-      : undefined;
-  const crosses =
-    raw.crosses_midnight_today ??
-    raw.crossesMidnightToday ??
-    raw.crosses_midnight ??
-    raw.crossesMidnight;
-  const crossesMidnight = typeof crosses === 'boolean' ? crosses : undefined;
-
+// Map raw hour data to BarHours type — returns null if day_of_week is missing or invalid
+export const mapToBarHour = (raw: LooseObject): BarHours | null => {
+  const day = coerceDayIndex(raw.day_of_week ?? raw.dayOfWeek);
+  if (day === null) {
+    return null;
+  }
   return {
-    closesAt,
-    crossesMidnight,
+    id: String(raw.id ?? ''),
+    day_of_week: day,
+    open_time: raw.open_time ?? raw.openTime ?? '',
+    close_time: raw.close_time ?? raw.closeTime ?? '',
+    is_closed: Boolean(raw.is_closed ?? raw.isClosed ?? false),
+    crosses_midnight: Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false),
   };
 };
 
-// Map raw hour data to BarHours type
-export const mapToBarHour = (raw: LooseObject): BarHours => ({
-  id: String(raw.id ?? ''),
-  day_of_week: typeof raw.day_of_week === 'number' ? raw.day_of_week : Number(raw.dayOfWeek ?? 0),
-  open_time: raw.open_time ?? raw.openTime ?? '',
-  close_time: raw.close_time ?? raw.closeTime ?? '',
-  is_closed: Boolean(raw.is_closed ?? raw.isClosed ?? false),
-  crosses_midnight: Boolean(raw.crosses_midnight ?? raw.crossesMidnight ?? false),
-});
-
-// Map raw bar data to Bar type
-export const mapToBar = (raw: LooseObject, index: number): Bar => {
+// Map raw bar data to Bar type — returns null if id or name are missing
+export const mapToBar = (raw: LooseObject, index: number): Bar | null => {
+  if (!raw.id || !raw.name) {
+    return null;
+  }
   const rawTags = raw.tags || [];
+  const seen = new Set<string>();
   const dedupedTags: BarTag[] = rawTags
     .map((tag: any, tagIndex: number) => mapToBarTag(tag, tagIndex))
-    .filter((tag: BarTag | null): tag is BarTag => Boolean(tag));
+    .filter((tag: BarTag | null): tag is BarTag => Boolean(tag))
+    .filter((tag: BarTag) => {
+      if (seen.has(tag.id)) return false;
+      seen.add(tag.id);
+      return true;
+    });
 
   return {
     id: String(raw.id),
-    name: raw.name,
+    name: String(raw.name),
     description: raw.description ?? undefined,
     address_street: raw.address_street ?? undefined,
     address_city: raw.address_city ?? undefined,
@@ -179,10 +161,10 @@ export const mapToBar = (raw: LooseObject, index: number): Bar => {
     distance_km: toNumber(raw.distance_km) ?? undefined,
     closes_at: (typeof raw.closes_at === 'string' && raw.closes_at.trim().length > 0)
       ? raw.closes_at.trim()
-      : extractTodayClosingMeta(raw).closesAt,
+      : extractTodayClosingMeta(raw),
     tags: dedupedTags,
     hours: Array.isArray(raw.hours)
-      ? raw.hours.map((h: LooseObject) => mapToBarHour(h)).filter((h) => typeof h.day_of_week === 'number')
+      ? raw.hours.map((h: LooseObject) => mapToBarHour(h)).filter((h): h is BarHours => h !== null)
       : [],
   };
 };
@@ -197,7 +179,8 @@ export const mapBarsInBatches = async (
   for (let i = 0; i < items.length; i += batchSize) {
     const slice = items.slice(i, i + batchSize);
     slice.forEach((item, offset) => {
-      mapped.push(mapToBar(item, startIndex + i + offset));
+      const bar = mapToBar(item, startIndex + i + offset);
+      if (bar) mapped.push(bar);
     });
 
     // Yield to the event loop between batches to avoid blocking rendering

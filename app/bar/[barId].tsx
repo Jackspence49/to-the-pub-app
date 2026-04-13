@@ -8,12 +8,10 @@ import type { Bar } from '../../types/index';
 
 // Utils
 import { mapToBar } from '../../utils/Barmappers';
+import { NORMALIZED_BASE_URL } from '../../utils/constants';
 
 // Components
 import BarDetails from '../../components/barDetails';
-
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
-const normalizedBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
 export default function BarDetailScreen() {
   const { barId } = useLocalSearchParams<{ barId?: string }>();
@@ -31,7 +29,7 @@ export default function BarDetailScreen() {
       setIsLoading(false);
       return;
     }
-    if (!normalizedBaseUrl) {
+    if (!NORMALIZED_BASE_URL) {
       setError('Set EXPO_PUBLIC_API_URL to load bar details.');
       setIsLoading(false);
       return;
@@ -39,13 +37,15 @@ export default function BarDetailScreen() {
     const controller = new AbortController();
     setIsLoading(true);
     setError(null);
-    fetch(`${normalizedBaseUrl}/bars/${barId}?include=hours,tags`, { signal: controller.signal })
+    fetch(`${NORMALIZED_BASE_URL}/bars/${barId}?include=hours,tags`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error(`Failed to fetch bar details (status ${response.status})`);
         return response.json();
       })
       .then((payload) => {
-        setBar(mapToBar(payload.data ?? payload, 0));
+        const bar = mapToBar(payload.data ?? payload, 0);
+        if (!bar) throw new Error('Invalid bar data received from server.');
+        setBar(bar);
       })
       .catch((err) => {
         if (err instanceof Error && err.name === 'AbortError') return;
