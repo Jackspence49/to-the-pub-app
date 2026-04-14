@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    maxHeight: '65%',
+    height: '65%',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,

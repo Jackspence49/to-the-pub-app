@@ -123,7 +123,7 @@ describe('use-auth', () => {
       mockGetItemAsync.mockResolvedValue('my-token');
       (global.fetch as jest.Mock).mockReturnValue(stubFetch({ data: makeUser() }));
 
-      const { result } = renderHook(() => useAuth(), { wrapper });
+      renderHook(() => useAuth(), { wrapper });
 
       await act(async () => {});
 
