@@ -13,6 +13,7 @@ module.exports = {
       displayName: 'hooks',
       preset: 'jest-expo',
       testMatch: ['<rootDir>/hooks/__tests__/**/*.test.{ts,tsx}'],
+      setupFiles: ['<rootDir>/hooks/__tests__/setup-env.ts'],
     },
   ],
 };
