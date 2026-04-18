@@ -268,11 +268,11 @@ export default function BarDetails({
 	const contactActions = useMemo(() => buildContactActions(bar), [bar]);
 	const socialActions = useMemo(() => buildSocialActions(bar), [bar]);
 	const typeTags = useMemo(
-		() => (bar?.tags ?? []).filter((tag) => (tag.category ?? '').toLowerCase() === 'type'),
+		() => (bar?.tags ?? []).filter((tag) => (tag.category ?? '').toLowerCase() === 'establishment type'),
 		[bar?.tags],
 	);
 	const amenityTags = useMemo(
-		() => (bar?.tags ?? []).filter((tag) => (tag.category ?? '').toLowerCase() === 'amenity'),
+		() => (bar?.tags ?? []).filter((tag) => (tag.category ?? '').toLowerCase() !== 'establishment type'),
 		[bar?.tags],
 	);
 	const hasMapAction = Boolean(onPressOpenMap ?? addressLabel);
