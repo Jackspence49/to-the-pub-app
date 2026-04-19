@@ -1,7 +1,21 @@
 {
-  "plugins": [
-    "expo-router",
-    "expo-secure-store",
-    "expo-web-browser"
-  ]
+  "expo": {
+    "name": "To The Pub",
+    "slug": "to-the-pub-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": { "image": "./assets/images/splash.png", "resizeMode": "contain" },
+    "ios": {
+      "bundleIdentifier": "com.yourname.tothepub",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you."
+      }
+    },
+    "android": {
+      "package": "com.yourname.tothepub"
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-web-browser"]
+  }
 }
