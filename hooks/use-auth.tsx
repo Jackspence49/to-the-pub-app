@@ -32,6 +32,7 @@ type AuthContextValue = {
   login: (payload: LoginPayload) => Promise<AuthActionResult>;
   loginWithToken: (token: string, user?: AuthenticatedUser | null) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<AuthActionResult>;
 };
 
 const TOKEN_STORAGE_KEY = 'ttp-auth-token';
@@ -195,6 +196,56 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setStatus('authenticated');
   }, []);
 
+  const deleteAccount = useCallback(async (): Promise<AuthActionResult> => {
+    if (!normalizedBaseUrl) {
+      return { success: false, message: 'Set EXPO_PUBLIC_API_URL to enable this action.' };
+    }
+    if (!token) {
+      return { success: false, message: 'Not authenticated.' };
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      let response: Response;
+      try {
+        response = await fetch(`${normalizedBaseUrl}/appUsers/me`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!response.ok) {
+        let message: string | undefined;
+        try {
+          const json = await response.json() as { message?: string };
+          message = json?.message;
+        } catch { /* ignore */ }
+        return { success: false, message: message ?? 'Failed to delete account. Please try again.' };
+      }
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: (error instanceof Error && error.name === 'AbortError')
+          ? 'The request timed out. Please check your connection and try again.'
+          : 'Unable to delete account right now. Please try again.',
+      };
+    }
+
+    setStatus('checking');
+    setUser(null);
+    setToken(null);
+    try {
+      await SecureStore.deleteItemAsync(TOKEN_STORAGE_KEY);
+    } finally {
+      setStatus('unauthenticated');
+    }
+    return { success: true };
+  }, [token]);
+
   const logout = useCallback(async () => {
     setStatus('checking');
     setUser(null);
@@ -216,8 +267,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       login,
       loginWithToken,
       logout,
+      deleteAccount,
     }),
-    [status, token, user, login, loginWithToken, logout],
+    [status, token, user, login, loginWithToken, logout, deleteAccount],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

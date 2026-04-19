@@ -7,7 +7,27 @@ import { Alert, StyleSheet, TouchableOpacity, useColorScheme } from 'react-nativ
 export function ProfileButton() {
   const theme = useColorScheme() ?? 'dark';
   const palette = Colors[theme];
-  const { logout } = useAuth();
+  const { logout, deleteAccount } = useAuth();
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all associated data. This cannot be undone.',
+      [
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteAccount();
+            if (!result.success) {
+              Alert.alert('Error', result.message ?? 'Something went wrong. Please try again.');
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  };
 
   const handlePress = () => {
     Alert.alert(
@@ -18,6 +38,11 @@ export function ProfileButton() {
           text: 'Log Out',
           style: 'destructive',
           onPress: logout,
+        },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: confirmDeleteAccount,
         },
         {
           text: 'Cancel',
