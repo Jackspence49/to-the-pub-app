@@ -1,55 +1,22 @@
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'expo-router';
 import { UserCircle } from 'lucide-react-native';
 import React from 'react';
-import { Alert, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
+import { StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
 
 export function ProfileButton() {
   const theme = useColorScheme() ?? 'dark';
   const palette = Colors[theme];
-  const { logout, deleteAccount } = useAuth();
-
-  const confirmDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This will permanently delete your account and all associated data. This cannot be undone.',
-      [
-        {
-          text: 'Delete Account',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await deleteAccount();
-            if (!result.success) {
-              Alert.alert('Error', result.message ?? 'Something went wrong. Please try again.');
-            }
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
-  };
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
 
   const handlePress = () => {
-    Alert.alert(
-      'Account',
-      'What would you like to do?',
-      [
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: logout,
-        },
-        {
-          text: 'Delete Account',
-          style: 'destructive',
-          onPress: confirmDeleteAccount,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ],
-    );
+    if (isAuthenticated) {
+      router.push('/account');
+    } else {
+      router.push('/login');
+    }
   };
 
   return (
