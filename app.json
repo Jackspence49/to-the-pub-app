@@ -4,8 +4,11 @@
     "slug": "to-the-pub-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "splash": { "image": "./assets/images/splash.png", "resizeMode": "contain" },
+    "icon": "./assets/images/logo.png",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain"
+    },
     "ios": {
       "bundleIdentifier": "com.yourname.tothepub",
       "buildNumber": "1",
