@@ -24,6 +24,13 @@ type AuthActionResult = {
   message?: string;
 };
 
+type UpdateProfilePayload = {
+  email?: string;
+  full_name?: string;
+  phone?: string | null;
+  new_password?: string;
+};
+
 type AuthContextValue = {
   status: AuthStatus;
   token: string | null;
@@ -33,6 +40,7 @@ type AuthContextValue = {
   loginWithToken: (token: string, user?: AuthenticatedUser | null) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<AuthActionResult>;
+  updateProfile: (fields: UpdateProfilePayload) => Promise<AuthActionResult>;
 };
 
 const TOKEN_STORAGE_KEY = 'ttp-auth-token';
@@ -246,6 +254,61 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return { success: true };
   }, [token]);
 
+  const updateProfile = useCallback(async (fields: UpdateProfilePayload): Promise<AuthActionResult> => {
+    if (!normalizedBaseUrl) {
+      return { success: false, message: 'Set EXPO_PUBLIC_API_URL to enable this action.' };
+    }
+    if (!token) {
+      return { success: false, message: 'Not authenticated.' };
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      let response: Response;
+      try {
+        response = await fetch(`${normalizedBaseUrl}/appUsers/me`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(fields),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      let json: { message?: string } | null = null;
+      try {
+        json = await response.json() as { message?: string };
+      } catch { /* ignore */ }
+
+      if (!response.ok) {
+        return { success: false, message: json?.message ?? 'Failed to update profile. Please try again.' };
+      }
+
+      setUser((current) => {
+        if (!current) return current;
+        const updates: Partial<AuthenticatedUser> = {};
+        if (fields.email !== undefined) updates.email = fields.email;
+        if (fields.full_name !== undefined) updates.full_name = fields.full_name;
+        if (fields.phone !== undefined) updates.phone = fields.phone ?? undefined;
+        return { ...current, ...updates };
+      });
+
+      return { success: true };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        message: (error instanceof Error && error.name === 'AbortError')
+          ? 'The request timed out. Please check your connection and try again.'
+          : 'Unable to update profile right now. Please try again.',
+      };
+    }
+  }, [token]);
+
   const logout = useCallback(async () => {
     setStatus('checking');
     setUser(null);
@@ -268,8 +331,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       loginWithToken,
       logout,
       deleteAccount,
+      updateProfile,
     }),
-    [status, token, user, login, loginWithToken, logout, deleteAccount],
+    [status, token, user, login, loginWithToken, logout, deleteAccount, updateProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

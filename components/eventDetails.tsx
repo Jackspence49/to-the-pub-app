@@ -107,8 +107,8 @@ export default function EventDetails({
 						accessibilityRole={onPressLocation ? 'button' : undefined}
 						accessibilityLabel={onPressLocation ? `View ${locationLabel} details` : undefined}
 					>
-						<MaterialIcons name='location-on' size={24} color={palette.iconSelected} style={styles.icon} />
 						<View style={styles.venueTextBlock}>
+							<MaterialIcons name='location-on' size={24} color={palette.iconSelected} style={styles.icon} />
 							<Text style={[styles.sectionValue, onPressLocation ? styles.barName : null, { color: palette.cardTitle }]}>
 								{locationLabel}
 							</Text>
@@ -116,22 +116,24 @@ export default function EventDetails({
 					</TouchableOpacity>
 				) : null}
 				{addressLabel ? (
-					<View style={styles.addressBlock}>
-						<Text style={[styles.addressText, { color: palette.cardSubtitle }]}>
-							{addressLabel}
-						</Text>
-						{onPressOpenMap ? (
-							<TouchableOpacity
-								onPress={onPressOpenMap}
-								style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
-								activeOpacity={0.9}
-								accessibilityRole='button'
-								accessibilityLabel='Get Directions'
-							>
-								<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>Get Directions</Text>
-							</TouchableOpacity>
-						) : null}
-					</View>
+					<>
+						<View style={styles.addressBlock}>
+							<Text style={[styles.addressText, { color: palette.cardSubtitle }]}>
+								{addressLabel}
+							</Text>
+							{onPressOpenMap ? (
+								<TouchableOpacity
+									onPress={onPressOpenMap}
+									style={[styles.externalBtn, { backgroundColor: palette.actionButton }]}
+									activeOpacity={0.9}
+									accessibilityRole='button'
+									accessibilityLabel='Get Directions'
+								>
+									<Text style={[styles.externalBtnText, { color: palette.filterTextActive }]}>Get Directions</Text>
+								</TouchableOpacity>
+							) : null}
+						</View>
+					</>
 				) : null}
 			</View>
 
@@ -271,6 +273,8 @@ const createStyles = (palette: Palette, horizontalInset: number) => StyleSheet.c
 	},
 	venueTextBlock: {
 		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'center',
 	},
 	addressBlock: {
 		marginTop: 6,
@@ -280,6 +284,7 @@ const createStyles = (palette: Palette, horizontalInset: number) => StyleSheet.c
 		fontSize: 20,
 		fontWeight: '700',
 		marginBottom: 4,
+		textDecorationLine: 'underline',
 	},
 	addressText: {
 		fontSize: 16,

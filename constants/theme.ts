@@ -58,6 +58,10 @@ export const Colors = {
     successBackground: '#ecfccb',
     successBorder: '#84cc16',
     successText: '#3f6212',
+
+    //account page
+    LogOutText: '#212121',
+    deleteAccountText: '#B71C1C',
   },
   dark: {
     // Layout
@@ -110,6 +114,10 @@ export const Colors = {
     successBackground: '#1a2e05',
     successBorder: '#65a30d',
     successText: '#bef264',
+
+    //account page
+    LogOutText: '#F5F5F5',
+    deleteAccountText: '#FF5252',
   },
 };
 

@@ -18,7 +18,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <ThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ contentStyle: { backgroundColor: palette.background } }}>
+        <Stack screenOptions={{ contentStyle: { backgroundColor: palette.background }, headerBackTitle: '' }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="bar/[barId]" options={{ title: 'Bar Details' }} />
           <Stack.Screen name="event/[instanceId]" options={{ title: 'Event Details' }} />
