@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { Stack } from 'expo-router';
-import { LogOut, Pencil, Trash2, UserCircle } from 'lucide-react-native';
+import { LogOut, Trash2, UserCircle } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -210,7 +210,7 @@ export default function AccountScreen() {
              headerShadowVisible: false,
              headerRight: () => (
                <TouchableOpacity onPress={openEdit} hitSlop={12} style={styles.headerEditButton}>
-                 <Pencil size={20} color={palette.iconSelected} />
+                 <Text style={{ color: palette.iconSelected, fontSize: 16, fontWeight: '600' }}>Edit</Text>
                </TouchableOpacity>
              ),
             }}
