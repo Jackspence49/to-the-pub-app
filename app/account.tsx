@@ -1,6 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { LogOut, Trash2, UserCircle } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';
 import {
@@ -73,6 +73,7 @@ export default function AccountScreen() {
   const theme = (useColorScheme() ?? 'dark') as ThemeName;
   const palette = Colors[theme];
   const { user, logout, deleteAccount, updateProfile } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -170,6 +171,7 @@ export default function AccountScreen() {
     setIsLoggingOut(true);
     await logout();
     setIsLoggingOut(false);
+    router.replace('/login');
   };
 
   const handleDeleteAccount = () => {
@@ -186,6 +188,8 @@ export default function AccountScreen() {
             setIsDeletingAccount(false);
             if (!result.success) {
               Alert.alert('Error', result.message ?? 'Something went wrong. Please try again.');
+            } else {
+              router.replace('/login');
             }
           },
         },

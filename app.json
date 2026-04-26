@@ -13,12 +13,23 @@
       "bundleIdentifier": "com.yourname.tothepub",
       "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you."
+        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.yourname.tothepub"
     },
-    "plugins": ["expo-router", "expo-secure-store", "expo-web-browser"]
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a0125005-6e29-4982-a085-9910609100a2"
+      }
+    }
   }
 }
