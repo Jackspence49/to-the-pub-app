@@ -10,26 +10,15 @@
       "resizeMode": "contain"
     },
     "ios": {
-      "bundleIdentifier": "com.yourname.tothepub",
+      "bundleIdentifier": "com.tothepub.tothepubapp",
       "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you.",
-        "ITSAppUsesNonExemptEncryption": false
+        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you."
       }
     },
     "android": {
-      "package": "com.yourname.tothepub"
+      "package": "com.tothepub.tothepubapp"
     },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store",
-      "expo-web-browser"
-    ],
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "a0125005-6e29-4982-a085-9910609100a2"
-      }
-    }
+    "plugins": ["expo-router", "expo-secure-store", "expo-web-browser"]
   }
 }
