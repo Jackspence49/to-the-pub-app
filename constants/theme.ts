@@ -12,7 +12,7 @@ export const Colors = {
     container: '#FFFFFF',
     border: '#EEEEEE',
     icon: '#757575',
-    iconSelected: '#npm ',
+    iconSelected: '#1976D2',
     activePill: '#E3F2FD',
 
     // Filters
