@@ -13,12 +13,31 @@
       "bundleIdentifier": "com.tothepub.tothepubapp",
       "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you."
+        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.tothepub.tothepubapp"
     },
-    "plugins": ["expo-router", "expo-secure-store", "expo-web-browser"]
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "to-the-pub"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a0125005-6e29-4982-a085-9910609100a2"
+      }
+    }
   }
 }
