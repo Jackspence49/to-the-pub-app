@@ -2,7 +2,7 @@
   "expo": {
     "name": "To The Pub",
     "slug": "to-the-pub-app",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "splash": {

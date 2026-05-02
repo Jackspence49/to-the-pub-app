@@ -6,13 +6,25 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://to-the-pub-backend-production.up.railway.app/",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://3d0ef695ce14c55e07aa5be848c61e79@o4511321331269632.ingest.us.sentry.io/4511321335005184"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://to-the-pub-backend-production.up.railway.app/",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://3d0ef695ce14c55e07aa5be848c61e79@o4511321331269632.ingest.us.sentry.io/4511321335005184"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://to-the-pub-backend-production.up.railway.app/",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://3d0ef695ce14c55e07aa5be848c61e79@o4511321331269632.ingest.us.sentry.io/4511321335005184"
+      }
     }
   },
   "submit": {
