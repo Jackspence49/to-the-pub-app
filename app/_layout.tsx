@@ -9,22 +9,9 @@ import { AuthProvider } from '@/hooks/use-auth';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
-  dsn: 'https://3d0ef695ce14c55e07aa5be848c61e79@o4511321331269632.ingest.us.sentry.io/4511321335005184',
-
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  tracesSampleRate: 1.0,
   sendDefaultPii: true,
-
-  // Enable Logs
-  enableLogs: true,
-
-  // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
 });
 
 export const unstable_settings = {
