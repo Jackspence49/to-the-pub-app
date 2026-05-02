@@ -13,7 +13,6 @@
       "bundleIdentifier": "com.tothepub.tothepubapp",
       "buildNumber": "1",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "To The Pub uses your location to find bars and events near you.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -24,6 +23,12 @@
       "expo-router",
       "expo-secure-store",
       "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "To The Pub uses your location to find bars and events near you."
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {
