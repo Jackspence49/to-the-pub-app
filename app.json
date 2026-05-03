@@ -2,12 +2,14 @@
   "expo": {
     "name": "To The Pub",
     "slug": "to-the-pub-app",
+    "scheme": "to-the-pub",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "splash": {
       "image": "./assets/images/splash.png",
-      "resizeMode": "contain"
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
     },
     "ios": {
       "bundleIdentifier": "com.tothepub.tothepubapp",
