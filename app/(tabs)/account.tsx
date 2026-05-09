@@ -1,8 +1,9 @@
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { Stack, useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { LogOut, Trash2, UserCircle } from 'lucide-react-native';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,7 +18,6 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ThemeName = keyof typeof Colors;
 
@@ -74,7 +74,7 @@ export default function AccountScreen() {
   const palette = Colors[theme];
   const { user, logout, deleteAccount, updateProfile } = useAuth();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
@@ -99,6 +99,16 @@ export default function AccountScreen() {
     setShowPassword(false);
     setEditVisible(true);
   }, [user]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={openEdit} hitSlop={12} style={styles.headerEditButton}>
+          <Text style={{ color: palette.iconSelected, fontSize: 16, fontWeight: '600' }}>Edit</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, openEdit, palette.iconSelected]);
 
   const handleFieldChange = useCallback((field: keyof EditForm, value: string) => {
     setEditForm((prev) => ({ ...prev, [field]: value }));
@@ -203,23 +213,7 @@ export default function AccountScreen() {
 
   return (
     <>
-      <View style={[styles.container, { backgroundColor: palette.background, paddingTop: insets.top + 16 }]}>
-        <Stack.Screen
-           options={{
-             headerTransparent: true,
-             headerTitle: '',
-             headerBackTitle: '',
-             headerBackButtonDisplayMode: 'minimal',
-             headerTintColor: palette.cardSurface,
-             headerShadowVisible: false,
-             headerRight: () => (
-               <TouchableOpacity onPress={openEdit} hitSlop={12} style={styles.headerEditButton}>
-                 <Text style={{ color: palette.iconSelected, fontSize: 16, fontWeight: '600' }}>Edit</Text>
-               </TouchableOpacity>
-             ),
-            }}
-        />
-
+      <View style={[styles.container, { backgroundColor: palette.background }]}>
         <View style={styles.avatarSection}>
           <UserCircle size={72} color={palette.iconSelected} strokeWidth={1.25} />
           <Text style={[styles.name, { color: palette.text }]}>{displayName}</Text>
@@ -412,15 +406,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
+    paddingTop: 24,
     gap: 20,
   },
   headerEditButton: {
     paddingHorizontal: 4,
+    marginRight: 8,
   },
   avatarSection: {
     alignItems: 'center',
     gap: 8,
-    paddingTop: 24,
   },
   name: {
     fontSize: 22,

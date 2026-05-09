@@ -32,7 +32,6 @@ export default Sentry.wrap(function RootLayout() {
           <Stack.Screen name="bar-events/[barId]" options={{ title: 'Bar Events' }} />
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="register" options={{ headerShown: false }} />
-          <Stack.Screen name="account" options={{ title: 'Account' }} />
         </Stack>
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       </ThemeProvider>

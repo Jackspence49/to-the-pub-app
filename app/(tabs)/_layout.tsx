@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/theme';
 import { Redirect, Tabs } from 'expo-router';
+import { UserCircle } from 'lucide-react-native';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Custom components
 import { HapticTab } from '@/components/haptic-tab';
 import { LogoHeader } from '@/components/logo-header';
-import { ProfileButton } from '@/components/profile-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 // Custom hooks for theming and authentication
@@ -49,7 +49,6 @@ export default function TabLayout() {
         },
         headerShown: true,
         headerTitle: () => <LogoHeader />,
-        headerRight: () => <ProfileButton />,
         headerTitleAlign: 'left',
         headerTitleContainerStyle: {
           alignItems: 'flex-start',
@@ -85,6 +84,13 @@ export default function TabLayout() {
         options={{
           title: 'Search',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <UserCircle size={28} color={color} strokeWidth={1.5} />,
         }}
       />
     </Tabs>
